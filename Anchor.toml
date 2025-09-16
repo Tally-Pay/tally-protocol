@@ -1,0 +1,15 @@
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[toolchain]
+anchor_version = "0.30.1"
+
+[programs.localnet]
+subs = "11111111111111111111111111111111"
+
+[registry]
+url = "https://anchor.projectserum.com"
+
+[scripts]
+test = "pnpm test"
