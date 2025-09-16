@@ -47,23 +47,40 @@ tally/
 │  │     │  ├─ build_start_tx.rs       # ApproveChecked + start_subscription
 │  │     │  └─ build_cancel_tx.rs      # Revoke + cancel_subscription
 │  │     └─ utils/                     # load IDL, memo, token program detection
-│  ├─ dashboard/                       # Merchant dashboard (Rust: Axum + Askama + HTMX)
+│  ├─ dashboard/                       # Merchant dashboard (Axum + Askama + HTMX + Basecoat UI; no TS)
 │  │  ├─ Cargo.toml
 │  │  └─ src/
-│  │     ├─ main.rs                    # auth, routing, templates
-│  │     ├─ views/                     # Askama templates
-│  │     ├─ controllers/
+│  │     ├─ main.rs                    # auth, routing, template resolution, static assets
+│  │     ├─ views/                     # Askama templates (.html)
+│  │     │  ├─ layout.html             # base layout (Basecoat tokens)
+│  │     │  ├─ partials/               # reusable partials (cards, tables, modals)
+│  │     │  ├─ overview.html
+│  │     │  ├─ plans.html
+│  │     │  ├─ subscriptions.html
+│  │     │  ├─ actions.html
+│  │     │  ├─ webhooks.html
+│  │     │  ├─ api_keys.html
+│  │     │  ├─ team.html
+│  │     │  ├─ audit_log.html
+│  │     │  └─ settings.html
+│  │     ├─ controllers/               # server-rendered pages & htmx endpoints
 │  │     │  ├─ overview.rs
 │  │     │  ├─ plans.rs
 │  │     │  ├─ subscriptions.rs
 │  │     │  ├─ actions.rs
 │  │     │  ├─ webhooks.rs
 │  │     │  ├─ api_keys.rs
-│  │     │  ├· team.rs
-│  │     │  ├· audit_log.rs
-│  │     │  └· settings.rs
-│  │     └─ models/                    # Off‑chain models & index snapshots
-│  └─ keeper/                          # Off‑chain renewals
+│  │     │  ├─ team.rs
+│  │     │  ├─ audit_log.rs
+│  │     │  └─ settings.rs
+│  │     ├─ models/                    # off‑chain models & index snapshots
+│  │     └─ public/                    # static assets served by Axum
+│  │        ├─ css/
+│  │        │  ├─ basecoat.css         # vendored Basecoat build (no TS)
+│  │        │  └─ dashboard.css        # minimal overrides (CSS variables)
+│  │        └─ js/
+│  │           └─ htmx.min.js          # vendored htmx (no frameworks)
+│  └─ keeper/                          # Off‑chain renewals                          # Off‑chain renewals
 │     ├─ Cargo.toml
 │     └─ src/
 │        ├─ main.rs                    # loop: find_due → renew → backoff
@@ -85,7 +102,7 @@ tally/
 * **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
 * **`crates/tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
 * **`services/actions-api`**: Rust Axum service serving Actions metadata and base64 transactions; depends on `tally-sdk`.
-* **`services/dashboard`**: Rust Axum + Askama + HTMX server for merchant UI; reads on‑chain and index snapshots.
+* **`services/dashboard`**: Rust Axum + Askama + HTMX server using **Basecoat UI** components (no TypeScript); server‑rendered templates and htmx partials; reads on‑chain and index snapshots.
 * **`services/keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
 * **`bins/tally-cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
 * **`tests`**: Integration tests for program, keeper, and Actions API.
@@ -97,16 +114,6 @@ tally/
 We keep the model lean: a single on‑chain program (**tally‑subs**) tracks `Merchant`, `Plan`, and `Subscription` accounts; a Rust Actions service composes wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions; the **tally‑sdk** crate centralizes IDL/PDA logic used by both **Actions API** and **tally‑cli**; a minimal **Merchant Dashboard** gives KPIs and link generation without TypeScript.
 
 **Outcome:** A merchant can post a Tally Blink for "\$5 / 30 days" and collect recurring USDC with clear receipts, low friction, and no custom frontend.
-
----
-
-## 1) Executive summary (pyramid principle)
-
-Creators and SaaS merchants on Solana need a simple way to sell recurring access without building a full checkout stack. This MVP ships a Blink‑native subscription flow that works anywhere links render: a user taps a Subscribe Blink, approves a bounded USDC allowance, is charged once immediately, and the off‑chain Keeper renews on schedule by pulling from the approved allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly.
-
-We keep the model lean: a single on‑chain program tracks `Merchant`, `Plan`, and `Subscription` accounts; Actions endpoints compose wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions. V2 can add Token‑2022 membership SFTs or Transfer Hooks, but the MVP delivers value without them.
-
-**Outcome:** A merchant can post a Blink today for “\$5 / 30 days” and collect recurring USDC with clear receipts, low friction, and no custom frontend.
 
 ---
 
@@ -446,7 +453,7 @@ We implement the Solana Actions spec directly in Rust (Axum). Responses mirror t
 ## 13) Testing strategy
 
 * **Unit:** program constraints, error codes, rounding checks.
-* **E2E localnet:** Approve → Start → Keeper Renew → Cancel with supertest against Actions API; explorer assertions for two USDC transfers.
+* **E2E localnet:** Approve → Start → Keeper Renew → Cancel with `reqwest` (Rust) against Actions API; explorer assertions for two USDC transfers.
 * **Property tests:** fee math and amount bounds.
 * **Chaos:** intermittent RPC failures; delayed Keeper; allowance set to 1×, 0.5×; revoked delegate mid‑grace.
 
@@ -476,7 +483,7 @@ Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 �
 2. **Jito tips:** off by default or minimal default (e.g., 5k lamports) for renewal reliability?
 3. **Memo format:** standardize action identity memos for analytics.
 4. **Wallet matrix:** which wallets are must‑have for devnet demo?
-5. **Dashboard:** include a tiny read‑only Next.js dashboard in MVP or defer to V2?
+5. **Dashboard:** confirm **Basecoat + HTMX** only; no SPA/Next.js.
 
 ---
 
@@ -502,7 +509,7 @@ Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 �
 
 ## 8) Merchant Dashboard (scope & MVP)
 
-**Stack:** Rust (Axum) + Askama templates + HTMX (no TypeScript). Auth via wallet‑sign message (SIWS‑style) with session cookie; optional email magic link for teammates. Reads on‑chain via `tally-sdk`; maintains a lightweight index (SQLite/Postgres) of plan/subscription snapshots and webhook deliveries.
+**Stack:** Rust (Axum) + Askama templates + **HTMX** + **Basecoat UI components** (no TypeScript). Server‑side template resolution; htmx drives partial updates (no SPA/CSR). Auth via wallet‑sign message (SIWS‑style) with session cookie; optional email magic link for teammates. Reads on‑chain via `tally-sdk`; maintains a lightweight index (SQLite/Postgres) of plan/subscription snapshots and webhook deliveries.
 
 **Primary sections & routes:**
 
@@ -516,6 +523,20 @@ Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 �
 * **/audit-log** — immutable activity log (who/what/when; IP/fingerprint), export.
 * **/settings** — merchant profile, fee account, branding, environment toggle (devnet/mainnet).
 
+**UI kit & patterns (Basecoat + HTMX):**
+
+* **Components**: buttons, cards, tables (sticky header), forms, badges, chips, alerts/toasts, modals/drawers; all styled with Basecoat tokens.
+* **Layouts**: responsive 12‑col grid, container widths (sm/md/lg), sticky top‑nav.
+* **HTMX**: `hx-get`/`hx-post` for inline create/update; `hx-swap="outerHTML"` for table rows; confirm dialogs for destructive actions; spinners via `aria-busy`.
+* **Accessibility**: focus states, `aria-live` for toasts, semantic headings; color‑contrast ≥ AA.
+* **No JS build**: only `public/js/htmx.min.js`; no TypeScript/webpack.
+
+**HTMX endpoints (examples):**
+
+* `POST /x/plans` → returns `<tr>` row partial; `DELETE /x/plans/:id` → removes row.
+* `POST /x/subs/:id/cancel` → returns updated status badge + toast.
+* `POST /x/webhooks/test` → renders delivery result card in place.
+
 **Off‑chain models:** Merchant, ApiKey, WebhookEndpoint, WebhookDelivery, TeamMember, AuditEvent, Index (plan/sub snapshots).
 
 **DX flows:**
@@ -526,7 +547,9 @@ Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 �
 
 **MVP Done when:**
 
-* Merchant can create a plan, copy a Subscribe Blink, and view live KPIs and failed renewals with reasons.
+* Merchant creates a plan, copies a Subscribe Blink, and sees live KPIs and failed renewals with reasons.
+* No SPA/TypeScript pipeline; pages render server‑side; all interactivity via htmx requests.
+* Basecoat components render consistently across /overview, /plans, /subscriptions.
 
 ---
 

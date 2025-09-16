@@ -17,9 +17,12 @@ anchor-client = "0.31.1"
 anchor-spl = "0.31.1"
 solana-sdk = "2.1"
 solana-program = "2.1"
+solana-client = "2.1"
+solana-account-decoder = "2.1"
 spl-token = "6.0"
 spl-token-2022 = "4.0"
 spl-associated-token-account = "4.0"
+spl-memo = "5.0"
 anyhow = "1"
 thiserror = "2.0"
 base64 = "0.22"
@@ -37,3 +40,48 @@ askama = "0.12"
 
 [profile.release]
 overflow-checks = true
+
+[workspace.lints.rust]
+# Forbid unsafe code across entire workspace
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+# Critical safety denials following Solana SDK patterns
+default_trait_access = "deny"
+arithmetic_side_effects = "deny"
+manual_let_else = "deny"
+used_underscore_binding = "deny"
+
+# Safety-critical lints that prevent unsafe code patterns
+undocumented_unsafe_blocks = "forbid"
+multiple_unsafe_ops_per_block = "forbid"
+missing_safety_doc = "forbid"
+
+# Code quality lints to enforce idiomatic Rust
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+# Performance lints
+perf = { level = "warn", priority = -1 }
+inefficient_to_string = "warn"
+
+# Cargo-specific lints
+cargo = { level = "warn", priority = -1 }
+
+# Allow some cargo lints that are too noisy for a workspace
+multiple_crate_versions = "allow"
+redundant_feature_names = "warn"
+
+# Allow some pedantic lints that can be overly restrictive
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+# Allow cargo metadata lints for internal packages
+cargo_common_metadata = "allow"
+# Allow derive macro style issues
+single_component_path_imports = "allow"
+needless_continue = "allow"
+# Allow negative feature names for Anchor conventions
+negative_feature_names = "allow"
