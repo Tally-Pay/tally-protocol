@@ -1,29 +1,26 @@
-# Product Requirements Document — Blink‑Native Subscriptions (Solo‑Friendly MVP)
+# Product Requirements Document — Tally (Blink‑Native Subscriptions, Solo‑Friendly MVP)
 
 **Doc owner:** Roland Rodriguez (Govcraft)
-**Date:** 2025‑09‑15
-**Status:** Draft v1.0
-**Repo:** `solana-subscriptions/` (full layout below)
+**Date:** 2025‑09‑16
+**Status:** Draft v1.1
+**Repo:** `tally/` (full layout below)
 
 ### Repository layout (authoritative)
 
 ```
-solana-subscriptions/
+tally/
 ├─ README.md
 ├─ .env.example
 ├─ Anchor.toml
 ├─ Cargo.toml                          # workspace
-├─ tailwind.config.ts                  # Tailwind v4 setup for HTMX fragments
-├─ packages/
-│  ├─ idl/                             # generated IDL JSON (build artifact, checked in)
-│  ├─ types/                           # shared TS types (Plans, Actions payloads)
-│  │  ├─ src/index.ts
-│  │  └─ package.json
-│  └─ sdk/                             # tiny TS client for Actions + onchain
-│     ├─ src/index.ts                  # load IDL/program, PDAs, ATAs, helpers
-│     └─ package.json
+├─ crates/
+│  ├─ tally-sdk/                       # Rust SDK used by Actions API & CLI
+│  │  ├─ Cargo.toml
+│  │  └─ src/lib.rs                    # IDL loader, PDAs/ATAs, tx builders, memo helpers
+│  └─ idl/
+│     └─ tally_subs.json               # generated IDL (checked in for SDK)
 ├─ programs/
-│  └─ subs/                            # Anchor program (subscriptions core)
+│  └─ tally-subs/                      # Anchor program (subscriptions core)
 │     ├─ Cargo.toml
 │     └─ src/
 │        ├─ lib.rs
@@ -36,46 +33,78 @@ solana-subscriptions/
 │        │  ├─ cancel_subscription.rs
 │        │  └─ admin_withdraw_fees.rs
 │        └─ events.rs
-├─ actions-api/                        # Solana Actions/Blinks server (Rust)
-│  ├─ Cargo.toml
-│  └─ src/
-│     ├─ main.rs                       # tower/axum server bootstrap + HTMX wiring
-│     ├─ routes.rs                     # GET/POST handlers for Blink actions + HTMX/Tailwind fragments
-│     └─ telemetry.rs                  # tracing subscriber + filters
-├─ keeper/                             # off-chain renewals “cron”
-│  ├─ Cargo.toml
-│  └─ src/
-│     ├─ main.rs                       # loop: find_due → renew → backoff
-│     ├─ fetch.rs                      # scans PDAs by next_renewal_at
-│     ├─ renew.rs                      # builds + sends renew tx
-│     └─ metrics.rs                    # Prometheus logs, alerts
-├─ cli/                                # quick merchant/dev commands
-│  ├─ Cargo.toml
-│  └─ src/main.rs                      # init-merchant, create-plan, list, etc.
+├─ services/
+│  ├─ actions-api/                     # Axum/Tower Solana Actions server (Rust)
+│  │  ├─ Cargo.toml
+│  │  └─ src/
+│  │     ├─ main.rs                    # router, CORS, actions.json
+│  │     ├─ routes/
+│  │     │  ├─ subscribe_get.rs
+│  │     │  ├─ subscribe_post.rs
+│  │     │  ├─ cancel_get.rs
+│  │     │  └─ cancel_post.rs
+│  │     ├─ builders/
+│  │     │  ├─ build_start_tx.rs       # ApproveChecked + start_subscription
+│  │     │  └─ build_cancel_tx.rs      # Revoke + cancel_subscription
+│  │     └─ utils/                     # load IDL, memo, token program detection
+│  ├─ dashboard/                       # Merchant dashboard (Rust: Axum + Askama + HTMX)
+│  │  ├─ Cargo.toml
+│  │  └─ src/
+│  │     ├─ main.rs                    # auth, routing, templates
+│  │     ├─ views/                     # Askama templates
+│  │     ├─ controllers/
+│  │     │  ├─ overview.rs
+│  │     │  ├─ plans.rs
+│  │     │  ├─ subscriptions.rs
+│  │     │  ├─ actions.rs
+│  │     │  ├─ webhooks.rs
+│  │     │  ├─ api_keys.rs
+│  │     │  ├· team.rs
+│  │     │  ├· audit_log.rs
+│  │     │  └· settings.rs
+│  │     └─ models/                    # Off‑chain models & index snapshots
+│  └─ keeper/                          # Off‑chain renewals
+│     ├─ Cargo.toml
+│     └─ src/
+│        ├─ main.rs                    # loop: find_due → renew → backoff
+│        ├─ fetch.rs                   # scans PDAs by next_renewal_at
+│        ├─ renew.rs                   # builds + sends renew tx
+│        └─ metrics.rs                 # Prometheus logs, alerts
+├─ bins/
+│  └─ tally-cli/                       # Rust clap CLI (merchant/dev commands)
+│     ├─ Cargo.toml
+│     └─ src/main.rs                   # init-merchant, create-plan, list, etc.
 └─ tests/
-   ├─ program.spec.ts                  # mocha/ava e2e in localnet
-   └─ keeper.spec.ts
+   ├─ program.rs                        # Rust integration tests (localnet)
+   ├─ keeper.rs
+   └─ actions_api.rs
 ```
 
 **Folder responsibilities**
 
-* **`programs/subs`**: single Anchor program implementing subscription logic using delegate‑based USDC transfers.
-* **`actions-api`**: Rust/tower service that serves Actions metadata, HTMX fragments styled with Basecoat + Tailwind v4, and prebuilt transactions.
-* **`keeper`**: renewal worker that scans due subscriptions and submits `renew_subscription` in batches.
-* **`packages/types`**: canonical TS types for accounts, API payloads, and events.
-* **`packages/sdk`**: lightweight client for loading the IDL, computing PDAs/ATAs, and building simple calls.
-* **`cli`**: developer/merchant utilities to initialize merchant, create plans, and inspect on‑chain state.
-* **`tests`**: program + keeper E2E/localnet tests.
-* **HTMX/Basecoat/Tailwind docs**: `htmx-docs.md` captures fragment conventions; Basecoat components live at https://basecoatui.com/, and Tailwind v4 utilities follow the official release guidance.
-* **`tailwind.config.ts`**: centralizes Tailwind v4 theme tokens layered over Basecoat primitives for HTMX snippets.
+* **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
+* **`crates/tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
+* **`services/actions-api`**: Rust Axum service serving Actions metadata and base64 transactions; depends on `tally-sdk`.
+* **`services/dashboard`**: Rust Axum + Askama + HTMX server for merchant UI; reads on‑chain and index snapshots.
+* **`services/keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
+* **`bins/tally-cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
+* **`tests`**: Integration tests for program, keeper, and Actions API.
+
+## 1) Executive summary (pyramid principle)
+
+**Tally** is a Blink‑native subscription engine for Solana. Merchants post a Subscribe Blink; a user approves a bounded USDC allowance and is charged once immediately; the Keeper renews on schedule by pulling from that allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly.
+
+We keep the model lean: a single on‑chain program (**tally‑subs**) tracks `Merchant`, `Plan`, and `Subscription` accounts; a Rust Actions service composes wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions; the **tally‑sdk** crate centralizes IDL/PDA logic used by both **Actions API** and **tally‑cli**; a minimal **Merchant Dashboard** gives KPIs and link generation without TypeScript.
+
+**Outcome:** A merchant can post a Tally Blink for "\$5 / 30 days" and collect recurring USDC with clear receipts, low friction, and no custom frontend.
 
 ---
 
 ## 1) Executive summary (pyramid principle)
 
-Creators and SaaS merchants on Solana need a simple way to sell recurring access without building a full checkout stack. This MVP ships a Blink‑native subscription flow that works anywhere links render: a user taps a Subscribe Blink, approves a bounded USDC allowance, is charged once immediately, and the off‑chain Keeper renews on schedule by pulling from the approved allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly. The brand name of the platform is Tally.
+Creators and SaaS merchants on Solana need a simple way to sell recurring access without building a full checkout stack. This MVP ships a Blink‑native subscription flow that works anywhere links render: a user taps a Subscribe Blink, approves a bounded USDC allowance, is charged once immediately, and the off‑chain Keeper renews on schedule by pulling from the approved allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly.
 
-We keep the model lean: a single on‑chain program named Tally tracks `Merchant`, `Plan`, and `Subscription` accounts; Actions endpoints compose wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper (Tally Keeper) renews due subscriptions. V2 can add Token‑2022 membership SFTs or Transfer Hooks, but the MVP delivers value without them.
+We keep the model lean: a single on‑chain program tracks `Merchant`, `Plan`, and `Subscription` accounts; Actions endpoints compose wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions. V2 can add Token‑2022 membership SFTs or Transfer Hooks, but the MVP delivers value without them.
 
 **Outcome:** A merchant can post a Blink today for “\$5 / 30 days” and collect recurring USDC with clear receipts, low friction, and no custom frontend.
 
@@ -139,13 +168,13 @@ This section is complete and self‑contained. It replaces any external checklis
 
 ### 5.1 Prereqs & Tooling (MVP)
 
-* \[MUST] **Toolchain**: Node 18+, pnpm, Rust stable, Anchor ≥ 0.30, Solana CLI ≥ 2.x.
-* \[MUST] **Localnet/devnet** workflows documented (`solana-test-validator` with pre‑minted USDC).
-* \[MUST] **.env** keys for Actions and Keeper (see §10).
-* \[SHOULD] Dockerfile/compose for Actions API; `anchor test` runs headless.
-* \[SHOULD] One‑command bootstrap scripts: `pnpm dev:local`, `make localnet-up`.
+* \[MUST] **Toolchain**: Rust stable, Anchor ≥ 0.30, Solana CLI ≥ 2.x, cargo-make (optional), justfile (optional).
+* \[MUST] **Localnet/devnet** workflows (`solana-test-validator` with pre‑minted USDC).
+* \[MUST] **.env** keys for Actions, Keeper, Dashboard, and CLI (see §10).
+* \[SHOULD] Dockerfiles for Actions, Keeper, Dashboard; `anchor test` runs headless.
+* \[SHOULD] One‑command bootstrap scripts: `make local-up`, `make demo`.
 
-**Done when**: a clean clone can run the Actions API and hit GET/POST against local validator.
+**Done when**: a clean clone can run `cargo run -p actions-api` and hit GET/POST endpoints against local validator.
 
 ### 5.2 On‑Chain Program (Anchor)
 
@@ -189,14 +218,27 @@ This section is complete and self‑contained. It replaces any external checklis
 * Exponential backoff; reason‑coded failures; optional Jito tips per tx.
 * Prometheus metrics: `subs_due_total`, `subs_renew_ok_total`, `subs_renew_fail_total{reason}`, `keeper_loops_total`, `rpc_errors_total`, `tip_lamports_sum`, latency histograms.
 
-### 5.7 SDK & Types
+### 5.7 Tally SDK (Rust)
 
-* `/packages/types` for canonical Typescript types.
-* `/packages/sdk` for IDL loading, PDA/ATA helpers, token program resolution, memo builders.
+* **Crate:** `crates/tally-sdk`
+* Responsibilities:
 
-### 5.8 CLI
+  * Load IDL and construct Anchor program clients.
+  * Compute PDAs (`Merchant`, `Plan`, `Subscription`) and ATAs.
+  * Detect token program (classic vs 2022) from mint and build `approve/transfer_checked` ix.
+  * Build **Approve → Start** and **Revoke → Cancel** transactions.
+  * Parse events and memos to structured receipts.
+* Consumers: `services/actions-api`, `bins/tally-cli`, and integration tests.
 
+**Done when**: Actions API & CLI compile solely against `tally-sdk`; no duplicated helpers.
+
+### 5.8 CLI (tally-cli)
+
+* **Crate:** `bins/tally-cli` (Rust, clap)
 * Commands: `init-merchant`, `create-plan`, `list-plans`, `list-subs`, `deactivate-plan`, `withdraw-fees` with `--json` output.
+* Uses `tally-sdk` for all chain interactions.
+
+**Done when**: Merchant demo can be completed end‑to‑end using CLI + Actions.
 
 ### 5.9 Data & Fees
 
@@ -242,126 +284,54 @@ This section is complete and self‑contained. It replaces any external checklis
 
 **Merchant setup**
 
-* The merchant initializes once: sets authority, USDC mint, merchant treasury ATA, and `platform_fee_bps` (0–1000).
-* A merchant can create multiple plans per merchant PDA using deterministic `plan_id` seeds.
-* A plan has `price_usdc`, `period_secs`, `grace_secs`, `name`, and `active`. Turning `active=false` stops new starts but does not touch existing subs.
+* Initialize merchant (authority, USDC mint, merchant treasury ATA, `platform_fee_bps`).
+* Create multiple plans per merchant PDA (`plan_id` seeds).
+* Plan fields: `price_usdc`, `period_secs`, `grace_secs`, `name`, `active`.
 
 **Start (approve + charge)**
 
-* POST Subscribe must return a single base64 transaction with:
-
-  1. SPL `ApproveChecked` delegating the user’s USDC ATA to the program PDA for `price * allowancePeriods` (default 3).
-  2. `start_subscription` that performs two token transfers via CPI as the delegate: `price - fee` to merchant treasury and `fee` to platform treasury.
-* The instruction sets `next_renewal_ts = now + period_secs` and emits a `Subscribed` event. Re‑submits within the same slot must not double‑charge.
+* Actions POST returns base64 transaction with SPL `ApproveChecked` (delegate = program PDA; allowance = `price × N`) then `start_subscription` (two transfers: merchant + platform).
+* Sets `next_renewal_ts = now + period_secs`; emits `Subscribed`; idempotent within slot.
 
 **Renew**
 
-* Only valid when `now >= next_renewal_ts` and `now <= next_renewal_ts + grace_secs` and `active=true`.
-* On success: same split transfer as start; update `next_renewal_ts += period_secs`, `renewals += 1`, `last_amount = price`. Emit `Renewed`.
+* Valid when due and within grace; on success updates timestamps, `renewals`, `last_amount`; emits `Renewed`.
 
 **Cancel**
 
-* Cancel marks `active=false` and emits `Canceled`. The Cancel Blink also includes a SPL `Revoke` so the delegate is removed in the same transaction.
+* Marks inactive and emits `Canceled`. Cancel Blink pairs SPL `Revoke` with `cancel_subscription`.
 
 **Admin withdraw fees**
 
-* Platform authority can move accumulated fees from platform ATA to treasury via `admin_withdraw_fees`.
+* Platform authority transfers USDC from platform ATA to treasury via `admin_withdraw_fees`.
 
 **Errors and reasons**
 
-* Use distinct program errors for: `InsufficientAllowance`, `InsufficientFunds`, `PastGrace`, `Inactive`, `WrongMint`, `BadSeeds`, and `InvalidPlan`.
+* Distinct program errors: `InsufficientAllowance`, `InsufficientFunds`, `PastGrace`, `Inactive`, `WrongMint`, `BadSeeds`, `InvalidPlan`.
 
 ---
 
-## 7) APIs (Actions/Blinks) — contract (complete)
+## 7) APIs (Actions/Blinks) — contract (complete, Rust)
+
+We implement the Solana Actions spec directly in Rust (Axum). Responses mirror the public schema used by wallets; no TypeScript dependency.
 
 ### 7.1 Discovery
 
-* Host `actions.json` at the site root with permissive CORS.
-* Example `actions.json` (reference template; final headers/syntax come from `@solana/actions`):
-
-```json
-{
-  "$schema": "https://unpkg.com/@solana/actions/schemas/metadata.json",
-  "name": "Blink Subscriptions",
-  "actions": [
-    { "path": "/api/actions/subscribe/:merchant/:plan", "methods": ["GET","POST"] },
-    { "path": "/api/actions/cancel/:merchant/:plan",    "methods": ["GET","POST"] }
-  ]
-}
-```
-
-* CORS: `Access-Control-Allow-Origin: *`, allow `GET, POST, OPTIONS`, allow `content-type`.
+* Serve `actions.json` at site root with permissive CORS (`*`).
+* Example content is unchanged; generated by the Rust service at startup.
 
 ### 7.2 Subscribe
 
-* **GET** `/api/actions/subscribe/:merchant/:plan`
-
-  * Returns: metadata object with fields like `title`, `icon`, `description`, and a primary action label (generated via `@solana/actions`).
-  * Example response:
-
-```json
-{
-  "title": "Subscribe to Pro ($5 / 30d)",
-  "icon": "https://cdn.example.com/pro-icon.png",
-  "description": "USDC recurring subscription handled by a secure delegate.",
-  "links": { "actions": [{ "label": "Subscribe", "href": "/api/actions/subscribe/9h.../pro" }] }
-}
-```
-
-* **POST** `/api/actions/subscribe/:merchant/:plan`
-
-  * Request body:
-
-```json
-{ "account": "F7u9...UserWalletPubkey" }
-```
-
-* Server responsibilities:
-
-  * Resolve program IDL and PDAs; compute subscriber USDC ATA; detect token program for `USDC_MINT`.
-  * Build one transaction with:
-
-    1. SPL `ApproveChecked` delegating allowance = `price_usdc × allowancePeriods` (default 3).
-    2. Anchor `start_subscription` instruction.
-  * Attach identity `Memo` (e.g., `subs:start:plan=pro`).
-* Response body:
-
-```json
-{ "transaction": "BASE64_SIGNABLE_TX", "message": "Subscribed to Pro" }
-```
+* **GET** `/api/actions/subscribe/:merchant/:plan` → metadata (`title`, `icon`, `description`, action label like “Subscribe \$5 / 30d”).
+* **POST** `/api/actions/subscribe/:merchant/:plan` → base64 transaction: `ApproveChecked` → `start_subscription` (+ optional `Memo`). Body: `{ account: <subscriberPubkey> }`.
 
 ### 7.3 Cancel
 
-* **GET** `/api/actions/cancel/:merchant/:plan`
+* **GET/POST** `/api/actions/cancel/:merchant/:plan` → base64 transaction: `Revoke` → `cancel_subscription` (+ optional `Memo`).
 
-```json
-{
-  "title": "Cancel Pro subscription",
-  "description": "Revokes allowance and deactivates your membership.",
-  "links": { "actions": [{ "label": "Cancel", "href": "/api/actions/cancel/9h.../pro" }] }
-}
-```
+### 7.4 Errors & limits
 
-* **POST** `/api/actions/cancel/:merchant/:plan`
-
-  * Request body: `{ "account": "<subscriberPubkey>" }`
-  * Builds a single transaction: SPL `Revoke` → Anchor `cancel_subscription` (+ `Memo`), and returns base64 payload.
-
-### 7.4 Errors
-
-* All endpoints return structured errors on failure:
-
-```json
-{ "code": "NO_USDC_ATA", "message": "Wallet has no USDC account", "hint": "Create ATA then retry" }
-```
-
-* Common codes: `NO_USDC_ATA`, `BAD_MERCHANT_OR_PLAN`, `SCHEMA_ERROR`, `BUILD_FAILED`, `RPC_UNAVAILABLE`.
-
-### 7.5 Headers & Limits
-
-* Rate limit suggestions: 60 req/min/IP for GET, 20 req/min/IP for POST.
-* Cache: allow GET metadata caching for 60s; never cache POST.
+* Structured errors `{ code, message, hint }`; suggested limits: 60/min GET, 20/min POST; GET cache 60s; POST no‑cache.
 
 ---
 
@@ -530,72 +500,85 @@ Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 �
 
 ---
 
-## 18) Bootstrap & runbook (copy/paste)
+## 8) Merchant Dashboard (scope & MVP)
 
-### 18.1 Prereqs
+**Stack:** Rust (Axum) + Askama templates + HTMX (no TypeScript). Auth via wallet‑sign message (SIWS‑style) with session cookie; optional email magic link for teammates. Reads on‑chain via `tally-sdk`; maintains a lightweight index (SQLite/Postgres) of plan/subscription snapshots and webhook deliveries.
 
-* Install Node 18+, pnpm, Rust stable, Anchor ≥ 0.30, Solana CLI ≥ 2.x.
+**Primary sections & routes:**
+
+* **/overview** — KPIs (MRR/ARR, active subs, churn, failed renewals), renewal calendar, latest webhooks.
+* **/plans** — create/update (name, interval, price, trial); publish on‑chain; versioning/deprecation; preview Action payloads.
+* **/subscriptions** — search/filter; cancel/renew; upgrade/downgrade; export CSV.
+* **/actions** — configure/share Blinks; generate one‑click links (subscribe/upgrade/cancel); devnet tester.
+* **/webhooks** — endpoints, secrets, event picker, test deliveries, retries, DLQ, signature docs.
+* **/api-keys** — scoped keys (read, write\:plans, write\:subs), rotation, last‑used metadata.
+* **/team** — invite members; roles: Owner, Admin, Developer, Finance, Support‑read.
+* **/audit-log** — immutable activity log (who/what/when; IP/fingerprint), export.
+* **/settings** — merchant profile, fee account, branding, environment toggle (devnet/mainnet).
+
+**Off‑chain models:** Merchant, ApiKey, WebhookEndpoint, WebhookDelivery, TeamMember, AuditEvent, Index (plan/sub snapshots).
+
+**DX flows:**
+
+1. Create plan → draft off‑chain → Anchor tx writes Plan PDA → index confirms → Action links available.
+2. Upgrade → dashboard issues Action with `to_plan` → user signs → Subscription PDA updated.
+3. Failed renewal → dashboard surfaces retry/cancel; Keeper reason codes displayed.
+
+**MVP Done when:**
+
+* Merchant can create a plan, copy a Subscribe Blink, and view live KPIs and failed renewals with reasons.
+
+---
+
+## 9) Bootstrap & runbook (copy/paste)
+
+### 9.1 Prereqs
+
+* Install Rust stable, Anchor ≥ 0.30, Solana CLI ≥ 2.x.
 * `solana config set --url localhost` (for localnet) or devnet as needed.
 
-### 18.2 Localnet USDC setup
+### 9.2 Localnet USDC setup
 
 ```bash
-solana-test-validator --reset --limit-ledger-size \
-  --bpf-program <placeholder> <placeholder> &
-# In a new shell:
+solana-test-validator --reset --limit-ledger-size &
 USDC_MINT=$(spl-token create-token --decimals 6 | awk '/Creating token/ {print $3}')
 USDC_ATA=$(spl-token create-account $USDC_MINT | awk '/Creating account/ {print $3}')
-spl-token mint $USDC_MINT 1000000000   # 1,000 USDC to your default keypair
+spl-token mint $USDC_MINT 1000000000   # 1,000 USDC
 ```
 
-### 18.3 Build & deploy program
+### 9.3 Build & deploy program
 
 ```bash
-anchor build
-anchor deploy
-PROGRAM_ID=$(solana address -k ./target/deploy/subs-keypair.json)
+anchor build && anchor deploy
+PROGRAM_ID=$(solana address -k ./target/deploy/tally_subs-keypair.json)
 ```
 
-Export `.env` for Actions and Keeper using values above.
-
-### 18.4 Merchant & plan via CLI
+### 9.4 Merchant & plan via tally-cli
 
 ```bash
-# Merchant treasury ATA for your USDC mint
 MERCHANT_TREASURY=$(spl-token create-account $USDC_MINT | awk '/Creating account/ {print $3}')
-# Init merchant (50 bps = 0.5%)
-cargo run -p cli -- init-merchant \
-  --authority $(solana address) \
-  --usdc $USDC_MINT \
-  --treasury $MERCHANT_TREASURY \
-  --fee-bps 50
-# Create $5 / 30d plan with 5d grace
-cargo run -p cli -- create-plan \
-  --merchant <MERCHANT_PDA> \
-  --id pro \
-  --price 5000000 \
-  --period 2592000 \
-  --grace 432000
+cargo run -p tally-cli -- init-merchant \
+  --authority $(solana address) --usdc $USDC_MINT \
+  --treasury $MERCHANT_TREASURY --fee-bps 50
+cargo run -p tally-cli -- create-plan \
+  --merchant <MERCHANT_PDA> --id pro --price 5000000 \
+  --period 2592000 --grace 432000
 ```
 
-### 18.5 Actions API
+### 9.5 Actions API
 
 ```bash
-export RUST_LOG=info
 cargo run -p actions-api
-# ensure SSL termination / CORS when fronting with nginx or fly.io
+# actions.json is served at /actions.json with CORS enabled
 ```
 
-* Subscribe Blink URL format:
+* Subscribe Blink URL:
 
 ```
 https://dial.to/?action=<url-encoded solana-action:https://YOURDOMAIN/api/actions/subscribe/<merchant>/<plan>>
 ```
 
-* HTML snippets use HTMX for interactivity with Basecoat + Tailwind v4 styling; reference `htmx-docs.md`, https://basecoatui.com/, and Tailwind v4 docs when extending UI responses.
-* Blink unfurls consume the Actions spec directly, so frontends can stay in Rust/HTML with HTMX—TypeScript helpers are optional.
-
-### 18.6 Keeper
+### 9.6 Keeper
 
 ```bash
 export RPC_URL=http://127.0.0.1:8899
@@ -608,7 +591,14 @@ export RETRY_BACKOFF_SECS=900
 cargo run -p keeper
 ```
 
-### 18.7 Demo validation
+### 9.7 Dashboard (dev)
+
+```bash
+cargo run -p dashboard
+# open http://localhost:8080 and sign with wallet
+```
+
+### 9.8 Demo validation
 
 * Post Subscribe Blink → sign one tx → verify two USDC transfers (merchant/platform) in explorer.
 * Warp time or tweak clock in tests → Keeper renews → balances update.
@@ -616,14 +606,14 @@ cargo run -p keeper
 
 ---
 
-## 19) Sequence diagrams (reference)
+## 10) Sequence diagrams (reference)
 
 **Subscribe (Approve → Start)**
 
 ```mermaid
 sequenceDiagram
     participant U as User Wallet
-    participant A as Actions API
+    participant A as Actions API (Rust)
     participant P as Program (Anchor)
     participant T as SPL Token Program
     U->>A: GET /api/actions/subscribe/:merchant/:plan
@@ -640,7 +630,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as User Wallet
-    participant A as Actions API
+    participant A as Actions API (Rust)
     participant P as Program (Anchor)
     participant T as SPL Token Program
     U->>A: GET /api/actions/cancel
@@ -654,7 +644,7 @@ sequenceDiagram
 
 ---
 
-## 20) Program errors (canonical)
+## 11) Program errors (canonical)
 
 * `InsufficientAllowance` (1001)
 * `InsufficientFunds` (1002)
