@@ -5,6 +5,7 @@ members = [
     "keeper",
     "cli",
     "actions-api",
+    "services/dashboard",
     "crates/tally-sdk"
 ]
 
