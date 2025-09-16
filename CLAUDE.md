@@ -10,7 +10,7 @@ This is a Solana-native subscription platform built as a monorepo with Rust and 
 
 **Anchor Program** (`programs/subs/`): Single on-chain program implementing subscription logic with accounts for Merchant, Plan, and Subscription. Uses SPL Token delegate approvals for secure recurring payments.
 
-**Actions API** (`actions-api/`): Rust/Tower HTTP service serving Solana Actions/Blinks endpoints. Returns prebuilt transactions for subscribe/cancel flows. Uses HTMX fragments with Basecoat UI and Tailwind v4 styling.
+**Actions API** (`actions-api/`): Unified Rust/Tower HTTP service serving both Solana Actions/Blinks endpoints and merchant dashboard functionality. Returns prebuilt transactions for subscribe/cancel flows. Includes wallet-based authentication, SurrealDB integration, and HTMX templates with Basecoat UI and Tailwind v4 styling.
 
 **Keeper** (`keeper/`): Off-chain renewal worker that scans for due subscriptions and submits `renew_subscription` transactions. Includes metrics, exponential backoff, and batch processing.
 
@@ -28,6 +28,8 @@ This is a Solana-native subscription platform built as a monorepo with Rust and 
 **Actions/Blinks Integration**: All user interactions happen via Solana Actions - no custom frontend required. Subscribe/Cancel Blinks can be shared anywhere links render.
 
 **Event-Driven Observability**: Program emits structured events (`Subscribed`, `Renewed`, `Canceled`, `PaymentFailed`) for off-chain monitoring and analytics.
+
+**Unified Dashboard Architecture**: The actions-api service serves dual purposes - public Solana Actions/Blinks for users and private merchant dashboard for subscription management. Dashboard features include wallet-based authentication, real-time analytics, plan management, and subscription monitoring through HTMX-powered interfaces.
 
 ## Development Commands
 

@@ -33,54 +33,35 @@ tally/
 │        │  ├─ cancel_subscription.rs
 │        │  └─ admin_withdraw_fees.rs
 │        └─ events.rs
-├─ services/
-│  ├─ actions-api/                     # Axum/Tower Solana Actions server (Rust)
-│  │  ├─ Cargo.toml
-│  │  └─ src/
-│  │     ├─ main.rs                    # router, CORS, actions.json
-│  │     ├─ routes/
-│  │     │  ├─ subscribe_get.rs
-│  │     │  ├─ subscribe_post.rs
-│  │     │  ├─ cancel_get.rs
-│  │     │  └─ cancel_post.rs
-│  │     ├─ builders/
-│  │     │  ├─ build_start_tx.rs       # ApproveChecked + start_subscription
-│  │     │  └─ build_cancel_tx.rs      # Revoke + cancel_subscription
-│  │     └─ utils/                     # load IDL, memo, token program detection
-│  ├─ dashboard/                       # Merchant dashboard (Axum + Askama + HTMX + Basecoat UI; no TS)
-│  │  ├─ Cargo.toml
-│  │  └─ src/
-│  │     ├─ main.rs                    # auth, routing, template resolution, static assets
-│  │     ├─ views/                     # Askama templates (.html)
-│  │     │  ├─ layout.html             # base layout (Basecoat tokens)
-│  │     │  ├─ partials/               # reusable partials (cards, tables, modals)
-│  │     │  ├─ overview.html
-│  │     │  ├─ plans.html
-│  │     │  ├─ subscriptions.html
-│  │     │  ├─ actions.html
-│  │     │  ├─ webhooks.html
-│  │     │  ├─ api_keys.html
-│  │     │  ├─ team.html
-│  │     │  ├─ audit_log.html
-│  │     │  └─ settings.html
-│  │     ├─ controllers/               # server-rendered pages & htmx endpoints
-│  │     │  ├─ overview.rs
-│  │     │  ├─ plans.rs
-│  │     │  ├─ subscriptions.rs
-│  │     │  ├─ actions.rs
-│  │     │  ├─ webhooks.rs
-│  │     │  ├─ api_keys.rs
-│  │     │  ├─ team.rs
-│  │     │  ├─ audit_log.rs
-│  │     │  └─ settings.rs
-│  │     ├─ models/                    # off‑chain models & index snapshots
-│  │     └─ public/                    # static assets served by Axum
-│  │        ├─ css/
-│  │        │  ├─ basecoat.css         # vendored Basecoat build (no TS)
-│  │        │  └─ dashboard.css        # minimal overrides (CSS variables)
-│  │        └─ js/
-│  │           └─ htmx.min.js          # vendored htmx (no frameworks)
-│  └─ keeper/                          # Off‑chain renewals                          # Off‑chain renewals
+├─ actions-api/                        # Unified Axum/Tower server (Solana Actions + Merchant Dashboard)
+│  ├─ Cargo.toml
+│  └─ src/
+│     ├─ main.rs                       # router, CORS, actions.json, dashboard routes
+│     ├─ routes/
+│     │  ├─ subscribe_get.rs
+│     │  ├─ subscribe_post.rs
+│     │  ├─ cancel_get.rs
+│     │  └─ cancel_post.rs
+│     ├─ dashboard/                    # Merchant dashboard module
+│     │  ├─ mod.rs                     # dashboard routing and state
+│     │  ├─ auth.rs                    # wallet-based authentication
+│     │  ├─ routes.rs                  # dashboard page handlers
+│     │  ├─ api.rs                     # HTMX API endpoints
+│     │  └─ templates.rs               # Askama template helpers
+│     ├─ builders/
+│     │  ├─ build_start_tx.rs          # ApproveChecked + start_subscription
+│     │  └─ build_cancel_tx.rs         # Revoke + cancel_subscription
+│     ├─ templates/                    # Askama templates (.html)
+│     │  ├─ actions/                   # Action metadata templates
+│     │  └─ dashboard/                 # Dashboard UI templates (Basecoat UI + HTMX)
+│     ├─ static/                       # Static assets served by Axum
+│     │  ├─ css/
+│     │  │  ├─ basecoat.css            # vendored Basecoat build (no TS)
+│     │  │  └─ dashboard.css           # minimal overrides (CSS variables)
+│     │  └─ js/
+│     │     └─ htmx.min.js             # vendored htmx (no frameworks)
+│     └─ utils/                        # load IDL, memo, token program detection
+├─ keeper/                             # Off‑chain renewals                          # Off‑chain renewals
 │     ├─ Cargo.toml
 │     └─ src/
 │        ├─ main.rs                    # loop: find_due → renew → backoff
@@ -101,17 +82,16 @@ tally/
 
 * **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
 * **`crates/tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
-* **`services/actions-api`**: Rust Axum service serving Actions metadata and base64 transactions; depends on `tally-sdk`.
-* **`services/dashboard`**: Rust Axum + Askama + HTMX server using **Basecoat UI** components (no TypeScript); server‑rendered templates and htmx partials; reads on‑chain and index snapshots.
-* **`services/keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
-* **`bins/tally-cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
+* **`actions-api`**: Unified Rust Axum service serving both Solana Actions metadata/transactions and merchant dashboard; includes wallet-based auth, SurrealDB integration, and HTMX-powered UI using **Basecoat UI** components (no TypeScript).
+* **`keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
+* **`cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
 * **`tests`**: Integration tests for program, keeper, and Actions API.
 
 ## 1) Executive summary (pyramid principle)
 
 **Tally** is a Blink‑native subscription engine for Solana. Merchants post a Subscribe Blink; a user approves a bounded USDC allowance and is charged once immediately; the Keeper renews on schedule by pulling from that allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly.
 
-We keep the model lean: a single on‑chain program (**tally‑subs**) tracks `Merchant`, `Plan`, and `Subscription` accounts; a Rust Actions service composes wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions; the **tally‑sdk** crate centralizes IDL/PDA logic used by both **Actions API** and **tally‑cli**; a minimal **Merchant Dashboard** gives KPIs and link generation without TypeScript.
+We keep the model lean: a single on‑chain program (**tally‑subs**) tracks `Merchant`, `Plan`, and `Subscription` accounts; a unified Rust Actions API service composes wallet‑safe transactions (Approve → Start, Revoke → Cancel) and serves the merchant dashboard; a small Rust Keeper renews due subscriptions; the **tally‑sdk** crate centralizes IDL/PDA logic used by both **Actions API** and **tally‑cli**; the integrated **Merchant Dashboard** provides KPIs and link generation through HTMX-powered interfaces without TypeScript.
 
 **Outcome:** A merchant can post a Tally Blink for "\$5 / 30 days" and collect recurring USDC with clear receipts, low friction, and no custom frontend.
 
