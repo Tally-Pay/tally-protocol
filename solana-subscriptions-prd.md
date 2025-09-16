@@ -73,9 +73,9 @@ solana-subscriptions/
 
 ## 1) Executive summary (pyramid principle)
 
-Creators and SaaS merchants on Solana need a simple way to sell recurring access without building a full checkout stack. This MVP ships a Blink‑native subscription flow that works anywhere links render: a user taps a Subscribe Blink, approves a bounded USDC allowance, is charged once immediately, and the off‑chain Keeper renews on schedule by pulling from the approved allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly.
+Creators and SaaS merchants on Solana need a simple way to sell recurring access without building a full checkout stack. This MVP ships a Blink‑native subscription flow that works anywhere links render: a user taps a Subscribe Blink, approves a bounded USDC allowance, is charged once immediately, and the off‑chain Keeper renews on schedule by pulling from the approved allowance. Cancel is one click via a Cancel Blink. Everything is standards‑based (Solana Actions, SPL Token delegate approvals) and wallet‑friendly. The brand name of the platform is Tally.
 
-We keep the model lean: a single on‑chain program tracks `Merchant`, `Plan`, and `Subscription` accounts; Actions endpoints compose wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper renews due subscriptions. V2 can add Token‑2022 membership SFTs or Transfer Hooks, but the MVP delivers value without them.
+We keep the model lean: a single on‑chain program named Tally tracks `Merchant`, `Plan`, and `Subscription` accounts; Actions endpoints compose wallet‑safe transactions (Approve → Start, Revoke → Cancel); a small Rust Keeper (Tally Keeper) renews due subscriptions. V2 can add Token‑2022 membership SFTs or Transfer Hooks, but the MVP delivers value without them.
 
 **Outcome:** A merchant can post a Blink today for “\$5 / 30 days” and collect recurring USDC with clear receipts, low friction, and no custom frontend.
 

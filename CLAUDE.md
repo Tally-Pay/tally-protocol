@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture Overview
 
-This is a Solana-native subscription platform built as a monorepo with Rust and TypeScript components. The system implements a delegate-based USDC subscription model where users approve bounded allowances for recurring payments.
+This is a Solana-native subscription platform built as a monorepo with Rust and TypeScript components. The system implements a delegate-based USDC subscription model where users approve bounded allowances for recurring payments. The name of the platform is Tally.
 
 ### Core Components
 
@@ -19,7 +19,7 @@ This is a Solana-native subscription platform built as a monorepo with Rust and 
 - `types/` - TypeScript types for accounts and API payloads
 - `sdk/` - Client helpers for loading IDL, computing PDAs/ATAs
 
-**CLI** (`cli/`): Developer utilities for merchant setup, plan creation, and state inspection.
+**CLI** (`cli/`): Developer utilities for merchant setup, plan creation, and state inspection. (tally-cli)
 
 ### Key Architectural Patterns
 
