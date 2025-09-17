@@ -3,4 +3,6 @@ node_modules/
 dist/
 .DS_Store
 .env
+.env.local
 test-ledger/
+.task/
