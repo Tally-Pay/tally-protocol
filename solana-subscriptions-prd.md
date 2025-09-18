@@ -61,7 +61,7 @@ tally/
 │     │  └─ js/
 │     │     └─ htmx.min.js             # vendored htmx (no frameworks)
 │     └─ utils/                        # load IDL, memo, token program detection
-├─ keeper/                             # Off‑chain renewals                          # Off‑chain renewals
+├─ tally-keeper/                       # Off‑chain renewals
 │     ├─ Cargo.toml
 │     └─ src/
 │        ├─ main.rs                    # loop: find_due → renew → backoff
@@ -74,7 +74,7 @@ tally/
 │     └─ src/main.rs                   # init-merchant, create-plan, list, etc.
 └─ tests/
    ├─ program.rs                        # Rust integration tests (localnet)
-   ├─ keeper.rs
+   ├─ tally-keeper.rs
    └─ actions_api.rs
 ```
 
@@ -83,9 +83,9 @@ tally/
 * **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
 * **`tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
 * **`actions-api`**: Unified Rust Axum service serving both Solana Actions metadata/transactions and merchant dashboard; includes wallet-based auth, SurrealDB integration, and HTMX-powered UI using **Basecoat UI** components (no TypeScript).
-* **`keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
+* **`tally-keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
 * **`cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
-* **`tests`**: Integration tests for program, keeper, and Actions API.
+* **`tests`**: Integration tests for program, tally-keeper, and Actions API.
 
 ## 1) Executive summary (pyramid principle)
 
@@ -453,7 +453,7 @@ We implement the Solana Actions spec directly in Rust (Axum). Responses mirror t
 
 * Small cohort merchant; alerting on; Jito tips optional; keep price low with explicit allowance text.
 
-Go/No‑Go checks: test coverage ≥ 80%; keeper dashboard stable; Actions p95 ≤ 400 ms; no critical audit blockers in a focused self‑review.
+Go/No‑Go checks: test coverage ≥ 80%; tally-keeper dashboard stable; Actions p95 ≤ 400 ms; no critical audit blockers in a focused self‑review.
 
 ---
 
@@ -591,7 +591,7 @@ export PLATFORM_USDC_TREASURY=<YOUR_PLATFORM_USDC_ATA>
 export JITO_TIP_LAMPORTS=0
 export RENEW_BATCH_SIZE=64
 export RETRY_BACKOFF_SECS=900
-cargo run -p keeper
+cargo run -p tally-keeper
 ```
 
 ### 9.7 Dashboard (dev)

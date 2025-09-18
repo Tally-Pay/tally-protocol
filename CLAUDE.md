@@ -18,7 +18,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 **Actions API** (`actions-api/`): Unified Rust/Axum HTTP service serving both Solana Actions/Blinks endpoints and merchant dashboard functionality. Returns prebuilt transactions for subscribe/cancel flows. Includes wallet-based authentication, SurrealDB integration, and HTMX templates with Basecoat UI and Tailwind v4 styling.
 
-**Keeper** (`keeper/`): Off-chain renewal worker that scans for due subscriptions and submits `renew_subscription` transactions. Includes metrics, exponential backoff, and batch processing.
+**Keeper** (`tally-keeper/`): Off-chain renewal worker that scans for due subscriptions and submits `renew_subscription` transactions. Includes metrics, exponential backoff, and batch processing.
 
 **Tally SDK** (`tally-sdk/`): Rust library providing IDL loading, PDA/ATA computation, transaction builders, and event parsing. Used by all Rust services.
 
@@ -89,7 +89,7 @@ cargo run --package actions-api
 
 **Keeper** (renewal worker):
 ```bash
-cargo run --package keeper
+cargo run --package tally-keeper
 # Runs renewal loop every 30 seconds
 ```
 
@@ -122,7 +122,7 @@ anchor test
 
 **Keeper Tests**:
 ```bash
-cargo test --package keeper
+cargo test --package tally-keeper
 ```
 
 ### Code Quality
