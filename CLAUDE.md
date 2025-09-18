@@ -113,11 +113,12 @@ cargo run --package tally-cli -- list-subs --plan <PLAN_PDA>
 anchor test
 ```
 
-**TypeScript Tests** (Vitest):
+**TypeScript Tests**:
 ```bash
-cd tests && pnpm test
-# or
-anchor test
+# Integration tests
+pnpm --filter @tally-subscriptions/tests test
+# or using Taskfile
+task test:integration
 ```
 
 **Keeper Tests**:
@@ -182,7 +183,7 @@ See `Taskfile.yml` for complete command reference.
 
 ## UI/Frontend Notes
 
-The system uses HTMX fragments for any web UI, styled with Basecoat UI components and Tailwind v4 utilities. Configuration is centralized in `tailwind.config.ts`. Reference `htmx-docs.md` for fragment conventions and https://basecoatui.com/ for component patterns.
+The system uses HTMX fragments for any web UI, styled with Basecoat UI components and Tailwind v4 utilities. Configuration is centralized in `tailwind.config.ts`. Reference `docs/htmx.md` for fragment conventions and https://basecoatui.com/ for component patterns.
 
 ## Monitoring and Observability
 
