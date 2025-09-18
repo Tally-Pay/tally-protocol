@@ -5,7 +5,7 @@ members = [
     "keeper",
     "tally-cli",
     "actions-api",
-    "crates/tally-sdk"
+    "tally-sdk"
 ]
 
 [workspace.package]

@@ -81,7 +81,7 @@ tally/
 **Folder responsibilities**
 
 * **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
-* **`crates/tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
+* **`tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
 * **`actions-api`**: Unified Rust Axum service serving both Solana Actions metadata/transactions and merchant dashboard; includes wallet-based auth, SurrealDB integration, and HTMX-powered UI using **Basecoat UI** components (no TypeScript).
 * **`keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
 * **`cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
@@ -207,7 +207,7 @@ This section is complete and self‑contained. It replaces any external checklis
 
 ### 5.7 Tally SDK (Rust)
 
-* **Crate:** `crates/tally-sdk`
+* **Crate:** `tally-sdk`
 * Responsibilities:
 
   * Load IDL and construct Anchor program clients.

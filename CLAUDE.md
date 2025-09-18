@@ -20,7 +20,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 **Keeper** (`keeper/`): Off-chain renewal worker that scans for due subscriptions and submits `renew_subscription` transactions. Includes metrics, exponential backoff, and batch processing.
 
-**Tally SDK** (`crates/tally-sdk/`): Rust library providing IDL loading, PDA/ATA computation, transaction builders, and event parsing. Used by all Rust services.
+**Tally SDK** (`tally-sdk/`): Rust library providing IDL loading, PDA/ATA computation, transaction builders, and event parsing. Used by all Rust services.
 
 **TypeScript Packages** (`packages/`):
 - `idl/` - Generated IDL JSON (build artifact, checked in)

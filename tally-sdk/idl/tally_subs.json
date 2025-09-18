@@ -1,0 +1,423 @@
+{
+  "address": "11111111111111111111111111111111",
+  "metadata": {
+    "name": "subs",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "admin_withdraw_fees",
+      "discriminator": [
+        236,
+        186,
+        208,
+        151,
+        204,
+        142,
+        168,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "AdminWithdrawFeesArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_subscription",
+      "discriminator": [
+        60,
+        139,
+        189,
+        242,
+        191,
+        208,
+        143,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CancelSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_plan",
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CreatePlanArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_merchant",
+      "discriminator": [
+        209,
+        11,
+        214,
+        195,
+        222,
+        157,
+        124,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitMerchantArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "renew_subscription",
+      "discriminator": [
+        45,
+        75,
+        154,
+        194,
+        160,
+        10,
+        111,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "RenewSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "start_subscription",
+      "discriminator": [
+        95,
+        237,
+        61,
+        140,
+        51,
+        173,
+        218,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "subscriber",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "StartSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Merchant",
+      "discriminator": [
+        71,
+        235,
+        30,
+        40,
+        231,
+        21,
+        32,
+        64
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "SubscriptionCanceled",
+      "discriminator": [
+        70,
+        219,
+        19,
+        123,
+        27,
+        219,
+        19,
+        197
+      ]
+    },
+    {
+      "name": "SubscriptionRenewed",
+      "discriminator": [
+        107,
+        68,
+        229,
+        211,
+        63,
+        57,
+        134,
+        149
+      ]
+    },
+    {
+      "name": "SubscriptionStarted",
+      "discriminator": [
+        178,
+        195,
+        63,
+        228,
+        79,
+        5,
+        5,
+        70
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminWithdrawFeesArgs",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "CancelSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreatePlanArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitMerchantArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Merchant",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RenewSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StartSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCanceled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionRenewed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

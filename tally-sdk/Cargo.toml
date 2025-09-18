@@ -1,0 +1,38 @@
+[package]
+name = "tally-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK for the Tally Solana subscriptions platform"
+authors = ["Tally Team"]
+license = "MIT"
+repository = "https://github.com/tally-team/solana-subscriptions"
+
+[lints]
+workspace = true
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-client = { workspace = true }
+anchor-spl = { workspace = true }
+solana-sdk = { workspace = true }
+solana-program = { workspace = true }
+spl-token = { workspace = true }
+spl-token-2022 = { workspace = true }
+spl-associated-token-account = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+borsh = { workspace = true }
+dirs = "6.0.0"
+solana-client.workspace = true
+solana-account-decoder.workspace = true
+chrono = { version = "0.4.42", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3.22.0"
+tokio = { workspace = true, features = ["test-util"] }
+
+[features]
+default = []
