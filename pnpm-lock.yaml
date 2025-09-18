@@ -6,7 +6,7 @@ settings:
 
 importers:
 
-  packages/sdk:
+  tally-pkgs/sdk:
     dependencies:
       '@solana/web3.js':
         specifier: ^1.90.0
@@ -40,7 +40,7 @@ importers:
         specifier: ^5.0.0
         version: 5.9.2
 
-  packages/types:
+  tally-pkgs/types:
     devDependencies:
       eslint:
         specifier: ^8.0.0

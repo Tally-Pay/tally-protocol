@@ -22,7 +22,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 **Tally SDK** (`tally-sdk/`): Rust library providing IDL loading, PDA/ATA computation, transaction builders, and event parsing. Used by all Rust services.
 
-**TypeScript Packages** (`packages/`):
+**TypeScript Packages** (`tally-pkgs/`):
 - `idl/` - Generated IDL JSON (build artifact, checked in)
 - `types/` - TypeScript types for accounts and API payloads
 - `sdk/` - Client helpers for loading IDL, computing PDAs/ATAs
