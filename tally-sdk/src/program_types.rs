@@ -186,7 +186,7 @@ impl Plan {
             .to_string()
     }
 
-    // Compatibility methods for actions-api migration
+    // Compatibility methods for tally-actions migration
 
     /// Get plan ID as string, removing null padding (alias for `plan_id_str`)
     #[must_use]

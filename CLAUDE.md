@@ -16,7 +16,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 **Anchor Program** (`tally-subs/`): Single on-chain program implementing subscription logic with accounts for Merchant, Plan, and Subscription. Uses SPL Token delegate approvals for secure recurring payments.
 
-**Actions API** (`actions-api/`): Unified Rust/Axum HTTP service serving both Solana Actions/Blinks endpoints and merchant dashboard functionality. Returns prebuilt transactions for subscribe/cancel flows. Includes wallet-based authentication, SurrealDB integration, and HTMX templates with Basecoat UI and Tailwind v4 styling.
+**Actions API** (`tally-actions/`): Unified Rust/Axum HTTP service serving both Solana Actions/Blinks endpoints and merchant dashboard functionality. Returns prebuilt transactions for subscribe/cancel flows. Includes wallet-based authentication, SurrealDB integration, and HTMX templates with Basecoat UI and Tailwind v4 styling.
 
 **Keeper** (`tally-keeper/`): Off-chain renewal worker that scans for due subscriptions and submits `renew_subscription` transactions. Includes metrics, exponential backoff, and batch processing.
 
@@ -37,7 +37,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 **Event-Driven Observability**: Program emits structured events (`Subscribed`, `Renewed`, `Canceled`, `PaymentFailed`) for off-chain monitoring and analytics.
 
-**Unified Dashboard Architecture**: The actions-api service serves dual purposes - public Solana Actions/Blinks for users and private merchant dashboard for subscription management. Dashboard features include wallet-based authentication, real-time analytics, plan management, and subscription monitoring through HTMX-powered interfaces.
+**Unified Dashboard Architecture**: The tally-actions service serves dual purposes - public Solana Actions/Blinks for users and private merchant dashboard for subscription management. Dashboard features include wallet-based authentication, real-time analytics, plan management, and subscription monitoring through HTMX-powered interfaces.
 
 ## Development Workflow
 
@@ -83,7 +83,7 @@ task env:setup-usdc
 
 **Actions API**:
 ```bash
-cargo run --package actions-api
+cargo run --package tally-actions
 # Serves on localhost:8787 by default
 ```
 

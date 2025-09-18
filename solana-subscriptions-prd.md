@@ -33,7 +33,7 @@ tally/
 │        │  ├─ cancel_subscription.rs
 │        │  └─ admin_withdraw_fees.rs
 │        └─ events.rs
-├─ actions-api/                        # Unified Axum/Tower server (Solana Actions + Merchant Dashboard)
+├─ tally-actions/                        # Unified Axum/Tower server (Solana Actions + Merchant Dashboard)
 │  ├─ Cargo.toml
 │  └─ src/
 │     ├─ main.rs                       # router, CORS, actions.json, dashboard routes
@@ -75,14 +75,14 @@ tally/
 └─ tests/
    ├─ program.rs                        # Rust integration tests (localnet)
    ├─ tally-keeper.rs
-   └─ actions_api.rs
+   └─ tally_actions.rs
 ```
 
 **Folder responsibilities**
 
 * **`programs/tally-subs`**: Anchor program implementing subscription logic using delegate‑based USDC transfers.
 * **`tally-sdk`**: Rust library to load IDL, compute PDAs/ATAs, build signable transactions, and parse events/memos.
-* **`actions-api`**: Unified Rust Axum service serving both Solana Actions metadata/transactions and merchant dashboard; includes wallet-based auth, SurrealDB integration, and HTMX-powered UI using **Basecoat UI** components (no TypeScript).
+* **`tally-actions`**: Unified Rust Axum service serving both Solana Actions metadata/transactions and merchant dashboard; includes wallet-based auth, SurrealDB integration, and HTMX-powered UI using **Basecoat UI** components (no TypeScript).
 * **`tally-keeper`**: Renewal worker that scans due subscriptions and submits `renew_subscription` in batches; exposes Prometheus.
 * **`cli`**: Rust clap utilities to initialize merchant, create plans, and inspect state via `tally-sdk`.
 * **`tests`**: Integration tests for program, tally-keeper, and Actions API.
@@ -161,7 +161,7 @@ This section is complete and self‑contained. It replaces any external checklis
 * \[SHOULD] Dockerfiles for Actions, Keeper, Dashboard; `anchor test` runs headless.
 * \[SHOULD] One‑command bootstrap scripts: `make local-up`, `make demo`.
 
-**Done when**: a clean clone can run `cargo run -p actions-api` and hit GET/POST endpoints against local validator.
+**Done when**: a clean clone can run `cargo run -p tally-actions` and hit GET/POST endpoints against local validator.
 
 ### 5.2 On‑Chain Program (Anchor)
 
@@ -215,7 +215,7 @@ This section is complete and self‑contained. It replaces any external checklis
   * Detect token program (classic vs 2022) from mint and build `approve/transfer_checked` ix.
   * Build **Approve → Start** and **Revoke → Cancel** transactions.
   * Parse events and memos to structured receipts.
-* Consumers: `services/actions-api`, `bins/tally-cli`, and integration tests.
+* Consumers: `services/tally-actions`, `bins/tally-cli`, and integration tests.
 
 **Done when**: Actions API & CLI compile solely against `tally-sdk`; no duplicated helpers.
 
@@ -571,7 +571,7 @@ cargo run -p tally-cli -- create-plan \
 ### 9.5 Actions API
 
 ```bash
-cargo run -p actions-api
+cargo run -p tally-actions
 # actions.json is served at /actions.json with CORS enabled
 ```
 
