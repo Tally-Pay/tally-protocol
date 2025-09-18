@@ -3,7 +3,7 @@ resolver = "2"
 members = [
     "programs/subs",
     "keeper",
-    "cli",
+    "tally-cli",
     "actions-api",
     "crates/tally-sdk"
 ]

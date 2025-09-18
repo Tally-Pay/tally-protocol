@@ -1,0 +1,28 @@
+[package]
+name = "tally-cli"
+version = "0.1.0"
+edition = "2021"
+
+[lints.rust]
+# Forbid unsafe code in CLI too
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Standard safety lints but allowing for clap derive macros
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+[[bin]]
+name = "tally-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4", features = ["derive"] }
+serde.workspace = true
+serde_json.workspace = true
+tally-sdk = { version = "0.1.0", path = "../crates/tally-sdk" }
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
