@@ -14,7 +14,7 @@ Tally implements a Blink-native subscription engine for Solana. The system allow
 
 ### Core Components
 
-**Anchor Program** (`programs/subs/`): Single on-chain program implementing subscription logic with accounts for Merchant, Plan, and Subscription. Uses SPL Token delegate approvals for secure recurring payments.
+**Anchor Program** (`tally-subs/`): Single on-chain program implementing subscription logic with accounts for Merchant, Plan, and Subscription. Uses SPL Token delegate approvals for secure recurring payments.
 
 **Actions API** (`actions-api/`): Unified Rust/Axum HTTP service serving both Solana Actions/Blinks endpoints and merchant dashboard functionality. Returns prebuilt transactions for subscribe/cancel flows. Includes wallet-based authentication, SurrealDB integration, and HTMX templates with Basecoat UI and Tailwind v4 styling.
 
