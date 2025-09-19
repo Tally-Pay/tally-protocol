@@ -1,3 +1,4 @@
 packages:
   - tally-pkgs/*
+  - tally-web3
   - tests
