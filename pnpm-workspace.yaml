@@ -2,3 +2,7 @@ packages:
   - tally-pkgs/*
   - tally-web3
   - tests
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - '@tailwindcss/oxide'

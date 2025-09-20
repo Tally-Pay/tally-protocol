@@ -60,6 +60,9 @@ importers:
       '@tailwindcss/cli':
         specifier: ^4.1.13
         version: 4.1.13
+      '@tailwindcss/vite':
+        specifier: ^4.1.13
+        version: 4.1.13(vite@5.4.20(@types/node@24.5.1)(lightningcss@1.30.1)(terser@5.44.0))
       basecoat-css:
         specifier: ^0.3.2
         version: 0.3.2
@@ -1084,6 +1087,11 @@ packages:
   '@tailwindcss/oxide@4.1.13':
     resolution: {integrity: sha512-CPgsM1IpGRa880sMbYmG1s4xhAy3xEt1QULgTJGQmZUeNgXFR7s1YxYygmJyBGtou4SyEosGAGEeYqY7R53bIA==}
     engines: {node: '>= 10'}
+
+  '@tailwindcss/vite@4.1.13':
+    resolution: {integrity: sha512-0PmqLQ010N58SbMTJ7BVJ4I2xopiQn/5i6nlb4JmxzQf8zcS5+m2Cv6tqh+sfDwtIdjoEnOvwsGQ1hkUi8QEHQ==}
+    peerDependencies:
+      vite: ^5.2.0 || ^6 || ^7
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -4059,6 +4067,13 @@ snapshots:
       '@tailwindcss/oxide-wasm32-wasi': 4.1.13
       '@tailwindcss/oxide-win32-arm64-msvc': 4.1.13
       '@tailwindcss/oxide-win32-x64-msvc': 4.1.13
+
+  '@tailwindcss/vite@4.1.13(vite@5.4.20(@types/node@24.5.1)(lightningcss@1.30.1)(terser@5.44.0))':
+    dependencies:
+      '@tailwindcss/node': 4.1.13
+      '@tailwindcss/oxide': 4.1.13
+      tailwindcss: 4.1.13
+      vite: 5.4.20(@types/node@24.5.1)(lightningcss@1.30.1)(terser@5.44.0)
 
   '@types/babel__core@7.20.5':
     dependencies:
