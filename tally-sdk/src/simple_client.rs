@@ -2,8 +2,8 @@
 
 use crate::{
     error::{Result, TallyError},
-    program_types::{Merchant, Plan, Subscription},
     program_id_string,
+    program_types::{Merchant, Plan, Subscription},
 };
 use anchor_client::solana_client::rpc_client::RpcClient;
 use anchor_lang::AnchorDeserialize;
@@ -448,12 +448,5 @@ mod tests {
     fn test_simple_client_creation() {
         let client = SimpleTallyClient::new("http://localhost:8899").unwrap();
         assert_eq!(client.program_id().to_string(), program_id_string());
-    }
-
-    #[test]
-    fn test_program_id() {
-        let client = SimpleTallyClient::new("http://localhost:8899").unwrap();
-        let expected = program_id();
-        assert_eq!(client.program_id(), expected);
     }
 }
