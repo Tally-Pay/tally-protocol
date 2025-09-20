@@ -9,3 +9,6 @@ test-ledger/
 
 # Log files
 *.log
+
+# Database data directory
+data/
