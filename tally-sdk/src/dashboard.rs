@@ -531,7 +531,7 @@ mod tests {
     #[test]
     fn test_dashboard_client_creation() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        assert_eq!(client.program_id().to_string(), crate::PROGRAM_ID);
+        assert_eq!(client.program_id().to_string(), crate::program_id_string());
     }
 
     #[test]

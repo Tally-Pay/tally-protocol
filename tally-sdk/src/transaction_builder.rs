@@ -8,7 +8,7 @@ use crate::{
         AdminWithdrawFeesArgs, CancelSubscriptionArgs, CreatePlanArgs, InitConfigArgs,
         InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs,
     },
-    PROGRAM_ID,
+    program_id,
 };
 use anchor_lang::prelude::*;
 #[allow(deprecated)]
@@ -167,7 +167,7 @@ impl StartSubscriptionBuilder {
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute required PDAs
@@ -305,7 +305,7 @@ impl CancelSubscriptionBuilder {
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute required PDAs
@@ -423,7 +423,7 @@ impl CreateMerchantBuilder {
         let platform_fee_bps = self.platform_fee_bps.unwrap_or(0);
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute required PDAs
@@ -510,7 +510,7 @@ impl CreatePlanBuilder {
         let plan_args = self.plan_args.ok_or("Plan args not set")?;
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute PDAs
@@ -610,7 +610,7 @@ impl AdminWithdrawFeesBuilder {
         let amount = self.amount.ok_or("Amount not set")?;
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute config PDA
@@ -689,7 +689,7 @@ impl InitConfigBuilder {
         let config_args = self.config_args.ok_or("Config args not set")?;
 
         let program_id = self.program_id.unwrap_or_else(|| {
-            Pubkey::try_from(PROGRAM_ID).expect("Default program ID should be valid")
+            program_id()
         });
 
         // Compute config PDA
@@ -811,7 +811,7 @@ mod tests {
         assert_eq!(instructions[0].program_id, spl_token::id());
 
         // Second instruction should be start_subscription
-        let program_id = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let program_id = program_id();
         assert_eq!(instructions[1].program_id, program_id);
     }
 
@@ -833,7 +833,7 @@ mod tests {
         assert_eq!(instructions[0].program_id, spl_token::id());
 
         // Second instruction should be cancel_subscription
-        let program_id = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let program_id = program_id();
         assert_eq!(instructions[1].program_id, program_id);
     }
 
@@ -851,7 +851,7 @@ mod tests {
             .build_instruction()
             .unwrap();
 
-        let program_id = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let program_id = program_id();
         assert_eq!(instruction.program_id, program_id);
         assert_eq!(instruction.accounts.len(), 8);
     }
@@ -882,7 +882,7 @@ mod tests {
             .build_instruction()
             .unwrap();
 
-        let program_id = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let program_id = program_id();
         assert_eq!(instruction.program_id, program_id);
         assert_eq!(instruction.accounts.len(), 5);
     }
@@ -977,7 +977,7 @@ mod tests {
             .build_instruction()
             .unwrap();
 
-        let program_id = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let program_id = program_id();
         assert_eq!(instruction.program_id, program_id);
         assert_eq!(instruction.accounts.len(), 3);
 

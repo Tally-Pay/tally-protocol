@@ -3,7 +3,7 @@
 use crate::{
     error::{Result, TallyError},
     program_types::*,
-    PROGRAM_ID,
+    program_id_string,
 };
 use anchor_client::{
     solana_client::rpc_client::RpcClient,
@@ -56,7 +56,7 @@ impl TallyClient {
         let client = Client::new_with_options(cluster, payer.clone(), CommitmentConfig::confirmed());
 
         // Get program ID
-        let program_id = Pubkey::from_str(PROGRAM_ID)
+        let program_id = Pubkey::from_str(&program_id_string())
             .map_err(|e| TallyError::Generic(format!("Invalid program ID: {e}")))?;
 
         // Create program interface (simplified without IDL for now)
@@ -100,7 +100,7 @@ impl TallyClient {
         let client = Client::new_with_options(cluster, payer_rc.clone(), CommitmentConfig::confirmed());
 
         // Get program ID
-        let program_id = Pubkey::from_str(PROGRAM_ID)
+        let program_id = Pubkey::from_str(&program_id_string())
             .map_err(|e| TallyError::Generic(format!("Invalid program ID: {e}")))?;
 
         // Create program interface (simplified without IDL for now)
@@ -343,20 +343,20 @@ mod tests {
     #[test]
     fn test_client_creation() {
         let client = TallyClient::new("http://localhost:8899".to_string()).unwrap();
-        assert_eq!(client.program_id().to_string(), PROGRAM_ID);
+        assert_eq!(client.program_id().to_string(), program_id_string());
     }
 
     #[test]
     fn test_client_with_payer() {
         let payer = Keypair::new();
         let client = TallyClient::new_with_payer("http://localhost:8899".to_string(), payer).unwrap();
-        assert_eq!(client.program_id().to_string(), PROGRAM_ID);
+        assert_eq!(client.program_id().to_string(), program_id_string());
     }
 
     #[test]
     fn test_program_id() {
         let client = TallyClient::new("http://localhost:8899".to_string()).unwrap();
-        let expected = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let expected = crate::program_id();
         assert_eq!(client.program_id(), expected);
     }
 }

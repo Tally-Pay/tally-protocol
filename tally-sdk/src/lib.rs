@@ -73,11 +73,20 @@ pub use solana_sdk;
 pub use spl_associated_token_account;
 pub use spl_token;
 
-/// The Tally subscription program ID
-pub const PROGRAM_ID: &str = "B9c98HcXYqVq2j48MLzFcbeDQbsUBMfYkDamLLsSHk1h";
+/// Default/fallback program ID (when no environment override is provided)
+pub const DEFAULT_PROGRAM_ID: &str = "Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV";
+
+/// Get the program ID as a string, checking environment first, then falling back to default
+#[must_use]
+pub fn program_id_string() -> String {
+    std::env::var("PROGRAM_ID").unwrap_or_else(|_| DEFAULT_PROGRAM_ID.to_string())
+}
 
 /// Get the program ID as a `Pubkey`
+///
+/// # Panics
+/// Panics if the program ID (from environment or default) is not a valid Pubkey
 #[must_use]
 pub fn program_id() -> solana_sdk::pubkey::Pubkey {
-    PROGRAM_ID.parse().expect("Valid program ID")
+    program_id_string().parse().expect("Valid program ID")
 }

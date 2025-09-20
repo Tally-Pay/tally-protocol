@@ -3,7 +3,7 @@
 use crate::{
     error::{Result, TallyError},
     program_types::{Merchant, Plan, Subscription},
-    PROGRAM_ID,
+    program_id_string,
 };
 use anchor_client::solana_client::rpc_client::RpcClient;
 use anchor_lang::AnchorDeserialize;
@@ -37,7 +37,7 @@ impl SimpleTallyClient {
     /// Returns an error if the program ID cannot be parsed or client creation fails
     pub fn new(cluster_url: &str) -> Result<Self> {
         let rpc_client = RpcClient::new_with_commitment(cluster_url, CommitmentConfig::confirmed());
-        let program_id = Pubkey::from_str(PROGRAM_ID)
+        let program_id = Pubkey::from_str(&program_id_string())
             .map_err(|e| TallyError::Generic(format!("Invalid program ID: {e}")))?;
 
         Ok(Self {
@@ -447,13 +447,13 @@ mod tests {
     #[test]
     fn test_simple_client_creation() {
         let client = SimpleTallyClient::new("http://localhost:8899").unwrap();
-        assert_eq!(client.program_id().to_string(), PROGRAM_ID);
+        assert_eq!(client.program_id().to_string(), program_id_string());
     }
 
     #[test]
     fn test_program_id() {
         let client = SimpleTallyClient::new("http://localhost:8899").unwrap();
-        let expected = Pubkey::from_str(PROGRAM_ID).unwrap();
+        let expected = program_id();
         assert_eq!(client.program_id(), expected);
     }
 }

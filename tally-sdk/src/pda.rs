@@ -1,6 +1,6 @@
 //! Program Derived Address (PDA) computation utilities
 
-use crate::{error::Result, PROGRAM_ID};
+use crate::{error::Result, program_id_string};
 use solana_sdk::pubkey::Pubkey;
 
 /// Compute the Merchant PDA
@@ -14,7 +14,7 @@ use solana_sdk::pubkey::Pubkey;
 /// # Errors
 /// Returns an error if the program ID cannot be parsed or PDA computation fails
 pub fn merchant(authority: &Pubkey) -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(merchant_with_program_id(authority, &program_id))
 }
 
@@ -27,7 +27,7 @@ pub fn merchant(authority: &Pubkey) -> Result<(Pubkey, u8)> {
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn merchant_address(authority: &Pubkey) -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(merchant_address_with_program_id(authority, &program_id))
 }
 
@@ -68,7 +68,7 @@ pub fn merchant_address_with_program_id(authority: &Pubkey, program_id: &Pubkey)
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn plan(merchant: &Pubkey, plan_id: &[u8]) -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(plan_with_program_id(merchant, plan_id, &program_id))
 }
 
@@ -82,7 +82,7 @@ pub fn plan(merchant: &Pubkey, plan_id: &[u8]) -> Result<(Pubkey, u8)> {
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn plan_address(merchant: &Pubkey, plan_id: &[u8]) -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(plan_address_with_program_id(merchant, plan_id, &program_id))
 }
 
@@ -133,7 +133,7 @@ pub fn plan_address_with_program_id(
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn plan_from_string(merchant: &Pubkey, plan_id: &str) -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(plan_from_string_with_program_id(
         merchant,
         plan_id,
@@ -151,7 +151,7 @@ pub fn plan_from_string(merchant: &Pubkey, plan_id: &str) -> Result<(Pubkey, u8)
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn plan_address_from_string(merchant: &Pubkey, plan_id: &str) -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(plan_address_from_string_with_program_id(
         merchant,
         plan_id,
@@ -205,7 +205,7 @@ pub fn plan_address_from_string_with_program_id(
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn subscription(plan: &Pubkey, subscriber: &Pubkey) -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(subscription_with_program_id(plan, subscriber, &program_id))
 }
 
@@ -219,7 +219,7 @@ pub fn subscription(plan: &Pubkey, subscriber: &Pubkey) -> Result<(Pubkey, u8)> 
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn subscription_address(plan: &Pubkey, subscriber: &Pubkey) -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(subscription_address_with_program_id(
         plan,
         subscriber,
@@ -270,7 +270,7 @@ pub fn subscription_address_with_program_id(
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn config() -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(config_with_program_id(&program_id))
 }
 
@@ -280,7 +280,7 @@ pub fn config() -> Result<(Pubkey, u8)> {
 /// * `Ok(Pubkey)` - The config PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn config_address() -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(config_address_with_program_id(&program_id))
 }
 
@@ -318,7 +318,7 @@ pub fn config_address_with_program_id(program_id: &Pubkey) -> Pubkey {
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn delegate(merchant: &Pubkey) -> Result<(Pubkey, u8)> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(delegate_with_program_id(merchant, &program_id))
 }
 
@@ -331,7 +331,7 @@ pub fn delegate(merchant: &Pubkey) -> Result<(Pubkey, u8)> {
 /// * `Ok(Pubkey)` - The delegate PDA address
 /// * `Err(TallyError)` - If PDA computation fails
 pub fn delegate_address(merchant: &Pubkey) -> Result<Pubkey> {
-    let program_id = PROGRAM_ID.parse()?;
+    let program_id = program_id_string().parse()?;
     Ok(delegate_address_with_program_id(merchant, &program_id))
 }
 
@@ -519,7 +519,7 @@ mod tests {
         // Test with the actual program ID to ensure consistency
         let program_id_str = "B9c98HcXYqVq2j48MLzFcbeDQbsUBMfYkDamLLsSHk1h";
         let expected_program_id = Pubkey::from_str(program_id_str).unwrap();
-        let actual_program_id = PROGRAM_ID.parse().unwrap();
+        let actual_program_id = program_id_string().parse().unwrap();
 
         assert_eq!(expected_program_id, actual_program_id);
     }
