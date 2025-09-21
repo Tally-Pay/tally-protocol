@@ -6,7 +6,7 @@ use crate::{
     pda,
     program_types::{
         AdminWithdrawFeesArgs, CancelSubscriptionArgs, CreatePlanArgs, InitConfigArgs,
-        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs,
+        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdatePlanArgs,
     },
     program_id,
 };
@@ -60,6 +60,16 @@ pub struct CreatePlanBuilder {
     authority: Option<Pubkey>,
     payer: Option<Pubkey>,
     plan_args: Option<CreatePlanArgs>,
+    program_id: Option<Pubkey>,
+}
+
+/// Builder for update plan transactions
+#[derive(Clone, Debug, Default)]
+pub struct UpdatePlanBuilder {
+    authority: Option<Pubkey>,
+    payer: Option<Pubkey>,
+    plan_key: Option<Pubkey>,
+    update_args: Option<UpdatePlanArgs>,
     program_id: Option<Pubkey>,
 }
 
@@ -544,6 +554,107 @@ impl CreatePlanBuilder {
     }
 }
 
+impl UpdatePlanBuilder {
+    /// Create a new update plan builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the merchant authority
+    #[must_use]
+    pub const fn authority(mut self, authority: Pubkey) -> Self {
+        self.authority = Some(authority);
+        self
+    }
+
+    /// Set the transaction payer
+    #[must_use]
+    pub const fn payer(mut self, payer: Pubkey) -> Self {
+        self.payer = Some(payer);
+        self
+    }
+
+    /// Set the plan account key
+    #[must_use]
+    pub const fn plan_key(mut self, plan_key: Pubkey) -> Self {
+        self.plan_key = Some(plan_key);
+        self
+    }
+
+    /// Set the plan update arguments
+    #[must_use]
+    pub fn update_args(mut self, args: UpdatePlanArgs) -> Self {
+        self.update_args = Some(args);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant account data for validation
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `update_plan` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(self, merchant: &Merchant) -> Result<Instruction> {
+        let authority = self.authority.ok_or("Authority not set")?;
+        let plan_key = self.plan_key.ok_or("Plan key not set")?;
+        let update_args = self.update_args.ok_or("Update args not set")?;
+
+        // Validate that authority matches merchant authority
+        if authority != merchant.authority {
+            return Err(TallyError::Generic(
+                "Authority does not match merchant authority".to_string(),
+            ));
+        }
+
+        // Validate that at least one field is being updated
+        if !update_args.has_updates() {
+            return Err(TallyError::Generic(
+                "No updates specified in UpdatePlanArgs".to_string(),
+            ));
+        }
+
+        let program_id = self.program_id.unwrap_or_else(|| {
+            program_id()
+        });
+
+        // Compute required PDAs
+        let config_pda = pda::config_address_with_program_id(&program_id);
+        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
+
+        let accounts = vec![
+            AccountMeta::new_readonly(config_pda, false),   // config
+            AccountMeta::new(plan_key, false),              // plan (PDA, mutable)
+            AccountMeta::new_readonly(merchant_pda, false), // merchant
+            AccountMeta::new(authority, true),              // authority (signer)
+        ];
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "update_plan")
+            data.extend_from_slice(&[219, 200, 88, 176, 158, 63, 253, 127]);
+            borsh::to_writer(&mut data, &update_args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 impl AdminWithdrawFeesBuilder {
     /// Create a new admin withdraw fees builder
     #[must_use]
@@ -754,6 +865,12 @@ pub fn admin_withdraw_fees() -> AdminWithdrawFeesBuilder {
 #[must_use]
 pub fn init_config() -> InitConfigBuilder {
     InitConfigBuilder::new()
+}
+
+/// Create a plan update transaction builder
+#[must_use]
+pub fn update_plan() -> UpdatePlanBuilder {
+    UpdatePlanBuilder::new()
 }
 
 #[cfg(test)]
@@ -1017,5 +1134,137 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Config args not set"));
+    }
+
+    #[test]
+    fn test_update_plan_builder() {
+        let merchant = create_test_merchant();
+        let plan_key = Keypair::new().pubkey();
+
+        let update_args = UpdatePlanArgs::new()
+            .with_name("Updated Plan".to_string())
+            .with_active(false)
+            .with_price_usdc(10_000_000); // 10 USDC
+
+        let instruction = update_plan()
+            .authority(merchant.authority)
+            .plan_key(plan_key)
+            .update_args(update_args)
+            .build_instruction(&merchant)
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 4);
+
+        // Verify account structure
+        assert!(!instruction.accounts[0].is_signer); // config (readonly)
+        assert!(!instruction.accounts[0].is_writable); // config (readonly)
+        assert!(!instruction.accounts[1].is_signer); // plan (mutable, but not signer)
+        assert!(instruction.accounts[1].is_writable); // plan (mutable)
+        assert!(!instruction.accounts[2].is_signer); // merchant (readonly)
+        assert!(!instruction.accounts[2].is_writable); // merchant (readonly)
+        assert!(instruction.accounts[3].is_signer); // authority (signer)
+        assert!(instruction.accounts[3].is_writable); // authority (mutable for fees)
+    }
+
+    #[test]
+    fn test_update_plan_builder_missing_required_fields() {
+        let merchant = create_test_merchant();
+        let plan_key = Keypair::new().pubkey();
+        let update_args = UpdatePlanArgs::new().with_name("Test".to_string());
+
+        // Test missing authority
+        let result = update_plan()
+            .plan_key(plan_key)
+            .update_args(update_args.clone())
+            .build_instruction(&merchant);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Authority not set"));
+
+        // Test missing plan key
+        let result = update_plan()
+            .authority(merchant.authority)
+            .update_args(update_args)
+            .build_instruction(&merchant);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Plan key not set"));
+
+        // Test missing update args
+        let result = update_plan()
+            .authority(merchant.authority)
+            .plan_key(plan_key)
+            .build_instruction(&merchant);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Update args not set"));
+    }
+
+    #[test]
+    fn test_update_plan_builder_validation() {
+        let merchant = create_test_merchant();
+        let wrong_authority = Keypair::new().pubkey();
+        let plan_key = Keypair::new().pubkey();
+
+        // Test wrong authority
+        let update_args = UpdatePlanArgs::new().with_name("Test".to_string());
+        let result = update_plan()
+            .authority(wrong_authority)
+            .plan_key(plan_key)
+            .update_args(update_args)
+            .build_instruction(&merchant);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Authority does not match merchant authority"));
+
+        // Test empty update args
+        let empty_args = UpdatePlanArgs::new();
+        let result = update_plan()
+            .authority(merchant.authority)
+            .plan_key(plan_key)
+            .update_args(empty_args)
+            .build_instruction(&merchant);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("No updates specified"));
+    }
+
+    #[test]
+    fn test_update_plan_args_functionality() {
+        // Test UpdatePlanArgs builder pattern
+        let args = UpdatePlanArgs::new()
+            .with_name("New Plan Name".to_string())
+            .with_active(true)
+            .with_price_usdc(5_000_000)
+            .with_period_secs(2_592_000)
+            .with_grace_secs(432_000);
+
+        assert!(args.has_updates());
+        assert_eq!(args.name, Some("New Plan Name".to_string()));
+        assert_eq!(args.active, Some(true));
+        assert_eq!(args.price_usdc, Some(5_000_000));
+        assert_eq!(args.period_secs, Some(2_592_000));
+        assert_eq!(args.grace_secs, Some(432_000));
+
+        // Test name_bytes conversion
+        let name_bytes = args.name_bytes().unwrap();
+        let expected_name = "New Plan Name";
+        assert_eq!(&name_bytes[..expected_name.len()], expected_name.as_bytes());
+        // Check that the rest of the array is zero-padded
+        for &byte in &name_bytes[expected_name.len()..] {
+            assert_eq!(byte, 0);
+        }
+
+        // Test empty args
+        let empty_args = UpdatePlanArgs::new();
+        assert!(!empty_args.has_updates());
+        assert!(empty_args.name_bytes().is_none());
+
+        // Test default
+        let default_args = UpdatePlanArgs::default();
+        assert!(!default_args.has_updates());
     }
 }

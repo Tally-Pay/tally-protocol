@@ -117,6 +117,23 @@ pub struct RenewSubscriptionArgs {
     pub expected_renewal_ts: i64,
 }
 
+/// Arguments for updating a subscription plan
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+)]
+pub struct UpdatePlanArgs {
+    /// New plan display name (will be padded to 32 bytes)
+    pub name: Option<String>,
+    /// Whether plan accepts new subscriptions
+    pub active: Option<bool>,
+    /// New price in USDC microlamports (affects only new subscriptions)
+    pub price_usdc: Option<u64>,
+    /// New subscription period in seconds (with validation)
+    pub period_secs: Option<u64>,
+    /// New grace period for renewals in seconds (with validation)
+    pub grace_secs: Option<u64>,
+}
+
 /// Arguments for canceling a subscription
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
@@ -244,5 +261,82 @@ impl CreatePlanArgs {
         let len = name_bytes.len().min(32);
         bytes[..len].copy_from_slice(&name_bytes[..len]);
         bytes
+    }
+}
+
+impl UpdatePlanArgs {
+    /// Create a new `UpdatePlanArgs` with all fields None
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            name: None,
+            active: None,
+            price_usdc: None,
+            period_secs: None,
+            grace_secs: None,
+        }
+    }
+
+    /// Set the plan name
+    #[must_use]
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    /// Set the plan active status
+    #[must_use]
+    pub const fn with_active(mut self, active: bool) -> Self {
+        self.active = Some(active);
+        self
+    }
+
+    /// Set the plan price
+    #[must_use]
+    pub const fn with_price_usdc(mut self, price_usdc: u64) -> Self {
+        self.price_usdc = Some(price_usdc);
+        self
+    }
+
+    /// Set the plan period
+    #[must_use]
+    pub const fn with_period_secs(mut self, period_secs: u64) -> Self {
+        self.period_secs = Some(period_secs);
+        self
+    }
+
+    /// Set the plan grace period
+    #[must_use]
+    pub const fn with_grace_secs(mut self, grace_secs: u64) -> Self {
+        self.grace_secs = Some(grace_secs);
+        self
+    }
+
+    /// Check if any fields are set for update
+    #[must_use]
+    pub const fn has_updates(&self) -> bool {
+        self.name.is_some()
+            || self.active.is_some()
+            || self.price_usdc.is_some()
+            || self.period_secs.is_some()
+            || self.grace_secs.is_some()
+    }
+
+    /// Convert name string to padded 32-byte array if present
+    #[must_use]
+    pub fn name_bytes(&self) -> Option<[u8; 32]> {
+        self.name.as_ref().map(|name| {
+            let mut bytes = [0u8; 32];
+            let name_bytes = name.as_bytes();
+            let len = name_bytes.len().min(32);
+            bytes[..len].copy_from_slice(&name_bytes[..len]);
+            bytes
+        })
+    }
+}
+
+impl Default for UpdatePlanArgs {
+    fn default() -> Self {
+        Self::new()
     }
 }
