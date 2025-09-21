@@ -37,6 +37,7 @@ tower-http = { version = "0.5", features = ["trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 askama = "0.12"
+socketioxide = "0.14"
 
 [profile.release]
 overflow-checks = true
