@@ -13,6 +13,9 @@ use tally_sdk::{
 use tracing::info;
 
 /// Execute the init config command
+///
+/// # Errors
+/// Returns error if configuration initialization fails due to invalid parameters, network issues, or Solana program errors
 #[allow(clippy::cognitive_complexity, clippy::too_many_arguments)]
 pub async fn execute(
     tally_client: &SimpleTallyClient,

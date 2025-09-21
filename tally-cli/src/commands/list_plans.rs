@@ -14,6 +14,9 @@ pub enum OutputFormat {
 }
 
 /// Execute the list plans command
+///
+/// # Errors
+/// Returns error if plan listing fails due to network issues or invalid merchant PDA
 #[allow(clippy::cognitive_complexity)] // Complex data processing and formatting
 pub async fn execute(
     tally_client: &SimpleTallyClient,

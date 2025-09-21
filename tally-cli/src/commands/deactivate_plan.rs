@@ -10,6 +10,9 @@ use tally_sdk::{
 use tracing::info;
 
 /// Execute the deactivate plan command
+///
+/// # Errors
+/// Returns error if plan deactivation fails due to invalid parameters, network issues, or Solana program errors
 #[allow(clippy::cognitive_complexity)] // Complex validation logic for plan deactivation
 pub async fn execute(
     tally_client: &SimpleTallyClient,

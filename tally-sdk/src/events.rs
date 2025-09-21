@@ -147,7 +147,7 @@ pub fn parse_events_from_logs(logs: &[String], program_id: &Pubkey) -> Result<Ve
 ///
 /// Anchor events are encoded as: discriminator (8 bytes) + borsh-serialized event data
 /// The discriminator is computed as the first 8 bytes of SHA256("event:<EventName>")
-fn parse_single_event(data: &str) -> Result<TallyEvent> {
+pub fn parse_single_event(data: &str) -> Result<TallyEvent> {
     // Decode base64 data
     let decoded_data = base64::prelude::BASE64_STANDARD.decode(data)
         .map_err(|e| TallyError::ParseError(format!("Failed to decode base64: {e}")))?;
@@ -426,7 +426,7 @@ mod tests {
 
         let receipt = TallyReceipt {
             signature,
-            block_time: Some(1640995200), // 2022-01-01
+            block_time: Some(1_640_995_200), // 2022-01-01
             slot: 100,
             success: true,
             error: None,
@@ -449,7 +449,7 @@ mod tests {
 
         let receipt = TallyReceipt {
             signature,
-            block_time: Some(1640995200),
+            block_time: Some(1_640_995_200),
             slot: 100,
             success: false,
             error: Some("InsufficientFunds".to_string()),
@@ -469,7 +469,7 @@ mod tests {
 
         let receipt = create_receipt(ReceiptParams {
             signature,
-            block_time: Some(1640995200),
+            block_time: Some(1_640_995_200),
             slot: 100,
             success: true,
             error: None,

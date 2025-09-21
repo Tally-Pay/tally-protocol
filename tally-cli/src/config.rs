@@ -21,6 +21,7 @@ pub struct TallyCliConfig {
     pub basis_points_divisor: f64,
 
     /// Default lookback time for dashboard events in seconds
+    #[allow(dead_code)] // Used when dashboard functionality is re-enabled
     pub default_events_lookback_secs: i64,
 }
 
@@ -64,6 +65,7 @@ impl TallyCliConfig {
     }
 
     /// Get the default lookback timestamp for dashboard events
+    #[allow(dead_code)] // Used when dashboard functionality is re-enabled
     pub const fn default_events_since_timestamp(&self, current_timestamp: i64) -> i64 {
         current_timestamp - self.default_events_lookback_secs
     }

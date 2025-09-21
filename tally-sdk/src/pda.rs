@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn test_known_program_id() {
         // Test with the actual program ID to ensure consistency
-        let program_id_str = "B9c98HcXYqVq2j48MLzFcbeDQbsUBMfYkDamLLsSHk1h";
+        let program_id_str = "Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV";
         let expected_program_id = Pubkey::from_str(program_id_str).unwrap();
         let actual_program_id = program_id_string().parse().unwrap();
 

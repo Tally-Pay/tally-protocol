@@ -466,7 +466,7 @@ impl DashboardClient {
     ///
     /// # Errors
     /// Returns an error if blockchain queries fail or event parsing fails
-    pub fn get_event_history(&self, _merchant: &Pubkey, _limit: usize) -> Result<Vec<ParsedEvent>> {
+    pub const fn get_event_history(&self, _merchant: &Pubkey, _limit: usize) -> Result<Vec<ParsedEvent>> {
         // TODO: Implement real blockchain querying
         // For now, return empty events to satisfy the interface
         // In a full implementation, this would:
@@ -963,7 +963,7 @@ mod tests {
         let end = Utc.with_ymd_and_hms(2024, 1, 31, 23, 59, 59).unwrap();
         let custom_period = Period::Custom { from: start, to: end };
 
-        assert_eq!(format!("{:?}", custom_period), format!("Custom {{ from: {start:?}, to: {end:?} }}"));
+        assert_eq!(format!("{custom_period:?}"), format!("Custom {{ from: {start:?}, to: {end:?} }}"));
 
         // Test equality
         assert_eq!(Period::Day, Period::Day);
@@ -1158,6 +1158,8 @@ mod tests {
 
     #[test]
     fn test_get_event_statistics() {
+        use chrono::{TimeZone, Utc};
+
         let client = DashboardClient::new("http://localhost:8899").unwrap();
         let merchant = Keypair::new().pubkey();
 
@@ -1173,7 +1175,6 @@ mod tests {
         assert_eq!(week_stats.unwrap().period, Period::Week);
 
         // Test custom period
-        use chrono::{TimeZone, Utc};
         let start = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let end = Utc.with_ymd_and_hms(2024, 1, 31, 23, 59, 59).unwrap();
         let custom_period = Period::Custom { from: start, to: end };

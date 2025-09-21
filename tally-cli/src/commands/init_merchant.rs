@@ -11,6 +11,9 @@ use tally_sdk::{
 use tracing::info;
 
 /// Execute the init merchant command
+///
+/// # Errors
+/// Returns error if merchant initialization fails due to invalid parameters, network issues, or Solana program errors
 #[allow(clippy::cognitive_complexity)] // Complex validation logic for merchant initialization
 pub async fn execute(
     tally_client: &SimpleTallyClient,

@@ -23,6 +23,9 @@ pub struct CreatePlanRequest<'a> {
 }
 
 /// Execute the create plan command
+///
+/// # Errors
+/// Returns error if plan creation fails due to invalid parameters, network issues, or Solana program errors
 #[allow(clippy::cognitive_complexity)] // Complex validation logic for plan creation
 pub async fn execute(
     tally_client: &SimpleTallyClient,

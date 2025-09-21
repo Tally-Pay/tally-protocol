@@ -17,6 +17,9 @@ pub enum OutputFormat {
 }
 
 /// Execute the list subscriptions command
+///
+/// # Errors
+/// Returns error if subscription listing fails due to network issues or invalid plan PDA
 #[allow(clippy::cognitive_complexity)] // Complex data processing and formatting
 pub async fn execute(
     tally_client: &SimpleTallyClient,

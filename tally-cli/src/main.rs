@@ -12,7 +12,7 @@ mod utils;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use config::TallyCliConfig;
-use tally_sdk::SimpleTallyClient;
+use tally_sdk::{solana_sdk::pubkey::Pubkey, SimpleTallyClient};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -163,6 +163,54 @@ enum Commands {
     Dashboard {
         #[command(subcommand)]
         command: DashboardCommands,
+    },
+
+    /// Simulate blockchain events for testing the monitoring system
+    SimulateEvents {
+        /// Merchant account address
+        #[arg(long)]
+        merchant: String,
+
+        /// Specific plan to generate events for (optional)
+        #[arg(long)]
+        plan: Option<String>,
+
+        /// Simulation scenario
+        #[arg(long, value_enum, default_value = "normal")]
+        scenario: commands::simulate_events::SimulationScenario,
+
+        /// Events per minute
+        #[arg(long, default_value = "60")]
+        rate: u64,
+
+        /// Duration in seconds
+        #[arg(long, default_value = "60")]
+        duration: u64,
+
+        /// Events per batch
+        #[arg(long, default_value = "10")]
+        batch_size: usize,
+
+        /// Output format
+        #[arg(long, value_enum, default_value = "stdout")]
+        output: commands::simulate_events::OutputFormat,
+
+        /// WebSocket URL for WebSocket output
+        #[arg(long)]
+        websocket_url: Option<String>,
+
+        /// File path for file output
+        #[arg(long)]
+        output_file: Option<String>,
+
+        /// Random seed for reproducible results
+        #[arg(long)]
+        seed: Option<u64>,
+
+        /// Custom event distribution (subscribed,renewed,canceled,payment_failed)
+        /// Example: 0.2,0.7,0.08,0.02
+        #[arg(long)]
+        event_distribution: Option<String>,
     },
 }
 
@@ -373,6 +421,79 @@ async fn execute_command(
                 config,
             )
             .await
+        }
+
+        Commands::SimulateEvents {
+            merchant,
+            plan,
+            scenario,
+            rate,
+            duration,
+            batch_size,
+            output,
+            websocket_url,
+            output_file,
+            seed,
+            event_distribution,
+        } => {
+            use commands::simulate_events::{EventDistribution, SimulateEventsCommand};
+            use std::str::FromStr;
+
+            // Parse merchant pubkey
+            let merchant_pubkey = Pubkey::from_str(merchant)
+                .map_err(|e| anyhow::anyhow!("Invalid merchant pubkey '{}': {}", merchant, e))?;
+
+            // Parse plan pubkey if provided
+            let plan_pubkey = if let Some(plan_str) = plan {
+                Some(Pubkey::from_str(plan_str)
+                    .map_err(|e| anyhow::anyhow!("Invalid plan pubkey '{}': {}", plan_str, e))?)
+            } else {
+                None
+            };
+
+            // Parse custom distribution if provided
+            let custom_distribution = if let Some(dist_str) = event_distribution {
+                let parts: Vec<&str> = dist_str.split(',').collect();
+                if parts.len() != 4 {
+                    return Err(anyhow::anyhow!(
+                        "Event distribution must have 4 values: subscribed,renewed,canceled,payment_failed"
+                    ));
+                }
+
+                let subscribed: f32 = parts[0].parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid subscribed percentage: {}", e))?;
+                let renewed: f32 = parts[1].parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid renewed percentage: {}", e))?;
+                let canceled: f32 = parts[2].parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid canceled percentage: {}", e))?;
+                let payment_failed: f32 = parts[3].parse()
+                    .map_err(|e| anyhow::anyhow!("Invalid payment_failed percentage: {}", e))?;
+
+                Some(EventDistribution {
+                    subscribed,
+                    renewed,
+                    canceled,
+                    payment_failed,
+                })
+            } else {
+                None
+            };
+
+            let command = SimulateEventsCommand {
+                merchant: merchant_pubkey,
+                plan: plan_pubkey,
+                scenario: scenario.clone(),
+                custom_distribution,
+                rate: *rate,
+                duration: *duration,
+                batch_size: *batch_size,
+                output_format: output.clone(),
+                websocket_url: websocket_url.clone(),
+                output_file: output_file.clone(),
+                seed: *seed,
+            };
+
+            commands::execute_simulate_events(tally_client, command, config).await
         }
     }
 }
