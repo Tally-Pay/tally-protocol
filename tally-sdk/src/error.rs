@@ -78,6 +78,10 @@ pub enum TallyError {
     #[error("Tally SDK error: {0}")]
     Generic(String),
 
+    /// Event parsing error
+    #[error("Event parsing error: {0}")]
+    ParseError(String),
+
     /// Invalid PDA computation
     #[error("Invalid PDA: {0}")]
     InvalidPda(String),
