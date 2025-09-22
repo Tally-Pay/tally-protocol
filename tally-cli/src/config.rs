@@ -28,7 +28,7 @@ pub struct TallyCliConfig {
 impl TallyCliConfig {
     /// Create a new configuration instance with values from environment variables
     /// or sensible defaults if not set
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             default_rpc_url: env::var("TALLY_RPC_URL")
                 .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string()),
@@ -55,18 +55,18 @@ impl TallyCliConfig {
 
     /// Convert USDC micro-units to display units (USDC)
     #[allow(clippy::cast_precision_loss)] // Acceptable for display formatting
-    pub fn format_usdc(&self, micro_units: u64) -> f64 {
+    #[must_use] pub fn format_usdc(&self, micro_units: u64) -> f64 {
         micro_units as f64 / self.usdc_decimals_divisor as f64
     }
 
     /// Convert fee basis points to percentage
-    pub fn format_fee_percentage(&self, fee_bps: u16) -> f64 {
+    #[must_use] pub fn format_fee_percentage(&self, fee_bps: u16) -> f64 {
         f64::from(fee_bps) / self.basis_points_divisor
     }
 
     /// Get the default lookback timestamp for dashboard events
     #[allow(dead_code)] // Used when dashboard functionality is re-enabled
-    pub const fn default_events_since_timestamp(&self, current_timestamp: i64) -> i64 {
+    #[must_use] pub const fn default_events_since_timestamp(&self, current_timestamp: i64) -> i64 {
         current_timestamp - self.default_events_lookback_secs
     }
 }

@@ -32,7 +32,7 @@ pub struct SubscriptionInfo {
 }
 
 /// Format plans for human-readable output
-pub fn format_plans_human(plans: &[PlanInfo], merchant_pda: &Pubkey) -> String {
+#[must_use] pub fn format_plans_human(plans: &[PlanInfo], merchant_pda: &Pubkey) -> String {
     use std::fmt::Write;
 
     if plans.is_empty() {
@@ -71,6 +71,10 @@ pub fn format_plans_human(plans: &[PlanInfo], merchant_pda: &Pubkey) -> String {
 }
 
 /// Format plans for JSON output
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails
 pub fn format_plans_json(plans: &[PlanInfo]) -> Result<String> {
     let json_plans: Vec<serde_json::Value> = plans
         .iter()
@@ -92,7 +96,7 @@ pub fn format_plans_json(plans: &[PlanInfo]) -> Result<String> {
 }
 
 /// Format subscriptions for human-readable output
-pub fn format_subscriptions_human(
+#[must_use] pub fn format_subscriptions_human(
     subscriptions: &[SubscriptionInfo],
     plan_pda: &Pubkey,
     config: &TallyCliConfig,
@@ -143,6 +147,10 @@ pub fn format_subscriptions_human(
 }
 
 /// Format subscriptions for JSON output
+///
+/// # Errors
+///
+/// Returns an error if JSON serialization fails
 pub fn format_subscriptions_json(
     subscriptions: &[SubscriptionInfo],
     config: &TallyCliConfig,
@@ -171,7 +179,13 @@ pub fn format_subscriptions_json(
 }
 
 /// Format unix timestamp to human-readable date
-pub fn format_timestamp(timestamp: i64) -> String {
+///
+/// # Panics
+///
+/// Panics if the datetime cannot calculate duration since `UNIX_EPOCH`,
+/// which should not happen in normal circumstances since we validate
+/// the timestamp and use checked arithmetic
+#[must_use] pub fn format_timestamp(timestamp: i64) -> String {
     if timestamp <= 0 {
         return "N/A".to_string();
     }

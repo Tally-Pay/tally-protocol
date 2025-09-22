@@ -12,6 +12,16 @@ use tally_sdk::{
 use tracing::info;
 
 /// Execute the withdraw fees command
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The platform authority keypair cannot be loaded
+/// - The destination account is invalid or cannot be parsed
+/// - The USDC mint validation fails
+/// - The platform treasury account is invalid
+/// - The destination account validation fails
+/// - The withdrawal transaction fails to be sent or confirmed
 #[allow(clippy::cognitive_complexity)] // Complex validation logic for fee withdrawal
 pub async fn execute(
     tally_client: &SimpleTallyClient,

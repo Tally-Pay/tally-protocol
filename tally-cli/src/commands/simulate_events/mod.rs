@@ -8,7 +8,9 @@ use crate::config::TallyCliConfig;
 use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, hash_map::DefaultHasher},
+    fmt::Write,
+    hash::{Hash, Hasher},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -41,13 +43,13 @@ pub enum OutputFormat {
 
 #[derive(Clone, Debug, ValueEnum)]
 pub enum SimulationScenario {
-    /// Normal operations: 80% renewed, 15% subscribed, 4% canceled, 1% payment_failed
+    /// Normal operations: 80% renewed, 15% subscribed, 4% canceled, 1% `payment_failed`
     Normal,
-    /// High churn scenario: 30% canceled, 20% payment_failed, 40% renewed, 10% subscribed
+    /// High churn scenario: 30% canceled, 20% `payment_failed`, 40% renewed, 10% subscribed
     HighChurn,
-    /// New product launch: 70% subscribed, 25% renewed, 4% canceled, 1% payment_failed
+    /// New product launch: 70% subscribed, 25% renewed, 4% canceled, 1% `payment_failed`
     NewLaunch,
-    /// Payment processing issues: 50% payment_failed, 30% renewed, 15% subscribed, 5% canceled
+    /// Payment processing issues: 50% `payment_failed`, 30% renewed, 15% subscribed, 5% canceled
     PaymentIssues,
     /// Custom distribution (specify via --event-distribution)
     Custom,
@@ -128,6 +130,14 @@ pub struct SimulateEventsCommand {
 
 impl SimulateEventsCommand {
     /// Validate command parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any parameter is outside its valid range:
+    /// - Rate must be between 1 and 10,000 events per minute
+    /// - Duration must be between 1 and 3,600 seconds
+    /// - Batch size must be between 1 and 100
+    /// - Event distribution percentages must sum to 100 (when custom scenario used)
     pub fn validate(&self) -> Result<()> {
         if self.rate == 0 {
             return Err(anyhow!("Rate must be greater than 0"));
@@ -163,12 +173,8 @@ impl SimulateEventsCommand {
     }
 
     /// Get the effective event distribution for this simulation
-    pub fn get_distribution(&self) -> EventDistribution {
-        if let Some(custom) = &self.custom_distribution {
-            custom.clone()
-        } else {
-            self.scenario.clone().into()
-        }
+    #[must_use] pub fn get_distribution(&self) -> EventDistribution {
+        self.custom_distribution.as_ref().map_or_else(|| self.scenario.clone().into(), std::clone::Clone::clone)
     }
 }
 
@@ -187,8 +193,8 @@ impl EventGenerator {
     /// Create a new event generator
     ///
     /// # Panics
-    /// Panics if system time is before UNIX_EPOCH (should never happen on modern systems)
-    pub fn new(command: &SimulateEventsCommand) -> Self {
+    /// Panics if system time is before `UNIX_EPOCH` (should never happen on modern systems)
+    #[must_use] pub fn new(command: &SimulateEventsCommand) -> Self {
         let seed = command.seed.unwrap_or_else(|| {
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -200,11 +206,7 @@ impl EventGenerator {
         let subscriber_pool = Self::generate_pubkey_pool(seed, 1000);
 
         // Generate plan pool (use provided plan or generate multiple)
-        let plan_pool = if let Some(plan) = command.plan {
-            vec![plan]
-        } else {
-            Self::generate_plan_pool(command.merchant, seed, 10)
-        };
+        let plan_pool = command.plan.map_or_else(|| Self::generate_plan_pool(command.merchant, seed, 10), |plan| vec![plan]);
 
         Self {
             merchant: command.merchant,
@@ -247,25 +249,21 @@ impl EventGenerator {
         for i in 0..count {
             // Use deterministic plan ID generation
             let plan_id = format!("plan_{i}");
-            match tally_sdk::pda::plan_from_string(&merchant, &plan_id) {
-                Ok((plan_pda, _)) => plans.push(plan_pda),
-                Err(_) => {
-                    // Fallback to generated pubkey if PDA computation fails
-                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                    use std::hash::{Hash, Hasher};
-                    merchant.hash(&mut hasher);
-                    seed.hash(&mut hasher);
-                    i.hash(&mut hasher);
-                    let hash = hasher.finish();
+            if let Ok((plan_pda, _)) = tally_sdk::pda::plan_from_string(&merchant, &plan_id) { plans.push(plan_pda) } else {
+                // Fallback to generated pubkey if PDA computation fails
+                let mut hasher = DefaultHasher::new();
+                merchant.hash(&mut hasher);
+                seed.hash(&mut hasher);
+                i.hash(&mut hasher);
+                let hash = hasher.finish();
 
-                    let mut bytes = [0u8; 32];
-                    bytes[..8].copy_from_slice(&hash.to_le_bytes());
-                    bytes[8..16].copy_from_slice(&(hash.wrapping_mul(43)).to_le_bytes());
-                    bytes[16..24].copy_from_slice(&(hash.wrapping_mul(47)).to_le_bytes());
-                    bytes[24..32].copy_from_slice(&(hash.wrapping_mul(53)).to_le_bytes());
+                let mut bytes = [0u8; 32];
+                bytes[..8].copy_from_slice(&hash.to_le_bytes());
+                bytes[8..16].copy_from_slice(&(hash.wrapping_mul(43)).to_le_bytes());
+                bytes[16..24].copy_from_slice(&(hash.wrapping_mul(47)).to_le_bytes());
+                bytes[24..32].copy_from_slice(&(hash.wrapping_mul(53)).to_le_bytes());
 
-                    plans.push(Pubkey::new_from_array(bytes));
-                }
+                plans.push(Pubkey::new_from_array(bytes));
             }
         }
         plans
@@ -275,7 +273,11 @@ impl EventGenerator {
     pub fn generate_event(&mut self) -> TallyEvent {
         // Use simple linear congruential generator for deterministic randomness
         self.seed = self.seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
-        let random_value = (self.seed as f32) / (u64::MAX as f32);
+        // Generate a value between 0.0 and 1.0 using integer arithmetic to avoid precision loss
+        // Use the upper 32 bits for better distribution
+        let high_bits = (self.seed >> 32) as u32;
+        #[allow(clippy::cast_possible_truncation)]
+        let random_value = (f64::from(high_bits) / f64::from(u32::MAX)) as f32;
 
         // Select event type based on distribution
         let event_type = if random_value < self.distribution.subscribed {
@@ -289,13 +291,14 @@ impl EventGenerator {
         };
 
         // Select random subscriber and plan
-        let subscriber_idx = (self.seed % self.subscriber_pool.len() as u64) as usize;
-        let subscriber = self.subscriber_pool[subscriber_idx];
+        let subscriber_idx = usize::try_from(self.seed % u64::try_from(self.subscriber_pool.len()).unwrap_or(1)).unwrap_or(0);
+        let subscriber = self.subscriber_pool[subscriber_idx.min(self.subscriber_pool.len().saturating_sub(1))];
 
         let plan = if let Some(plan) = self.plan {
             plan
         } else {
-            let plan_idx = ((self.seed >> 16) % self.plan_pool.len() as u64) as usize;
+            let plan_idx = usize::try_from((self.seed >> 16) % u64::try_from(self.plan_pool.len()).unwrap_or(1)).unwrap_or(0);
+            let plan_idx = plan_idx.min(self.plan_pool.len().saturating_sub(1));
             self.plan_pool[plan_idx]
         };
 
@@ -333,7 +336,8 @@ impl EventGenerator {
                     "Network congestion",
                     "RPC timeout",
                 ];
-                let reason_idx = (amount_seed % reasons.len() as u64) as usize;
+                let reason_idx = usize::try_from(amount_seed % u64::try_from(reasons.len()).unwrap_or(1)).unwrap_or(0);
+                let reason_idx = reason_idx.min(reasons.len().saturating_sub(1));
                 TallyEvent::PaymentFailed(PaymentFailed {
                     merchant: self.merchant,
                     plan,
@@ -375,11 +379,11 @@ impl SimulationStats {
         *self.events_by_type.entry(event_type.to_string()).or_insert(0) += 1;
     }
 
-    fn record_batch(&mut self) {
+    const fn record_batch(&mut self) {
         self.batches_sent += 1;
     }
 
-    fn record_error(&mut self) {
+    const fn record_error(&mut self) {
         self.errors += 1;
     }
 
@@ -401,6 +405,7 @@ impl SimulationStats {
     fn events_per_second(&self) -> f64 {
         if let Some(duration) = self.duration() {
             if duration.as_secs_f64() > 0.0 {
+                #[allow(clippy::cast_precision_loss)]
                 return self.total_events as f64 / duration.as_secs_f64();
             }
         }
@@ -410,6 +415,10 @@ impl SimulationStats {
 
 impl EventSimulator {
     /// Create a new event simulator
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command validation fails or if WebSocket URL parsing fails.
     pub fn new(command: SimulateEventsCommand) -> Result<Self> {
         command.validate()?;
         let generator = EventGenerator::new(&command);
@@ -421,41 +430,39 @@ impl EventSimulator {
         })
     }
 
-    /// Run the simulation
-    pub async fn run(&mut self) -> Result<SimulationStats> {
-        info!(
-            "Starting event simulation: {} events/min for {} seconds",
-            self.command.rate, self.command.duration
-        );
-
-        self.stats.start();
-
-        // Calculate timing parameters
+    /// Calculate timing parameters for the simulation
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    fn calculate_timing_parameters(&self) -> (f64, u64, u64) {
         let events_per_second = self.command.rate as f64 / 60.0;
-        let total_events = (events_per_second * self.command.duration as f64) as u64;
+        let total_events = (events_per_second * self.command.duration as f64)
+            .min(u64::MAX as f64)
+            .max(0.0) as u64;
         let interval_ms = if events_per_second >= 1.0 {
-            (1000.0 / events_per_second) as u64
+            (1000.0 / events_per_second).max(1.0) as u64
         } else {
             1000
         };
+        (events_per_second, total_events, interval_ms)
+    }
 
-        info!(
-            "Simulation parameters: {:.2} events/sec, {} total events, {}ms interval",
-            events_per_second, total_events, interval_ms
-        );
-
-        // Setup output channel
+    /// Setup the output channel and spawn the output handler
+    fn setup_output_channel(&self) -> (mpsc::Sender<Vec<TallyEvent>>, tokio::task::JoinHandle<Result<()>>) {
         let (tx, mut rx) = mpsc::channel::<Vec<TallyEvent>>(100);
-
-        // Start output handler
         let output_handle = {
             let command = self.command.clone();
             tokio::spawn(async move {
                 Self::handle_output(command, &mut rx).await
             })
         };
+        (tx, output_handle)
+    }
 
-        // Setup shutdown signal
+    /// Setup shutdown signal handlers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if signal handlers cannot be set up
+    fn setup_shutdown_signal() -> Result<Arc<AtomicBool>> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let shutdown_clone = shutdown.clone();
 
@@ -478,7 +485,23 @@ impl EventSimulator {
             });
         }
 
-        // Generate and send events
+        Ok(shutdown)
+    }
+
+    /// Run the main event generation loop
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are issues with event generation or output handling
+    async fn run_event_generation_loop(
+        &mut self,
+        tx: mpsc::Sender<Vec<TallyEvent>>,
+        output_handle: tokio::task::JoinHandle<Result<()>>,
+        shutdown: Arc<AtomicBool>,
+        events_per_second: f64,
+        total_events: u64,
+        interval_ms: u64,
+    ) -> Result<()> {
         let mut interval = interval(Duration::from_millis(interval_ms.max(1)));
         let mut events_sent = 0u64;
         let mut batch = Vec::with_capacity(self.command.batch_size);
@@ -488,16 +511,12 @@ impl EventSimulator {
         while events_sent < total_events && Instant::now() < end_time && !shutdown.load(Ordering::SeqCst) {
             interval.tick().await;
 
-            // Generate events for this batch
-            let events_to_generate = if events_per_second < 1.0 {
-                // For very low rates, generate probabilistically
-                let probability = events_per_second * (interval_ms as f64 / 1000.0);
-                if rand::random::<f64>() < probability { 1 } else { 0 }
-            } else {
-                // For normal rates, generate up to batch size
-                let remaining = total_events - events_sent;
-                self.command.batch_size.min(remaining as usize)
-            };
+            let events_to_generate = self.calculate_events_to_generate(
+                events_per_second,
+                interval_ms,
+                total_events,
+                events_sent
+            );
 
             for _ in 0..events_to_generate {
                 let event = self.generator.generate_event();
@@ -506,17 +525,46 @@ impl EventSimulator {
                 events_sent += 1;
 
                 if batch.len() >= self.command.batch_size {
-                    if let Err(e) = tx.send(batch.clone()).await {
-                        error!("Failed to send event batch: {}", e);
-                        self.stats.record_error();
-                    } else {
-                        self.stats.record_batch();
-                    }
-                    batch.clear();
+                    self.send_batch(&tx, &mut batch).await;
                 }
             }
         }
 
+        self.finalize_simulation(tx, output_handle, batch).await
+    }
+
+    /// Calculate how many events to generate in this iteration
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+    fn calculate_events_to_generate(&self, events_per_second: f64, interval_ms: u64, total_events: u64, events_sent: u64) -> usize {
+        if events_per_second < 1.0 {
+            // For very low rates, generate probabilistically
+            let probability = events_per_second * (interval_ms as f64 / 1000.0);
+            usize::from(rand::random::<f64>() < probability)
+        } else {
+            // For normal rates, generate up to batch size
+            let remaining = total_events - events_sent;
+            self.command.batch_size.min(remaining as usize)
+        }
+    }
+
+    /// Send a batch of events
+    async fn send_batch(&mut self, tx: &mpsc::Sender<Vec<TallyEvent>>, batch: &mut Vec<TallyEvent>) {
+        if let Err(e) = tx.send(batch.clone()).await {
+            error!("Failed to send event batch: {}", e);
+            self.stats.record_error();
+        } else {
+            self.stats.record_batch();
+        }
+        batch.clear();
+    }
+
+    /// Finalize the simulation by sending remaining events and cleaning up
+    async fn finalize_simulation(
+        &mut self,
+        tx: mpsc::Sender<Vec<TallyEvent>>,
+        output_handle: tokio::task::JoinHandle<Result<()>>,
+        batch: Vec<TallyEvent>,
+    ) -> Result<()> {
         // Send remaining events
         if !batch.is_empty() {
             if let Err(e) = tx.send(batch).await {
@@ -533,6 +581,42 @@ impl EventSimulator {
             error!("Output handler failed: {}", e);
             self.stats.record_error();
         }
+
+        Ok(())
+    }
+
+    /// Run the simulation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if WebSocket connection fails, if sending events fails,
+    /// or if there are issues with the simulation setup.
+    pub async fn run(&mut self) -> Result<SimulationStats> {
+        info!(
+            "Starting event simulation: {} events/min for {} seconds",
+            self.command.rate, self.command.duration
+        );
+
+        self.stats.start();
+
+        let (events_per_second, total_events, interval_ms) = self.calculate_timing_parameters();
+        info!(
+            "Simulation parameters: {:.2} events/sec, {} total events, {}ms interval",
+            events_per_second, total_events, interval_ms
+        );
+
+        let (tx, output_handle) = self.setup_output_channel();
+
+        let shutdown = Self::setup_shutdown_signal()?;
+
+        self.run_event_generation_loop(
+            tx,
+            output_handle,
+            shutdown,
+            events_per_second,
+            total_events,
+            interval_ms
+        ).await?;
 
         self.stats.end();
 
@@ -565,6 +649,7 @@ impl EventSimulator {
     }
 
     /// Handle WebSocket output
+    #[allow(clippy::cognitive_complexity)]
     async fn handle_websocket_output(
         websocket_url: String,
         rx: &mut mpsc::Receiver<Vec<TallyEvent>>,
@@ -720,6 +805,12 @@ impl EventSimulator {
 }
 
 /// Execute the simulate events command
+///
+/// # Errors
+///
+/// Returns an error if the event simulation fails, if WebSocket connections fail,
+/// or if the command validation fails.
+#[allow(clippy::cast_precision_loss)]
 pub async fn execute(
     _tally_client: &SimpleTallyClient,
     command: SimulateEventsCommand,
@@ -734,11 +825,11 @@ pub async fn execute(
         "Event Simulation Results\n{}\n",
         "=".repeat(50)
     );
-    output.push_str(&format!("Total Events:      {}\n", stats.total_events));
-    output.push_str(&format!("Duration:          {:.2}s\n", duration.as_secs_f64()));
-    output.push_str(&format!("Events/Second:     {:.2}\n", stats.events_per_second()));
-    output.push_str(&format!("Batches Sent:      {}\n", stats.batches_sent));
-    output.push_str(&format!("Errors:            {}\n", stats.errors));
+    writeln!(output, "Total Events:      {}", stats.total_events)?;
+    writeln!(output, "Duration:          {:.2}s", duration.as_secs_f64())?;
+    writeln!(output, "Events/Second:     {:.2}", stats.events_per_second())?;
+    writeln!(output, "Batches Sent:      {}", stats.batches_sent)?;
+    writeln!(output, "Errors:            {}", stats.errors)?;
 
     output.push_str("\nEvents by Type:\n");
     for (event_type, count) in &stats.events_by_type {
@@ -747,7 +838,7 @@ pub async fn execute(
         } else {
             0.0
         };
-        output.push_str(&format!("  {event_type:<15} {count:>8} ({percentage:>5.1}%)\n"));
+        writeln!(output, "  {event_type:<15} {count:>8} ({percentage:>5.1}%)")?;
     }
 
     Ok(output)
@@ -768,11 +859,12 @@ mod rand {
     }
 
     impl Random for f64 {
+        #[allow(clippy::cast_precision_loss)]
         fn random() -> Self {
             let seed = SEED.fetch_add(1, Ordering::SeqCst);
             let mut x = seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
             x = (x >> 16) & 0x7FFF;
-            (x as f64) / 32767.0
+            x as Self / 32767.0
         }
     }
 }

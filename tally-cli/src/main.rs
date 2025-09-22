@@ -207,7 +207,7 @@ enum Commands {
         #[arg(long)]
         seed: Option<u64>,
 
-        /// Custom event distribution (subscribed,renewed,canceled,payment_failed)
+        /// Custom event distribution (`subscribed,renewed,canceled,payment_failed`)
         /// Example: 0.2,0.7,0.08,0.02
         #[arg(long)]
         event_distribution: Option<String>,
@@ -314,6 +314,7 @@ fn parse_output_format(format_str: &str) -> Result<OutputFormat> {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn execute_command(
     cli: &Cli,
     tally_client: &SimpleTallyClient,

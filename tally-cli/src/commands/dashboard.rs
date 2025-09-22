@@ -15,9 +15,9 @@ pub enum OutputFormat {
 ///
 /// # Errors
 /// Currently returns OK as functionality is stubbed
-pub async fn execute(
+pub async fn execute<T: std::fmt::Debug + Send + Sync>(
     _tally_client: &SimpleTallyClient,
-    _command: &dyn std::fmt::Debug,
+    _command: &T,
     _output_format: &OutputFormat,
     _rpc_url: &str,
     _config: &TallyCliConfig,
