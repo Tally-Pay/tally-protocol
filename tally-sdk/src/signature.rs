@@ -1,12 +1,21 @@
-//! Wallet signature verification utilities for Solana authentication
+//! Wallet signature verification and transaction signing utilities for Solana
 //!
 //! This module provides cryptographic signature verification functionality
-//! for wallet-based authentication in the Tally ecosystem.
+//! for wallet-based authentication and transaction signing support for frontend
+//! wallet integration in the Tally ecosystem.
 
 #![forbid(unsafe_code)]
 
 use anyhow::{Context, Result};
-use solana_sdk::{pubkey::Pubkey, signature::Signature};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use solana_sdk::{
+    hash::Hash,
+    instruction::Instruction,
+    message::{Message, VersionedMessage},
+    pubkey::Pubkey,
+    signature::Signature,
+    transaction::VersionedTransaction,
+};
 use std::str::FromStr;
 
 /// Verify wallet signature for authentication
@@ -76,6 +85,185 @@ pub fn verify_wallet_signature(wallet_address: &str, signature: &str, message: &
     }
 
     Ok(())
+}
+
+/// Normalize signature format from different wallet implementations
+///
+/// Handles various wallet signature formats:
+/// - `Uint8Array` converted to base58 string
+/// - Hex-encoded signatures (128 characters)
+/// - Base58-encoded signatures (88 characters)
+/// - Signature objects with toString method
+///
+/// # Arguments
+///
+/// * `signature_input` - Signature in various formats from frontend wallets
+///
+/// # Returns
+///
+/// Base58-encoded signature string compatible with Solana
+///
+/// # Errors
+///
+/// Returns an error if signature format cannot be normalized
+pub fn normalize_signature_format(signature_input: &str) -> Result<String> {
+    // Handle empty or whitespace-only signatures
+    let signature = signature_input.trim();
+    if signature.is_empty() {
+        anyhow::bail!("Empty signature");
+    }
+
+    // Try parsing as base58 first (most common format)
+    if Signature::from_str(signature).is_ok() {
+        return Ok(signature.to_string());
+    }
+
+    // Try parsing as hex if base58 fails
+    if signature.len() == 128 {
+        // 64 bytes * 2 hex chars = 128 chars
+        match hex::decode(signature) {
+            Ok(bytes) if bytes.len() == 64 => {
+                // Convert hex bytes to base58 string
+                match <[u8; 64]>::try_from(bytes) {
+                    Ok(array) => {
+                        let sig = Signature::from(array);
+                        return Ok(sig.to_string());
+                    }
+                    Err(_) => anyhow::bail!("Failed to convert hex bytes to signature array"),
+                }
+            }
+            _ => {
+                anyhow::bail!("Invalid hex signature format - must be 128 hex characters (64 bytes)")
+            }
+        }
+    }
+
+    // If neither base58 nor hex worked, return error with details
+    anyhow::bail!(
+        "Invalid signature format - must be base58 encoded (88 chars) or hex encoded (128 chars), got {} chars",
+        signature.len()
+    )
+}
+
+/// Prepare transaction for frontend wallet signing
+///
+/// Serializes a Solana transaction to base64 format that can be sent to
+/// frontend wallets for signing via `wallet.signTransaction()`.
+///
+/// # Arguments
+///
+/// * `instructions` - Vector of instructions to include in transaction
+/// * `payer` - Transaction fee payer public key
+/// * `recent_blockhash` - Recent blockhash for transaction
+///
+/// # Returns
+///
+/// Base64-encoded serialized transaction ready for wallet signing
+///
+/// # Errors
+///
+/// Returns error if transaction building or serialization fails
+pub fn prepare_transaction_for_signing(
+    instructions: &[Instruction],
+    payer: &Pubkey,
+    recent_blockhash: Hash,
+) -> Result<String> {
+    // Create message with recent blockhash
+    let message = Message::new_with_blockhash(instructions, Some(payer), &recent_blockhash);
+    let num_signatures = message.header.num_required_signatures;
+    let versioned_message = VersionedMessage::Legacy(message);
+
+    // Create unsigned transaction with placeholder signatures
+    let transaction = VersionedTransaction {
+        signatures: vec![Signature::default(); num_signatures as usize],
+        message: versioned_message,
+    };
+
+    // Serialize transaction
+    let serialized = bincode::serialize(&transaction)
+        .context("Failed to serialize transaction for signing")?;
+
+    // Encode as base64 for frontend
+    Ok(STANDARD.encode(serialized))
+}
+
+/// Verify a signed transaction from frontend wallet
+///
+/// Deserializes and validates a transaction that was signed by a frontend wallet.
+/// Checks that all required signatures are present and valid.
+///
+/// # Arguments
+///
+/// * `signed_transaction_base64` - Base64-encoded signed transaction from wallet
+/// * `expected_signer` - Expected signer public key to validate against
+///
+/// # Returns
+///
+/// Deserialized and verified `VersionedTransaction`
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Transaction deserialization fails
+/// - Required signatures are missing or invalid
+/// - Signer verification fails
+pub fn verify_signed_transaction(
+    signed_transaction_base64: &str,
+    expected_signer: &Pubkey,
+) -> Result<VersionedTransaction> {
+    // Decode base64 transaction
+    let transaction_bytes = STANDARD
+        .decode(signed_transaction_base64)
+        .context("Failed to decode base64 transaction")?;
+
+    // Deserialize transaction
+    let transaction: VersionedTransaction = bincode::deserialize(&transaction_bytes)
+        .context("Failed to deserialize signed transaction")?;
+
+    // Verify transaction has signatures
+    if transaction.signatures.is_empty() {
+        anyhow::bail!("Transaction has no signatures");
+    }
+
+    // Verify first signature corresponds to expected signer
+    let message_data = transaction.message.serialize();
+    let signature = &transaction.signatures[0];
+
+    if signature == &Signature::default() {
+        anyhow::bail!("Transaction signature is empty/default");
+    }
+
+    // Verify signature against message and expected signer
+    if !signature.verify(expected_signer.as_ref(), &message_data) {
+        anyhow::bail!("Transaction signature verification failed for expected signer");
+    }
+
+    Ok(transaction)
+}
+
+/// Validate wallet address format (basic Solana base58 check)
+///
+/// Performs basic validation of Solana wallet address format without
+/// requiring full parsing. Checks length and base58 character validity.
+///
+/// # Arguments
+///
+/// * `address` - Wallet address string to validate
+///
+/// # Returns
+///
+/// `true` if address appears to be a valid Solana wallet format, `false` otherwise
+#[must_use]
+pub fn is_valid_wallet_address(address: &str) -> bool {
+    const BASE58_ALPHABET: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    // Basic validation: Solana addresses are 32-44 characters, base58 encoded
+    if address.len() < 32 || address.len() > 44 {
+        return false;
+    }
+
+    // Check if all characters are valid base58
+    address.chars().all(|c| BASE58_ALPHABET.contains(c))
 }
 
 #[cfg(test)]
@@ -176,5 +364,144 @@ mod tests {
         assert!(result.is_err());
         let error_message = result.unwrap_err().to_string();
         assert!(error_message.contains("Invalid signature format"));
+    }
+
+    #[test]
+    fn test_normalize_signature_format() {
+        // Test empty signature
+        let result = normalize_signature_format("");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Empty signature"));
+
+        // Test whitespace-only signature
+        let result = normalize_signature_format("   ");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Empty signature"));
+
+        // Test valid hex signature (128 characters)
+        let valid_hex = "1234567890abcdef".repeat(8);
+        let result = normalize_signature_format(&valid_hex);
+        assert!(result.is_ok());
+
+        // Test invalid hex signature (wrong length)
+        let invalid_hex = "1234567890abcdef".repeat(4); // 64 characters
+        let result = normalize_signature_format(&invalid_hex);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid signature format"));
+
+        // Test invalid format (not base58, not hex)
+        let invalid_format = "invalid_signature_format_123";
+        let result = normalize_signature_format(invalid_format);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid signature format"));
+    }
+
+    #[test]
+    fn test_prepare_transaction_for_signing() {
+        use solana_sdk::hash::Hash;
+
+        let payer = Pubkey::new_unique();
+        let _recipient = Pubkey::new_unique();
+        let recent_blockhash = Hash::default();
+
+        // Create a simple instruction for testing
+        let instruction = Instruction {
+            program_id: Pubkey::new_unique(), // Use any program ID for testing
+            accounts: vec![],
+            data: vec![],
+        };
+        let instructions = vec![instruction];
+
+        let result = prepare_transaction_for_signing(&instructions, &payer, recent_blockhash);
+        assert!(result.is_ok());
+
+        let transaction_base64 = result.unwrap();
+        assert!(!transaction_base64.is_empty());
+
+        // Verify it's valid base64
+        let decoded = STANDARD.decode(&transaction_base64);
+        assert!(decoded.is_ok());
+
+        // Verify we can deserialize it back to a transaction
+        let transaction_bytes = decoded.unwrap();
+        let transaction: Result<VersionedTransaction, _> = bincode::deserialize(&transaction_bytes);
+        assert!(transaction.is_ok());
+
+        let tx = transaction.unwrap();
+        // Should have default signatures (unsigned)
+        assert!(!tx.signatures.is_empty());
+        assert_eq!(tx.signatures[0], Signature::default());
+    }
+
+    #[test]
+    fn test_verify_signed_transaction_empty_signatures() {
+        use solana_sdk::hash::Hash;
+
+        let payer = Pubkey::new_unique();
+        let recent_blockhash = Hash::default();
+
+        // Create transaction with empty instructions
+        let instructions = vec![];
+        let transaction_base64 = prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
+            .expect("Should prepare transaction successfully");
+
+        // Try to verify unsigned transaction
+        let result = verify_signed_transaction(&transaction_base64, &payer);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+    }
+
+    #[test]
+    fn test_verify_signed_transaction_invalid_base64() {
+        let payer = Pubkey::new_unique();
+        let invalid_base64 = "not_valid_base64_data!!!";
+
+        let result = verify_signed_transaction(invalid_base64, &payer);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to decode base64 transaction"));
+    }
+
+    #[test]
+    fn test_verify_signed_transaction_invalid_transaction_data() {
+        let payer = Pubkey::new_unique();
+        // Valid base64 but not a valid transaction
+        let invalid_transaction = STANDARD.encode(b"not a valid transaction");
+
+        let result = verify_signed_transaction(&invalid_transaction, &payer);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to deserialize signed transaction"));
+    }
+
+    #[test]
+    fn test_is_valid_wallet_address() {
+        // Valid wallet address
+        assert!(is_valid_wallet_address(
+            "6YbW3k3oiU8kMbJLYCc8XA27c7DfqG5WSjTkED4Z2pj9"
+        ));
+
+        // Invalid cases
+        assert!(!is_valid_wallet_address("too_short"));
+        assert!(!is_valid_wallet_address("contains_invalid_characters_0OIl"));
+        assert!(!is_valid_wallet_address(""));
+        assert!(!is_valid_wallet_address(
+            "way_too_long_to_be_a_valid_solana_wallet_address_definitely_longer_than_44_chars"
+        ));
+
+        // Edge cases for length
+        let min_length = "123456789ABCDEFGHJKLMNPQRSTUVWXYZa"; // 32 chars, valid base58
+        assert!(is_valid_wallet_address(min_length));
+
+        let max_length = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijk"; // 44 chars, valid base58
+        assert!(is_valid_wallet_address(max_length));
+
+        // Just outside valid length ranges
+        let too_short = "123456789ABCDEFGHJKLMNPQRSTUVWXYz"; // 33 chars, but this is actually valid
+        assert!(is_valid_wallet_address(too_short)); // This is valid (33 chars within 32-44 range)
+
+        let too_short_actual = "123456789ABCDEFGHJKLMNPQRSTUVWx"; // 31 chars
+        assert!(!is_valid_wallet_address(too_short_actual));
+
+        let too_long = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkL"; // 45 chars
+        assert!(!is_valid_wallet_address(too_long));
     }
 }

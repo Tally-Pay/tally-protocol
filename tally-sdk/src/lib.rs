@@ -74,8 +74,11 @@ pub use transaction_builder::{
 };
 pub use validation::*;
 
-// Re-export signature verification utilities
-pub use signature::verify_wallet_signature;
+// Re-export signature verification and transaction signing utilities
+pub use signature::{
+    verify_wallet_signature, normalize_signature_format, prepare_transaction_for_signing,
+    verify_signed_transaction, is_valid_wallet_address,
+};
 
 // Re-export commonly used external types
 pub use solana_sdk;
