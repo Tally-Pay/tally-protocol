@@ -18,6 +18,33 @@ use solana_sdk::{
 };
 use std::str::FromStr;
 
+/// Transaction signing utilities for frontend wallet integration
+pub mod transaction_signing {
+    use super::{Hash, Instruction, Pubkey, Result, VersionedTransaction};
+
+    /// Build a signable transaction for frontend `wallet.signTransaction()`
+    pub fn prepare_transaction_for_signing(
+        instructions: &[Instruction],
+        payer: &Pubkey,
+        recent_blockhash: Hash,
+    ) -> Result<String> {
+        super::prepare_transaction_for_signing(instructions, payer, recent_blockhash)
+    }
+
+    /// Verify a signed transaction from frontend
+    pub fn verify_signed_transaction(
+        signed_transaction_base64: &str,
+        expected_signer: &Pubkey,
+    ) -> Result<VersionedTransaction> {
+        super::verify_signed_transaction(signed_transaction_base64, expected_signer)
+    }
+
+    /// Extract signature from signed transaction
+    pub fn extract_transaction_signature(signed_transaction_base64: &str) -> Result<String> {
+        super::extract_transaction_signature(signed_transaction_base64)
+    }
+}
+
 /// Verify wallet signature for authentication
 ///
 /// # Arguments
@@ -239,6 +266,50 @@ pub fn verify_signed_transaction(
     }
 
     Ok(transaction)
+}
+
+/// Extract signature from signed transaction
+///
+/// Extracts the first signature from a signed transaction and returns it as a base58 string.
+/// This is useful for getting the transaction signature for logging, tracking, or verification.
+///
+/// # Arguments
+///
+/// * `signed_transaction_base64` - Base64-encoded signed transaction from wallet
+///
+/// # Returns
+///
+/// Base58-encoded signature string
+///
+/// # Errors
+///
+/// Returns error if:
+/// - Transaction deserialization fails
+/// - Transaction has no signatures
+/// - Signature extraction fails
+pub fn extract_transaction_signature(signed_transaction_base64: &str) -> Result<String> {
+    // Decode base64 transaction
+    let transaction_bytes = STANDARD
+        .decode(signed_transaction_base64)
+        .context("Failed to decode base64 transaction")?;
+
+    // Deserialize transaction
+    let transaction: VersionedTransaction = bincode::deserialize(&transaction_bytes)
+        .context("Failed to deserialize signed transaction")?;
+
+    // Check if transaction has signatures
+    if transaction.signatures.is_empty() {
+        anyhow::bail!("Transaction has no signatures");
+    }
+
+    // Get first signature and convert to base58
+    let signature = &transaction.signatures[0];
+
+    if signature == &Signature::default() {
+        anyhow::bail!("Transaction signature is empty/default");
+    }
+
+    Ok(signature.to_string())
 }
 
 /// Validate wallet address format (basic Solana base58 check)
@@ -470,6 +541,91 @@ mod tests {
         let result = verify_signed_transaction(&invalid_transaction, &payer);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Failed to deserialize signed transaction"));
+    }
+
+    #[test]
+    fn test_extract_transaction_signature() {
+        use solana_sdk::hash::Hash;
+
+        let payer = Pubkey::new_unique();
+        let recent_blockhash = Hash::default();
+
+        // Create a simple instruction for testing
+        let instruction = Instruction {
+            program_id: Pubkey::new_unique(),
+            accounts: vec![],
+            data: vec![],
+        };
+        let instructions = vec![instruction];
+
+        // Prepare transaction
+        let transaction_base64 = prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
+            .expect("Should prepare transaction successfully");
+
+        // Try to extract signature from unsigned transaction
+        let result = extract_transaction_signature(&transaction_base64);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+
+        // Test with invalid base64
+        let invalid_base64 = "not_valid_base64_data!!!";
+        let result = extract_transaction_signature(invalid_base64);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to decode base64 transaction"));
+
+        // Test with valid base64 but invalid transaction data
+        let invalid_transaction = STANDARD.encode(b"not a valid transaction");
+        let result = extract_transaction_signature(&invalid_transaction);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Failed to deserialize signed transaction"));
+
+        // Test creating a properly signed transaction (this would normally be done by wallet)
+        let transaction_bytes = STANDARD.decode(&transaction_base64).unwrap();
+        let mut transaction: VersionedTransaction = bincode::deserialize(&transaction_bytes).unwrap();
+
+        // Replace default signature with a real signature for testing
+        let test_signature = Signature::new_unique();
+        transaction.signatures[0] = test_signature;
+
+        // Re-serialize and encode
+        let signed_transaction_bytes = bincode::serialize(&transaction).unwrap();
+        let signed_transaction_base64 = STANDARD.encode(signed_transaction_bytes);
+
+        // Now extract signature should work
+        let result = extract_transaction_signature(&signed_transaction_base64);
+        assert!(result.is_ok());
+        let extracted_signature = result.unwrap();
+        assert_eq!(extracted_signature, test_signature.to_string());
+    }
+
+    #[test]
+    fn test_transaction_signing_module() {
+        use super::transaction_signing;
+        use solana_sdk::hash::Hash;
+
+        let payer = Pubkey::new_unique();
+        let recent_blockhash = Hash::default();
+        let instruction = Instruction {
+            program_id: Pubkey::new_unique(),
+            accounts: vec![],
+            data: vec![],
+        };
+        let instructions = vec![instruction];
+
+        // Test prepare_transaction_for_signing through module
+        let result = transaction_signing::prepare_transaction_for_signing(&instructions, &payer, recent_blockhash);
+        assert!(result.is_ok());
+
+        let transaction_base64 = result.unwrap();
+
+        // Test extract_transaction_signature through module
+        let result = transaction_signing::extract_transaction_signature(&transaction_base64);
+        assert!(result.is_err()); // Should fail because transaction is unsigned
+        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+
+        // Test verify_signed_transaction through module
+        let result = transaction_signing::verify_signed_transaction(&transaction_base64, &payer);
+        assert!(result.is_err()); // Should fail because transaction is unsigned
     }
 
     #[test]
