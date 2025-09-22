@@ -48,6 +48,7 @@ pub mod events;
 pub mod keypair;
 pub mod pda;
 pub mod program_types;
+pub mod signature;
 pub mod transaction_builder;
 pub mod validation;
 
@@ -72,6 +73,9 @@ pub use transaction_builder::{
     CreatePlanBuilder, InitConfigBuilder, StartSubscriptionBuilder,
 };
 pub use validation::*;
+
+// Re-export signature verification utilities
+pub use signature::verify_wallet_signature;
 
 // Re-export commonly used external types
 pub use solana_sdk;
