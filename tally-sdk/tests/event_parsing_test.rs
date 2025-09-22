@@ -8,17 +8,17 @@
 //! - Base64 encoding/decoding edge cases
 //! - Program log parsing and filtering
 
+use anchor_lang::prelude::*;
 use base64::prelude::*;
 use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use std::collections::HashMap;
 use tally_sdk::{
     events::{
-        create_receipt, parse_events_from_logs, parse_single_event, extract_memo_from_logs, Canceled, PaymentFailed, Renewed, Subscribed,
-        TallyEvent, TallyReceipt, ReceiptParams,
+        create_receipt, extract_memo_from_logs, parse_events_from_logs, parse_single_event,
+        Canceled, PaymentFailed, ReceiptParams, Renewed, Subscribed, TallyEvent, TallyReceipt,
     },
     TallyError,
 };
-use anchor_lang::prelude::*;
 
 /// Test fixture for creating realistic event data
 struct EventTestFixture {
@@ -108,7 +108,10 @@ impl EventTestFixture {
             logs.push(format!("Program log: Event emitted: {event_name}"));
         }
 
-        logs.push(format!("Program {} consumed 15000 of 200000 compute units", self.program_id));
+        logs.push(format!(
+            "Program {} consumed 15000 of 200000 compute units",
+            self.program_id
+        ));
         logs.push(format!("Program {} success", self.program_id));
         logs
     }
@@ -120,12 +123,12 @@ async fn test_subscribed_event_parsing_comprehensive() {
 
     // Test various amounts including edge cases
     let test_amounts = vec![
-        0,                    // Zero amount
-        1,                    // Minimum amount
-        1_000_000,           // 1 USDC
-        5_000_000,           // 5 USDC (typical subscription)
-        100_000_000,         // 100 USDC (high-value subscription)
-        u64::MAX,            // Maximum possible amount
+        0,           // Zero amount
+        1,           // Minimum amount
+        1_000_000,   // 1 USDC
+        5_000_000,   // 5 USDC (typical subscription)
+        100_000_000, // 100 USDC (high-value subscription)
+        u64::MAX,    // Maximum possible amount
     ];
 
     for amount in test_amounts {
@@ -134,7 +137,10 @@ async fn test_subscribed_event_parsing_comprehensive() {
 
         // Parse the event
         let result = parse_single_event(&encoded_data);
-        assert!(result.is_ok(), "Failed to parse Subscribed event with amount {amount}");
+        assert!(
+            result.is_ok(),
+            "Failed to parse Subscribed event with amount {amount}"
+        );
 
         match result.unwrap() {
             TallyEvent::Subscribed(parsed) => {
@@ -165,7 +171,10 @@ async fn test_renewed_event_parsing_comprehensive() {
         let encoded_data = EventTestFixture::create_encoded_event("Renewed", &event);
 
         let result = parse_single_event(&encoded_data);
-        assert!(result.is_ok(), "Failed to parse Renewed event: {description}");
+        assert!(
+            result.is_ok(),
+            "Failed to parse Renewed event: {description}"
+        );
 
         match result.unwrap() {
             TallyEvent::Renewed(parsed) => {
@@ -223,7 +232,10 @@ async fn test_payment_failed_event_parsing_comprehensive() {
         let encoded_data = EventTestFixture::create_encoded_event("PaymentFailed", &event);
 
         let result = parse_single_event(&encoded_data);
-        assert!(result.is_ok(), "Failed to parse PaymentFailed event with reason: {reason}");
+        assert!(
+            result.is_ok(),
+            "Failed to parse PaymentFailed event with reason: {reason}"
+        );
 
         match result.unwrap() {
             TallyEvent::PaymentFailed(parsed) => {
@@ -247,20 +259,32 @@ async fn test_malformed_event_data_handling() {
     let malformed_cases = vec![
         ("", "Empty string"),
         ("invalid_base64_!@#$", "Invalid base64"),
-        ("SGVsbG8gV29ybGQ=", "Valid base64 but too short for discriminator"),
+        (
+            "SGVsbG8gV29ybGQ=",
+            "Valid base64 but too short for discriminator",
+        ),
         (&short_4_bytes, "Less than 8 bytes"),
         (&short_7_bytes, "Exactly 7 bytes"),
-        (&unknown_discriminator, "Valid length but unknown discriminator"),
+        (
+            &unknown_discriminator,
+            "Valid length but unknown discriminator",
+        ),
     ];
 
     for (malformed_data, description) in malformed_cases {
         let result = parse_single_event(malformed_data);
-        assert!(result.is_err(), "Expected error for malformed data: {description}");
+        assert!(
+            result.is_err(),
+            "Expected error for malformed data: {description}"
+        );
 
         // Verify error type
         match result.unwrap_err() {
             TallyError::ParseError(msg) => {
-                assert!(!msg.is_empty(), "Error message should not be empty for: {description}");
+                assert!(
+                    !msg.is_empty(),
+                    "Error message should not be empty for: {description}"
+                );
             }
             _ => panic!("Expected ParseError for: {description}"),
         }
@@ -277,7 +301,10 @@ async fn test_corrupted_event_serialization() {
         (vec![], "No event data after discriminator"),
         (vec![0xFF], "Single corrupted byte"),
         (vec![0xFF, 0xFF, 0xFF], "Multiple corrupted bytes"),
-        (vec![1, 2, 3, 4, 5], "Invalid data that can't be deserialized as Subscribed"),
+        (
+            vec![1, 2, 3, 4, 5],
+            "Invalid data that can't be deserialized as Subscribed",
+        ),
     ];
 
     for (corrupted_data, description) in corrupted_cases {
@@ -287,12 +314,17 @@ async fn test_corrupted_event_serialization() {
         let encoded_data = BASE64_STANDARD.encode(data);
 
         let result = parse_single_event(&encoded_data);
-        assert!(result.is_err(), "Expected error for corrupted data: {description}");
+        assert!(
+            result.is_err(),
+            "Expected error for corrupted data: {description}"
+        );
 
         match result.unwrap_err() {
             TallyError::ParseError(msg) => {
-                assert!(msg.contains("Failed to deserialize"),
-                    "Error should mention deserialization failure for: {description}");
+                assert!(
+                    msg.contains("Failed to deserialize"),
+                    "Error should mention deserialization failure for: {description}"
+                );
             }
             _ => panic!("Expected ParseError for corrupted data: {description}"),
         }
@@ -310,10 +342,22 @@ async fn test_multiple_events_in_logs() {
     let payment_failed = fixture.create_payment_failed_event("Test failure".to_string());
 
     let events_data = vec![
-        ("Subscribed", EventTestFixture::create_encoded_event("Subscribed", &subscribed)),
-        ("Renewed", EventTestFixture::create_encoded_event("Renewed", &renewed)),
-        ("Canceled", EventTestFixture::create_encoded_event("Canceled", &canceled)),
-        ("PaymentFailed", EventTestFixture::create_encoded_event("PaymentFailed", &payment_failed)),
+        (
+            "Subscribed",
+            EventTestFixture::create_encoded_event("Subscribed", &subscribed),
+        ),
+        (
+            "Renewed",
+            EventTestFixture::create_encoded_event("Renewed", &renewed),
+        ),
+        (
+            "Canceled",
+            EventTestFixture::create_encoded_event("Canceled", &canceled),
+        ),
+        (
+            "PaymentFailed",
+            EventTestFixture::create_encoded_event("PaymentFailed", &payment_failed),
+        ),
     ];
 
     let logs = fixture.create_program_logs(events_data);
@@ -322,14 +366,20 @@ async fn test_multiple_events_in_logs() {
     assert_eq!(parsed_events.len(), 4, "Should parse all 4 events");
 
     // Verify each event type was parsed correctly
-    let event_types: Vec<&str> = parsed_events.iter().map(|e| match e {
-        TallyEvent::Subscribed(_) => "Subscribed",
-        TallyEvent::Renewed(_) => "Renewed",
-        TallyEvent::Canceled(_) => "Canceled",
-        TallyEvent::PaymentFailed(_) => "PaymentFailed",
-    }).collect();
+    let event_types: Vec<&str> = parsed_events
+        .iter()
+        .map(|e| match e {
+            TallyEvent::Subscribed(_) => "Subscribed",
+            TallyEvent::Renewed(_) => "Renewed",
+            TallyEvent::Canceled(_) => "Canceled",
+            TallyEvent::PaymentFailed(_) => "PaymentFailed",
+        })
+        .collect();
 
-    assert_eq!(event_types, vec!["Subscribed", "Renewed", "Canceled", "PaymentFailed"]);
+    assert_eq!(
+        event_types,
+        vec!["Subscribed", "Renewed", "Canceled", "PaymentFailed"]
+    );
 }
 
 #[tokio::test]
@@ -385,8 +435,11 @@ async fn test_high_volume_event_parsing_performance() {
     assert_eq!(parsed_events.len(), EVENT_COUNT);
 
     // Performance assertion: should parse 1000 events in less than 100ms
-    assert!(duration.as_millis() < 100,
-        "High volume parsing took too long: {}ms", duration.as_millis());
+    assert!(
+        duration.as_millis() < 100,
+        "High volume parsing took too long: {}ms",
+        duration.as_millis()
+    );
 
     // Verify event data integrity
     for (i, event) in parsed_events.iter().enumerate() {
@@ -418,11 +471,19 @@ async fn test_program_id_filtering() {
 
     // Should only parse events from our program
     let parsed_events = parse_events_from_logs(&logs, &fixture.program_id).unwrap();
-    assert_eq!(parsed_events.len(), 1, "Should only parse events from target program");
+    assert_eq!(
+        parsed_events.len(),
+        1,
+        "Should only parse events from target program"
+    );
 
     // Test parsing with different program filter
     let other_parsed = parse_events_from_logs(&logs, &other_program_id).unwrap();
-    assert_eq!(other_parsed.len(), 1, "Should parse events when filtering for other program");
+    assert_eq!(
+        other_parsed.len(),
+        1,
+        "Should parse events when filtering for other program"
+    );
 }
 
 #[tokio::test]
@@ -434,8 +495,14 @@ async fn test_receipt_creation_comprehensive() {
     let payment_failed = fixture.create_payment_failed_event("Insufficient balance".to_string());
 
     let events_data = vec![
-        ("Subscribed", EventTestFixture::create_encoded_event("Subscribed", &subscribed)),
-        ("PaymentFailed", EventTestFixture::create_encoded_event("PaymentFailed", &payment_failed)),
+        (
+            "Subscribed",
+            EventTestFixture::create_encoded_event("Subscribed", &subscribed),
+        ),
+        (
+            "PaymentFailed",
+            EventTestFixture::create_encoded_event("PaymentFailed", &payment_failed),
+        ),
     ];
 
     let logs = fixture.create_program_logs(events_data);
@@ -452,7 +519,8 @@ async fn test_receipt_creation_comprehensive() {
         compute_units_consumed: Some(15000),
         fee: 5000,
         program_id: fixture.program_id,
-    }).unwrap();
+    })
+    .unwrap();
 
     assert_eq!(receipt.signature, signature);
     assert_eq!(receipt.block_time, Some(1_640_995_200));
@@ -474,11 +542,15 @@ async fn test_receipt_creation_comprehensive() {
         compute_units_consumed: Some(5000),
         fee: 5000,
         program_id: fixture.program_id,
-    }).unwrap();
+    })
+    .unwrap();
 
     assert!(!error_receipt.success);
     assert!(error_receipt.error.is_some());
-    assert!(error_receipt.error.unwrap().contains("InsufficientFundsForFee"));
+    assert!(error_receipt
+        .error
+        .unwrap()
+        .contains("InsufficientFundsForFee"));
 }
 
 #[tokio::test]
@@ -524,25 +596,40 @@ async fn test_receipt_event_getters() {
 async fn test_memo_extraction_comprehensive() {
     let memo_cases = vec![
         // Standard memo format
-        (vec!["Program log: Memo (len 12): \"Hello World!\"".to_string()], Some("Hello World!".to_string())),
+        (
+            vec!["Program log: Memo (len 12): \"Hello World!\"".to_string()],
+            Some("Hello World!".to_string()),
+        ),
         // Alternative memo format
-        (vec!["Program log: Processing memo: Payment for subscription".to_string()], Some("Payment for subscription".to_string())),
+        (
+            vec!["Program log: Processing memo: Payment for subscription".to_string()],
+            Some("Payment for subscription".to_string()),
+        ),
         // Multiple memos (should return first)
-        (vec![
-            "Program log: Memo (len 5): \"First\"".to_string(),
-            "Program log: Memo (len 6): \"Second\"".to_string(),
-        ], Some("First".to_string())),
+        (
+            vec![
+                "Program log: Memo (len 5): \"First\"".to_string(),
+                "Program log: Memo (len 6): \"Second\"".to_string(),
+            ],
+            Some("First".to_string()),
+        ),
         // No memo
         (vec!["Program log: No memo here".to_string()], None),
         // Empty memo (current implementation returns None for empty memos)
         (vec!["Program log: Memo (len 0): \"\"".to_string()], None),
         // Unicode memo
-        (vec!["Program log: Memo (len 15): \"Hello 世界! 🌍\"".to_string()], Some("Hello 世界! 🌍".to_string())),
+        (
+            vec!["Program log: Memo (len 15): \"Hello 世界! 🌍\"".to_string()],
+            Some("Hello 世界! 🌍".to_string()),
+        ),
     ];
 
     for (logs, expected) in memo_cases {
         let extracted = extract_memo_from_logs(&logs);
-        assert_eq!(extracted, expected, "Memo extraction failed for logs: {logs:?}");
+        assert_eq!(
+            extracted, expected,
+            "Memo extraction failed for logs: {logs:?}"
+        );
     }
 }
 
@@ -559,8 +646,10 @@ async fn test_event_discriminator_uniqueness_and_determinism() {
 
         // Check for uniqueness
         for (existing_disc, existing_name) in &discriminators {
-            assert_ne!(disc, *existing_disc,
-                "Discriminator collision between {event_name} and {existing_name}");
+            assert_ne!(
+                disc, *existing_disc,
+                "Discriminator collision between {event_name} and {existing_name}"
+            );
         }
 
         discriminators.insert(disc, event_name);
@@ -570,11 +659,18 @@ async fn test_event_discriminator_uniqueness_and_determinism() {
     for event_name in &event_names {
         let disc1 = EventTestFixture::compute_discriminator(event_name);
         let disc2 = EventTestFixture::compute_discriminator(event_name);
-        assert_eq!(disc1, disc2, "Discriminator for {event_name} should be deterministic");
+        assert_eq!(
+            disc1, disc2,
+            "Discriminator for {event_name} should be deterministic"
+        );
     }
 
     // Verify we have all expected discriminators
-    assert_eq!(discriminators.len(), 4, "Should have exactly 4 unique discriminators");
+    assert_eq!(
+        discriminators.len(),
+        4,
+        "Should have exactly 4 unique discriminators"
+    );
 }
 
 #[tokio::test]
@@ -582,25 +678,27 @@ async fn test_concurrent_event_parsing() {
     let _fixture = EventTestFixture::new();
 
     // Test concurrent parsing of events
-    let handles: Vec<_> = (0..10).map(|i| {
-        let fixture = EventTestFixture::new(); // Each task gets its own fixture
-        tokio::spawn(async move {
-            let event = fixture.create_subscribed_event(i * 1_000_000);
-            let encoded = EventTestFixture::create_encoded_event("Subscribed", &event);
+    let handles: Vec<_> = (0..10)
+        .map(|i| {
+            let fixture = EventTestFixture::new(); // Each task gets its own fixture
+            tokio::spawn(async move {
+                let event = fixture.create_subscribed_event(i * 1_000_000);
+                let encoded = EventTestFixture::create_encoded_event("Subscribed", &event);
 
-            // Parse the event
-            let result = parse_single_event(&encoded);
-            assert!(result.is_ok(), "Failed to parse event in task {i}");
+                // Parse the event
+                let result = parse_single_event(&encoded);
+                assert!(result.is_ok(), "Failed to parse event in task {i}");
 
-            match result.unwrap() {
-                TallyEvent::Subscribed(parsed) => {
-                    assert_eq!(parsed.amount, i * 1_000_000);
-                    i // Return the task number for verification
+                match result.unwrap() {
+                    TallyEvent::Subscribed(parsed) => {
+                        assert_eq!(parsed.amount, i * 1_000_000);
+                        i // Return the task number for verification
+                    }
+                    _ => panic!("Expected Subscribed event in task {i}"),
                 }
-                _ => panic!("Expected Subscribed event in task {i}"),
-            }
+            })
         })
-    }).collect();
+        .collect();
 
     // Wait for all tasks to complete
     let mut results = Vec::new();
@@ -669,8 +767,10 @@ async fn benchmark_event_parsing_throughput() {
     let events_per_second = (BENCHMARK_COUNT as f64) / duration.as_secs_f64();
 
     // Performance assertion: should parse at least 50K events per second
-    assert!(events_per_second > 50_000.0,
-        "Event parsing throughput too low: {events_per_second:.0} events/sec");
+    assert!(
+        events_per_second > 50_000.0,
+        "Event parsing throughput too low: {events_per_second:.0} events/sec"
+    );
 
     println!("Event parsing benchmark: {events_per_second:.0} events/sec");
 }

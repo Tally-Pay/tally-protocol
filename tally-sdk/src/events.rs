@@ -4,15 +4,13 @@ use crate::{error::Result, TallyError};
 use anchor_lang::prelude::*;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
-use solana_sdk::{
-    pubkey::Pubkey,
-    signature::Signature,
-    transaction::TransactionError,
-};
+use solana_sdk::{pubkey::Pubkey, signature::Signature, transaction::TransactionError};
 use std::collections::HashMap;
 
 /// Event emitted when a subscription is successfully started
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+)]
 pub struct Subscribed {
     /// The merchant who owns the subscription plan
     pub merchant: Pubkey,
@@ -25,7 +23,9 @@ pub struct Subscribed {
 }
 
 /// Event emitted when a subscription is successfully renewed
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+)]
 pub struct Renewed {
     /// The merchant who owns the subscription plan
     pub merchant: Pubkey,
@@ -38,7 +38,9 @@ pub struct Renewed {
 }
 
 /// Event emitted when a subscription is canceled
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+)]
 pub struct Canceled {
     /// The merchant who owns the subscription plan
     pub merchant: Pubkey,
@@ -49,7 +51,9 @@ pub struct Canceled {
 }
 
 /// Event emitted when a subscription payment fails
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+)]
 pub struct PaymentFailed {
     /// The merchant who owns the subscription plan
     pub merchant: Pubkey,
@@ -91,7 +95,10 @@ fn get_event_discriminators() -> HashMap<[u8; 8], &'static str> {
     discriminators.insert(compute_event_discriminator("Subscribed"), "Subscribed");
     discriminators.insert(compute_event_discriminator("Renewed"), "Renewed");
     discriminators.insert(compute_event_discriminator("Canceled"), "Canceled");
-    discriminators.insert(compute_event_discriminator("PaymentFailed"), "PaymentFailed");
+    discriminators.insert(
+        compute_event_discriminator("PaymentFailed"),
+        "PaymentFailed",
+    );
     discriminators
 }
 
@@ -149,13 +156,14 @@ pub fn parse_events_from_logs(logs: &[String], program_id: &Pubkey) -> Result<Ve
 /// The discriminator is computed as the first 8 bytes of SHA256("event:<EventName>")
 pub fn parse_single_event(data: &str) -> Result<TallyEvent> {
     // Decode base64 data
-    let decoded_data = base64::prelude::BASE64_STANDARD.decode(data)
+    let decoded_data = base64::prelude::BASE64_STANDARD
+        .decode(data)
         .map_err(|e| TallyError::ParseError(format!("Failed to decode base64: {e}")))?;
 
     // Check minimum length for discriminator (8 bytes)
     if decoded_data.len() < 8 {
         return Err(TallyError::ParseError(
-            "Event data too short, must be at least 8 bytes for discriminator".to_string()
+            "Event data too short, must be at least 8 bytes for discriminator".to_string(),
         ));
     }
 
@@ -168,34 +176,39 @@ pub fn parse_single_event(data: &str) -> Result<TallyEvent> {
 
     // Determine event type based on discriminator
     let discriminators = get_event_discriminators();
-    let event_type = discriminators.get(&discriminator)
-        .ok_or_else(|| TallyError::ParseError(format!(
-            "Unknown event discriminator: {discriminator:?}"
-        )))?;
+    let event_type = discriminators.get(&discriminator).ok_or_else(|| {
+        TallyError::ParseError(format!("Unknown event discriminator: {discriminator:?}"))
+    })?;
 
     // Deserialize the event data using Borsh
     match *event_type {
         "Subscribed" => {
-            let event = Subscribed::try_from_slice(event_data)
-                .map_err(|e| TallyError::ParseError(format!("Failed to deserialize Subscribed event: {e}")))?;
+            let event = Subscribed::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize Subscribed event: {e}"))
+            })?;
             Ok(TallyEvent::Subscribed(event))
         }
         "Renewed" => {
-            let event = Renewed::try_from_slice(event_data)
-                .map_err(|e| TallyError::ParseError(format!("Failed to deserialize Renewed event: {e}")))?;
+            let event = Renewed::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize Renewed event: {e}"))
+            })?;
             Ok(TallyEvent::Renewed(event))
         }
         "Canceled" => {
-            let event = Canceled::try_from_slice(event_data)
-                .map_err(|e| TallyError::ParseError(format!("Failed to deserialize Canceled event: {e}")))?;
+            let event = Canceled::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize Canceled event: {e}"))
+            })?;
             Ok(TallyEvent::Canceled(event))
         }
         "PaymentFailed" => {
-            let event = PaymentFailed::try_from_slice(event_data)
-                .map_err(|e| TallyError::ParseError(format!("Failed to deserialize PaymentFailed event: {e}")))?;
+            let event = PaymentFailed::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize PaymentFailed event: {e}"))
+            })?;
             Ok(TallyEvent::PaymentFailed(event))
         }
-        _ => Err(TallyError::ParseError(format!("Unhandled event type: {event_type}")))
+        _ => Err(TallyError::ParseError(format!(
+            "Unhandled event type: {event_type}"
+        ))),
     }
 }
 
@@ -364,11 +377,10 @@ impl TallyReceipt {
     /// Check if this receipt represents a successful subscription operation
     #[must_use]
     pub fn is_subscription_success(&self) -> bool {
-        self.success && (
-            self.get_subscribed_event().is_some() ||
-            self.get_renewed_event().is_some() ||
-            self.get_canceled_event().is_some()
-        )
+        self.success
+            && (self.get_subscribed_event().is_some()
+                || self.get_renewed_event().is_some()
+                || self.get_canceled_event().is_some())
     }
 }
 
@@ -382,7 +394,8 @@ mod tests {
         let logs = vec![
             "Program 11111111111111111111111111111111 invoke [1]".to_string(),
             "Program log: Memo (len 12): \"Test message\"".to_string(),
-            "Program 11111111111111111111111111111111 consumed 1000 of 200000 compute units".to_string(),
+            "Program 11111111111111111111111111111111 consumed 1000 of 200000 compute units"
+                .to_string(),
         ];
 
         let memo = extract_memo_from_logs(&logs);
@@ -391,9 +404,7 @@ mod tests {
 
     #[test]
     fn test_extract_memo_alternative_format() {
-        let logs = vec![
-            "Program log: Processing memo: Hello world".to_string(),
-        ];
+        let logs = vec!["Program log: Processing memo: Hello world".to_string()];
 
         let memo = extract_memo_from_logs(&logs);
         assert_eq!(memo, Some("Hello world".to_string()));
@@ -403,7 +414,8 @@ mod tests {
     fn test_extract_memo_none() {
         let logs = vec![
             "Program 11111111111111111111111111111111 invoke [1]".to_string(),
-            "Program 11111111111111111111111111111111 consumed 1000 of 200000 compute units".to_string(),
+            "Program 11111111111111111111111111111111 consumed 1000 of 200000 compute units"
+                .to_string(),
         ];
 
         let memo = extract_memo_from_logs(&logs);
@@ -477,7 +489,8 @@ mod tests {
             compute_units_consumed: Some(5000),
             fee: 5000,
             program_id,
-        }).unwrap();
+        })
+        .unwrap();
 
         assert_eq!(receipt.signature, signature);
         assert_eq!(receipt.slot, 100);

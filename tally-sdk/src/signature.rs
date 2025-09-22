@@ -160,7 +160,9 @@ pub fn normalize_signature_format(signature_input: &str) -> Result<String> {
                 }
             }
             _ => {
-                anyhow::bail!("Invalid hex signature format - must be 128 hex characters (64 bytes)")
+                anyhow::bail!(
+                    "Invalid hex signature format - must be 128 hex characters (64 bytes)"
+                )
             }
         }
     }
@@ -207,8 +209,8 @@ pub fn prepare_transaction_for_signing(
     };
 
     // Serialize transaction
-    let serialized = bincode::serialize(&transaction)
-        .context("Failed to serialize transaction for signing")?;
+    let serialized =
+        bincode::serialize(&transaction).context("Failed to serialize transaction for signing")?;
 
     // Encode as base64 for frontend
     Ok(STANDARD.encode(serialized))
@@ -458,13 +460,19 @@ mod tests {
         let invalid_hex = "1234567890abcdef".repeat(4); // 64 characters
         let result = normalize_signature_format(&invalid_hex);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid signature format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid signature format"));
 
         // Test invalid format (not base58, not hex)
         let invalid_format = "invalid_signature_format_123";
         let result = normalize_signature_format(invalid_format);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid signature format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid signature format"));
     }
 
     #[test]
@@ -513,13 +521,17 @@ mod tests {
 
         // Create transaction with empty instructions
         let instructions = vec![];
-        let transaction_base64 = prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
-            .expect("Should prepare transaction successfully");
+        let transaction_base64 =
+            prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
+                .expect("Should prepare transaction successfully");
 
         // Try to verify unsigned transaction
         let result = verify_signed_transaction(&transaction_base64, &payer);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Transaction signature is empty/default"));
     }
 
     #[test]
@@ -529,7 +541,10 @@ mod tests {
 
         let result = verify_signed_transaction(invalid_base64, &payer);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to decode base64 transaction"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to decode base64 transaction"));
     }
 
     #[test]
@@ -540,7 +555,10 @@ mod tests {
 
         let result = verify_signed_transaction(&invalid_transaction, &payer);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to deserialize signed transaction"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to deserialize signed transaction"));
     }
 
     #[test]
@@ -559,29 +577,40 @@ mod tests {
         let instructions = vec![instruction];
 
         // Prepare transaction
-        let transaction_base64 = prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
-            .expect("Should prepare transaction successfully");
+        let transaction_base64 =
+            prepare_transaction_for_signing(&instructions, &payer, recent_blockhash)
+                .expect("Should prepare transaction successfully");
 
         // Try to extract signature from unsigned transaction
         let result = extract_transaction_signature(&transaction_base64);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Transaction signature is empty/default"));
 
         // Test with invalid base64
         let invalid_base64 = "not_valid_base64_data!!!";
         let result = extract_transaction_signature(invalid_base64);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to decode base64 transaction"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to decode base64 transaction"));
 
         // Test with valid base64 but invalid transaction data
         let invalid_transaction = STANDARD.encode(b"not a valid transaction");
         let result = extract_transaction_signature(&invalid_transaction);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to deserialize signed transaction"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to deserialize signed transaction"));
 
         // Test creating a properly signed transaction (this would normally be done by wallet)
         let transaction_bytes = STANDARD.decode(&transaction_base64).unwrap();
-        let mut transaction: VersionedTransaction = bincode::deserialize(&transaction_bytes).unwrap();
+        let mut transaction: VersionedTransaction =
+            bincode::deserialize(&transaction_bytes).unwrap();
 
         // Replace default signature with a real signature for testing
         let test_signature = Signature::new_unique();
@@ -613,7 +642,11 @@ mod tests {
         let instructions = vec![instruction];
 
         // Test prepare_transaction_for_signing through module
-        let result = transaction_signing::prepare_transaction_for_signing(&instructions, &payer, recent_blockhash);
+        let result = transaction_signing::prepare_transaction_for_signing(
+            &instructions,
+            &payer,
+            recent_blockhash,
+        );
         assert!(result.is_ok());
 
         let transaction_base64 = result.unwrap();
@@ -621,7 +654,10 @@ mod tests {
         // Test extract_transaction_signature through module
         let result = transaction_signing::extract_transaction_signature(&transaction_base64);
         assert!(result.is_err()); // Should fail because transaction is unsigned
-        assert!(result.unwrap_err().to_string().contains("Transaction signature is empty/default"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Transaction signature is empty/default"));
 
         // Test verify_signed_transaction through module
         let result = transaction_signing::verify_signed_transaction(&transaction_base64, &payer);

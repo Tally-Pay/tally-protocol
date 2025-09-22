@@ -218,7 +218,8 @@ pub fn validate_plan_update_args(
                 // If we don't have current plan data and no new period, we can't validate
                 // This should be caught by the program's validation
                 return Err(TallyError::Generic(
-                    "Cannot validate grace period without current plan data or new period".to_string(),
+                    "Cannot validate grace period without current plan data or new period"
+                        .to_string(),
                 ));
             };
 
@@ -240,14 +241,13 @@ pub fn validate_plan_update_args(
             )));
         }
         if name.is_empty() {
-            return Err(TallyError::Generic(
-                "Plan name cannot be empty".to_string(),
-            ));
+            return Err(TallyError::Generic("Plan name cannot be empty".to_string()));
         }
     }
 
     // Cross-field validation for period and grace period
-    if let (Some(period_secs), Some(grace_secs)) = (update_args.period_secs, update_args.grace_secs) {
+    if let (Some(period_secs), Some(grace_secs)) = (update_args.period_secs, update_args.grace_secs)
+    {
         let max_grace_secs = 2_u64.saturating_mul(period_secs);
         if grace_secs > max_grace_secs {
             return Err(TallyError::Generic(format!(
@@ -464,7 +464,7 @@ mod tests {
 
         // Shorter periods are also allowed (for now)
         let shorter_period = UpdatePlanArgs::new().with_period_secs(43200); // 12 hours (but still > 24h min)
-        // This should fail validation at the args level due to minimum period requirement
+                                                                            // This should fail validation at the args level due to minimum period requirement
         assert!(validate_plan_update_args(&shorter_period, Some(&current_plan)).is_err());
 
         // Grace period changes are safe

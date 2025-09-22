@@ -123,8 +123,8 @@ async fn test_event_distribution_normal_scenario() {
         plan: None,
         scenario: SimulationScenario::Normal,
         custom_distribution: None,
-        rate: 6000, // High rate for statistical accuracy
-        duration: 1,  // Short duration
+        rate: 6000,  // High rate for statistical accuracy
+        duration: 1, // Short duration
         batch_size: 100,
         output_format: OutputFormat::Stdout,
         websocket_url: None,
@@ -151,10 +151,12 @@ async fn test_event_distribution_normal_scenario() {
     // Check approximate distribution (within 5% tolerance)
     let distribution = EventDistribution::from(SimulationScenario::Normal);
 
-    let subscribed_ratio = f64::from(*counts.get("subscribed").unwrap_or(&0)) / f64::from(total_events);
+    let subscribed_ratio =
+        f64::from(*counts.get("subscribed").unwrap_or(&0)) / f64::from(total_events);
     let renewed_ratio = f64::from(*counts.get("renewed").unwrap_or(&0)) / f64::from(total_events);
     let canceled_ratio = f64::from(*counts.get("canceled").unwrap_or(&0)) / f64::from(total_events);
-    let payment_failed_ratio = f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
+    let payment_failed_ratio =
+        f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
 
     assert!((subscribed_ratio - f64::from(distribution.subscribed)).abs() < 0.05);
     assert!((renewed_ratio - f64::from(distribution.renewed)).abs() < 0.05);
@@ -197,7 +199,8 @@ async fn test_event_distribution_high_churn_scenario() {
 
     // High churn should have more cancellations and payment failures
     let canceled_ratio = f64::from(*counts.get("canceled").unwrap_or(&0)) / f64::from(total_events);
-    let payment_failed_ratio = f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
+    let payment_failed_ratio =
+        f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
 
     // Should be higher than normal scenario
     assert!(canceled_ratio > 0.25); // Expected ~30%
@@ -244,7 +247,8 @@ async fn test_custom_event_distribution() {
         *counts.entry(event_type).or_insert(0) += 1;
     }
 
-    let subscribed_ratio = f64::from(*counts.get("subscribed").unwrap_or(&0)) / f64::from(total_events);
+    let subscribed_ratio =
+        f64::from(*counts.get("subscribed").unwrap_or(&0)) / f64::from(total_events);
     let renewed_ratio = f64::from(*counts.get("renewed").unwrap_or(&0)) / f64::from(total_events);
 
     // Check custom distribution is approximately followed
@@ -356,8 +360,8 @@ async fn test_simulate_events_stdout() {
         plan: None,
         scenario: SimulationScenario::Normal,
         custom_distribution: None,
-        rate: 600, // 10 events per second
-        duration: 1,  // 1 second
+        rate: 600,   // 10 events per second
+        duration: 1, // 1 second
         batch_size: 5,
         output_format: OutputFormat::Stdout,
         websocket_url: None,
@@ -436,13 +440,15 @@ async fn test_websocket_message_format() {
     assert!(parsed["params"]["result"]["value"]["signature"].is_string());
     assert!(parsed["params"]["result"]["value"]["logs"].is_array());
 
-    let logs = parsed["params"]["result"]["value"]["logs"].as_array().unwrap();
+    let logs = parsed["params"]["result"]["value"]["logs"]
+        .as_array()
+        .unwrap();
     assert!(!logs.is_empty());
 
     // Check that one of the logs contains program data
-    let has_program_data = logs.iter().any(|log| {
-        log.as_str().unwrap_or("").contains("Program data:")
-    });
+    let has_program_data = logs
+        .iter()
+        .any(|log| log.as_str().unwrap_or("").contains("Program data:"));
     assert!(has_program_data);
 }
 

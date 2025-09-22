@@ -32,7 +32,8 @@ pub struct SubscriptionInfo {
 }
 
 /// Format plans for human-readable output
-#[must_use] pub fn format_plans_human(plans: &[PlanInfo], merchant_pda: &Pubkey) -> String {
+#[must_use]
+pub fn format_plans_human(plans: &[PlanInfo], merchant_pda: &Pubkey) -> String {
     use std::fmt::Write;
 
     if plans.is_empty() {
@@ -96,7 +97,8 @@ pub fn format_plans_json(plans: &[PlanInfo]) -> Result<String> {
 }
 
 /// Format subscriptions for human-readable output
-#[must_use] pub fn format_subscriptions_human(
+#[must_use]
+pub fn format_subscriptions_human(
     subscriptions: &[SubscriptionInfo],
     plan_pda: &Pubkey,
     config: &TallyCliConfig,
@@ -185,7 +187,8 @@ pub fn format_subscriptions_json(
 /// Panics if the datetime cannot calculate duration since `UNIX_EPOCH`,
 /// which should not happen in normal circumstances since we validate
 /// the timestamp and use checked arithmetic
-#[must_use] pub fn format_timestamp(timestamp: i64) -> String {
+#[must_use]
+pub fn format_timestamp(timestamp: i64) -> String {
     if timestamp <= 0 {
         return "N/A".to_string();
     }

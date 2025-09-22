@@ -8,7 +8,8 @@
 
 use crate::{
     dashboard_types::{
-        DashboardEvent, DashboardEventType, DashboardSubscription, EventStream, Overview, PlanAnalytics,
+        DashboardEvent, DashboardEventType, DashboardSubscription, EventStream, Overview,
+        PlanAnalytics,
     },
     error::{Result, TallyError},
     events::TallyEvent,
@@ -34,7 +35,10 @@ pub enum Period {
     /// Last 365 days
     Year,
     /// Custom date range
-    Custom { from: DateTime<Utc>, to: DateTime<Utc> },
+    Custom {
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    },
 }
 
 /// Event statistics for a time period
@@ -466,7 +470,11 @@ impl DashboardClient {
     ///
     /// # Errors
     /// Returns an error if blockchain queries fail or event parsing fails
-    pub const fn get_event_history(&self, _merchant: &Pubkey, _limit: usize) -> Result<Vec<ParsedEvent>> {
+    pub const fn get_event_history(
+        &self,
+        _merchant: &Pubkey,
+        _limit: usize,
+    ) -> Result<Vec<ParsedEvent>> {
         // TODO: Implement real blockchain querying
         // For now, return empty events to satisfy the interface
         // In a full implementation, this would:
@@ -541,10 +549,13 @@ impl DashboardClient {
         // For now, use the same approach for all periods - get recent events and filter
         // TODO: Implement custom date range querying when async support is added
         let since_timestamp = Self::period_to_timestamp(period);
-        let events = self.get_event_history(merchant, 5000)? // Get more events for better statistics
+        let events = self
+            .get_event_history(merchant, 5000)? // Get more events for better statistics
             .into_iter()
             .filter(|event| {
-                event.block_time.is_some_and(|block_time| block_time >= since_timestamp)
+                event
+                    .block_time
+                    .is_some_and(|block_time| block_time >= since_timestamp)
             })
             .collect::<Vec<_>>();
 
@@ -694,37 +705,37 @@ impl DashboardClient {
 
     /// Convert `ParsedEvent` to `DashboardEvent`
     fn convert_parsed_event_to_dashboard_event(parsed_event: &ParsedEvent) -> DashboardEvent {
-
-        let (event_type, plan_address, subscription_address, subscriber, amount) = match &parsed_event.event {
-            TallyEvent::Subscribed(event) => (
-                DashboardEventType::SubscriptionStarted,
-                Some(event.plan),
-                None, // We don't have subscription address in the event
-                Some(event.subscriber),
-                Some(event.amount),
-            ),
-            TallyEvent::Renewed(event) => (
-                DashboardEventType::SubscriptionRenewed,
-                Some(event.plan),
-                None,
-                Some(event.subscriber),
-                Some(event.amount),
-            ),
-            TallyEvent::Canceled(event) => (
-                DashboardEventType::SubscriptionCanceled,
-                Some(event.plan),
-                None,
-                Some(event.subscriber),
-                None,
-            ),
-            TallyEvent::PaymentFailed(event) => (
-                DashboardEventType::PaymentFailed,
-                Some(event.plan),
-                None,
-                Some(event.subscriber),
-                None,
-            ),
-        };
+        let (event_type, plan_address, subscription_address, subscriber, amount) =
+            match &parsed_event.event {
+                TallyEvent::Subscribed(event) => (
+                    DashboardEventType::SubscriptionStarted,
+                    Some(event.plan),
+                    None, // We don't have subscription address in the event
+                    Some(event.subscriber),
+                    Some(event.amount),
+                ),
+                TallyEvent::Renewed(event) => (
+                    DashboardEventType::SubscriptionRenewed,
+                    Some(event.plan),
+                    None,
+                    Some(event.subscriber),
+                    Some(event.amount),
+                ),
+                TallyEvent::Canceled(event) => (
+                    DashboardEventType::SubscriptionCanceled,
+                    Some(event.plan),
+                    None,
+                    Some(event.subscriber),
+                    None,
+                ),
+                TallyEvent::PaymentFailed(event) => (
+                    DashboardEventType::PaymentFailed,
+                    Some(event.plan),
+                    None,
+                    Some(event.subscriber),
+                    None,
+                ),
+            };
 
         let mut metadata = HashMap::new();
         metadata.insert("signature".to_string(), parsed_event.signature.to_string());
@@ -744,7 +755,9 @@ impl DashboardClient {
             subscriber,
             amount,
             transaction_signature: Some(parsed_event.signature.to_string()),
-            timestamp: parsed_event.block_time.unwrap_or_else(|| Utc::now().timestamp()),
+            timestamp: parsed_event
+                .block_time
+                .unwrap_or_else(|| Utc::now().timestamp()),
             metadata,
         }
     }
@@ -778,7 +791,6 @@ pub struct ParsedEvent {
     /// Log index within the transaction
     pub log_index: usize,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -961,16 +973,25 @@ mod tests {
         // Test custom period
         let start = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let end = Utc.with_ymd_and_hms(2024, 1, 31, 23, 59, 59).unwrap();
-        let custom_period = Period::Custom { from: start, to: end };
+        let custom_period = Period::Custom {
+            from: start,
+            to: end,
+        };
 
-        assert_eq!(format!("{custom_period:?}"), format!("Custom {{ from: {start:?}, to: {end:?} }}"));
+        assert_eq!(
+            format!("{custom_period:?}"),
+            format!("Custom {{ from: {start:?}, to: {end:?} }}")
+        );
 
         // Test equality
         assert_eq!(Period::Day, Period::Day);
         assert_eq!(Period::Week, Period::Week);
         assert_ne!(Period::Day, Period::Week);
 
-        let custom_period2 = Period::Custom { from: start, to: end };
+        let custom_period2 = Period::Custom {
+            from: start,
+            to: end,
+        };
         assert_eq!(custom_period, custom_period2);
     }
 
@@ -986,7 +1007,7 @@ mod tests {
         let stats = EventStats {
             event_counts: event_counts.clone(),
             total_events: 62,
-            success_rate: 96.77, // (60 successful / 62 total) * 100
+            success_rate: 96.77,  // (60 successful / 62 total) * 100
             revenue: 300_000_000, // 300 USDC in micro-lamports
             unique_subscribers: 25,
             period: Period::Month,
@@ -1035,14 +1056,17 @@ mod tests {
         // Test custom period
         let start = Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
         let end = Utc.with_ymd_and_hms(2024, 1, 31, 12, 0, 0).unwrap();
-        let custom_period = Period::Custom { from: start, to: end };
+        let custom_period = Period::Custom {
+            from: start,
+            to: end,
+        };
         let custom_timestamp = DashboardClient::period_to_timestamp(custom_period);
         assert_eq!(custom_timestamp, start.timestamp());
     }
 
     #[test]
     fn test_get_event_type_name() {
-        use crate::events::{TallyEvent, Subscribed, Renewed, Canceled, PaymentFailed};
+        use crate::events::{Canceled, PaymentFailed, Renewed, Subscribed, TallyEvent};
 
         // Create mock events to test event type name extraction
         let subscribed_event = TallyEvent::Subscribed(Subscribed {
@@ -1072,15 +1096,27 @@ mod tests {
             reason: "Insufficient allowance".to_string(),
         });
 
-        assert_eq!(DashboardClient::get_event_type_name(&subscribed_event), "SubscriptionStarted");
-        assert_eq!(DashboardClient::get_event_type_name(&renewed_event), "SubscriptionRenewed");
-        assert_eq!(DashboardClient::get_event_type_name(&canceled_event), "SubscriptionCanceled");
-        assert_eq!(DashboardClient::get_event_type_name(&payment_failed_event), "PaymentFailed");
+        assert_eq!(
+            DashboardClient::get_event_type_name(&subscribed_event),
+            "SubscriptionStarted"
+        );
+        assert_eq!(
+            DashboardClient::get_event_type_name(&renewed_event),
+            "SubscriptionRenewed"
+        );
+        assert_eq!(
+            DashboardClient::get_event_type_name(&canceled_event),
+            "SubscriptionCanceled"
+        );
+        assert_eq!(
+            DashboardClient::get_event_type_name(&payment_failed_event),
+            "PaymentFailed"
+        );
     }
 
     #[test]
     fn test_convert_parsed_event_to_dashboard_event() {
-        use crate::events::{TallyEvent, Subscribed, PaymentFailed};
+        use crate::events::{PaymentFailed, Subscribed, TallyEvent};
         use solana_sdk::signature::Signature;
         use std::str::FromStr;
 
@@ -1106,9 +1142,13 @@ mod tests {
             log_index: 0,
         };
 
-        let dashboard_event = DashboardClient::convert_parsed_event_to_dashboard_event(&parsed_event);
+        let dashboard_event =
+            DashboardClient::convert_parsed_event_to_dashboard_event(&parsed_event);
 
-        assert_eq!(dashboard_event.event_type, DashboardEventType::SubscriptionStarted);
+        assert_eq!(
+            dashboard_event.event_type,
+            DashboardEventType::SubscriptionStarted
+        );
         assert_eq!(dashboard_event.plan_address, Some(plan));
         assert_eq!(dashboard_event.subscription_address, None); // Subscribed events don't have subscription address
         assert_eq!(dashboard_event.subscriber, Some(subscriber));
@@ -1117,8 +1157,14 @@ mod tests {
         assert!(dashboard_event.transaction_signature.is_some());
 
         // Check metadata
-        assert_eq!(dashboard_event.metadata.get("slot"), Some(&"12345".to_string()));
-        assert_eq!(dashboard_event.metadata.get("log_index"), Some(&"0".to_string()));
+        assert_eq!(
+            dashboard_event.metadata.get("slot"),
+            Some(&"12345".to_string())
+        );
+        assert_eq!(
+            dashboard_event.metadata.get("log_index"),
+            Some(&"0".to_string())
+        );
 
         // Test PaymentFailed event with failure reason metadata
         let payment_failed_event = TallyEvent::PaymentFailed(PaymentFailed {
@@ -1137,10 +1183,17 @@ mod tests {
             log_index: 1,
         };
 
-        let dashboard_payment_failed = DashboardClient::convert_parsed_event_to_dashboard_event(&parsed_payment_failed);
+        let dashboard_payment_failed =
+            DashboardClient::convert_parsed_event_to_dashboard_event(&parsed_payment_failed);
 
-        assert_eq!(dashboard_payment_failed.event_type, DashboardEventType::PaymentFailed);
-        assert_eq!(dashboard_payment_failed.metadata.get("failure_reason"), Some(&"Insufficient allowance".to_string()));
+        assert_eq!(
+            dashboard_payment_failed.event_type,
+            DashboardEventType::PaymentFailed
+        );
+        assert_eq!(
+            dashboard_payment_failed.metadata.get("failure_reason"),
+            Some(&"Insufficient allowance".to_string())
+        );
     }
 
     #[test]
@@ -1177,7 +1230,10 @@ mod tests {
         // Test custom period
         let start = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
         let end = Utc.with_ymd_and_hms(2024, 1, 31, 23, 59, 59).unwrap();
-        let custom_period = Period::Custom { from: start, to: end };
+        let custom_period = Period::Custom {
+            from: start,
+            to: end,
+        };
 
         let custom_stats = client.get_event_statistics(&merchant, custom_period);
         assert!(custom_stats.is_ok());

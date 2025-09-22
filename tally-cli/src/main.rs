@@ -445,12 +445,14 @@ async fn execute_command(
                 .map_err(|e| anyhow::anyhow!("Invalid merchant pubkey '{}': {}", merchant, e))?;
 
             // Parse plan pubkey if provided
-            let plan_pubkey = if let Some(plan_str) = plan {
-                Some(Pubkey::from_str(plan_str)
-                    .map_err(|e| anyhow::anyhow!("Invalid plan pubkey '{}': {}", plan_str, e))?)
-            } else {
-                None
-            };
+            let plan_pubkey =
+                if let Some(plan_str) = plan {
+                    Some(Pubkey::from_str(plan_str).map_err(|e| {
+                        anyhow::anyhow!("Invalid plan pubkey '{}': {}", plan_str, e)
+                    })?)
+                } else {
+                    None
+                };
 
             // Parse custom distribution if provided
             let custom_distribution = if let Some(dist_str) = event_distribution {
@@ -461,13 +463,17 @@ async fn execute_command(
                     ));
                 }
 
-                let subscribed: f32 = parts[0].parse()
+                let subscribed: f32 = parts[0]
+                    .parse()
                     .map_err(|e| anyhow::anyhow!("Invalid subscribed percentage: {}", e))?;
-                let renewed: f32 = parts[1].parse()
+                let renewed: f32 = parts[1]
+                    .parse()
                     .map_err(|e| anyhow::anyhow!("Invalid renewed percentage: {}", e))?;
-                let canceled: f32 = parts[2].parse()
+                let canceled: f32 = parts[2]
+                    .parse()
                     .map_err(|e| anyhow::anyhow!("Invalid canceled percentage: {}", e))?;
-                let payment_failed: f32 = parts[3].parse()
+                let payment_failed: f32 = parts[3]
+                    .parse()
                     .map_err(|e| anyhow::anyhow!("Invalid payment_failed percentage: {}", e))?;
 
                 Some(EventDistribution {

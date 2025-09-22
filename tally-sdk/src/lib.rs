@@ -62,8 +62,8 @@ pub use dashboard_types::{
 };
 pub use error::{Result, TallyError};
 pub use events::{
-    TallyEvent, TallyReceipt, Subscribed, Renewed, Canceled, PaymentFailed, ReceiptParams,
-    parse_events_from_logs, create_receipt, create_receipt_legacy, extract_memo_from_logs,
+    create_receipt, create_receipt_legacy, extract_memo_from_logs, parse_events_from_logs,
+    Canceled, PaymentFailed, ReceiptParams, Renewed, Subscribed, TallyEvent, TallyReceipt,
 };
 pub use keypair::load_keypair;
 pub use program_types::*;
@@ -76,9 +76,9 @@ pub use validation::*;
 
 // Re-export signature verification and transaction signing utilities
 pub use signature::{
-    verify_wallet_signature, normalize_signature_format, prepare_transaction_for_signing,
-    verify_signed_transaction, is_valid_wallet_address, extract_transaction_signature,
-    transaction_signing,
+    extract_transaction_signature, is_valid_wallet_address, normalize_signature_format,
+    prepare_transaction_for_signing, transaction_signing, verify_signed_transaction,
+    verify_wallet_signature,
 };
 
 // Re-export commonly used external types
