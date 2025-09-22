@@ -156,10 +156,10 @@ async fn test_event_distribution_normal_scenario() {
     let canceled_ratio = f64::from(*counts.get("canceled").unwrap_or(&0)) / f64::from(total_events);
     let payment_failed_ratio = f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
 
-    assert!((subscribed_ratio - distribution.subscribed as f64).abs() < 0.05);
-    assert!((renewed_ratio - distribution.renewed as f64).abs() < 0.05);
-    assert!((canceled_ratio - distribution.canceled as f64).abs() < 0.05);
-    assert!((payment_failed_ratio - distribution.payment_failed as f64).abs() < 0.05);
+    assert!((subscribed_ratio - f64::from(distribution.subscribed)).abs() < 0.05);
+    assert!((renewed_ratio - f64::from(distribution.renewed)).abs() < 0.05);
+    assert!((canceled_ratio - f64::from(distribution.canceled)).abs() < 0.05);
+    assert!((payment_failed_ratio - f64::from(distribution.payment_failed)).abs() < 0.05);
 }
 
 #[tokio::test]
@@ -196,8 +196,8 @@ async fn test_event_distribution_high_churn_scenario() {
     }
 
     // High churn should have more cancellations and payment failures
-    let canceled_ratio = *counts.get("canceled").unwrap_or(&0) as f64 / total_events as f64;
-    let payment_failed_ratio = *counts.get("payment_failed").unwrap_or(&0) as f64 / total_events as f64;
+    let canceled_ratio = f64::from(*counts.get("canceled").unwrap_or(&0)) / f64::from(total_events);
+    let payment_failed_ratio = f64::from(*counts.get("payment_failed").unwrap_or(&0)) / f64::from(total_events);
 
     // Should be higher than normal scenario
     assert!(canceled_ratio > 0.25); // Expected ~30%
@@ -312,7 +312,7 @@ async fn test_command_validation() {
     let file_no_path = SimulateEventsCommand {
         output_format: OutputFormat::File,
         output_file: None,
-        ..valid_command.clone()
+        ..valid_command
     };
     assert!(file_no_path.validate().is_err());
 }
@@ -437,7 +437,7 @@ async fn test_websocket_message_format() {
     assert!(parsed["params"]["result"]["value"]["logs"].is_array());
 
     let logs = parsed["params"]["result"]["value"]["logs"].as_array().unwrap();
-    assert!(logs.len() > 0);
+    assert!(!logs.is_empty());
 
     // Check that one of the logs contains program data
     let has_program_data = logs.iter().any(|log| {
