@@ -175,7 +175,7 @@ impl StartSubscriptionBuilder {
         let allowance_periods = self.allowance_periods.unwrap_or(3);
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
@@ -311,7 +311,7 @@ impl CancelSubscriptionBuilder {
         let _payer = self.payer.unwrap_or(subscriber);
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute required PDAs
         let subscription_pda =
@@ -427,7 +427,7 @@ impl CreateMerchantBuilder {
         let treasury_ata = self.treasury_ata.ok_or("Treasury ATA not set")?;
         let platform_fee_bps = self.platform_fee_bps.unwrap_or(0);
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
@@ -512,7 +512,7 @@ impl CreatePlanBuilder {
         let _payer = self.payer.unwrap_or(authority);
         let plan_args = self.plan_args.ok_or("Plan args not set")?;
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
@@ -614,7 +614,7 @@ impl UpdatePlanBuilder {
             ));
         }
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
@@ -709,7 +709,7 @@ impl AdminWithdrawFeesBuilder {
         let usdc_mint = self.usdc_mint.ok_or("USDC mint not set")?;
         let amount = self.amount.ok_or("Amount not set")?;
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute config PDA
         let config_pda = pda::config_address_with_program_id(&program_id);
@@ -786,7 +786,7 @@ impl InitConfigBuilder {
         let authority = self.authority.ok_or("Authority not set")?;
         let config_args = self.config_args.ok_or("Config args not set")?;
 
-        let program_id = self.program_id.unwrap_or_else(|| program_id());
+        let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute config PDA
         let config_pda = pda::config_address_with_program_id(&program_id);
