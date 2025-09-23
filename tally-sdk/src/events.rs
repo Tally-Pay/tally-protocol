@@ -3,6 +3,7 @@
 use crate::{error::Result, TallyError};
 use anchor_lang::prelude::*;
 use base64::prelude::*;
+use chrono;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{pubkey::Pubkey, signature::Signature, transaction::TransactionError};
 use std::collections::HashMap;
@@ -78,6 +79,238 @@ pub enum TallyEvent {
     PaymentFailed(PaymentFailed),
 }
 
+/// Enhanced parsed event with transaction context for RPC queries and WebSocket streaming
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ParsedEventWithContext {
+    /// Transaction signature that contains this event
+    pub signature: Signature,
+    /// Slot number where transaction was processed
+    pub slot: u64,
+    /// Block time (Unix timestamp)
+    pub block_time: Option<i64>,
+    /// Transaction success status
+    pub success: bool,
+    /// The parsed Tally event
+    pub event: TallyEvent,
+    /// Log index within the transaction
+    pub log_index: usize,
+}
+
+/// WebSocket-friendly event data for dashboard streaming
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StreamableEventData {
+    /// Event type as string
+    pub event_type: String,
+    /// Merchant PDA
+    pub merchant_pda: String,
+    /// Transaction signature
+    pub transaction_signature: String,
+    /// Event timestamp
+    pub timestamp: i64,
+    /// Event metadata
+    pub metadata: HashMap<String, String>,
+    /// Amount involved (if applicable)
+    pub amount: Option<u64>,
+    /// Plan address (if applicable)
+    pub plan_address: Option<String>,
+    /// Subscription address (if applicable)
+    pub subscription_address: Option<String>,
+}
+
+impl ParsedEventWithContext {
+    /// Create a new `ParsedEventWithContext` from components
+    #[must_use]
+    pub const fn new(
+        signature: Signature,
+        slot: u64,
+        block_time: Option<i64>,
+        success: bool,
+        event: TallyEvent,
+        log_index: usize,
+    ) -> Self {
+        Self {
+            signature,
+            slot,
+            block_time,
+            success,
+            event,
+            log_index,
+        }
+    }
+
+    /// Convert to streamable event data for WebSocket
+    #[must_use]
+    pub fn to_streamable(&self) -> StreamableEventData {
+        let (event_type, merchant_pda, plan_address, subscriber, amount, reason) = match &self.event {
+            TallyEvent::Subscribed(e) => (
+                "subscribed".to_string(),
+                e.merchant.to_string(),
+                Some(e.plan.to_string()),
+                Some(e.subscriber.to_string()),
+                Some(e.amount),
+                None,
+            ),
+            TallyEvent::Renewed(e) => (
+                "renewed".to_string(),
+                e.merchant.to_string(),
+                Some(e.plan.to_string()),
+                Some(e.subscriber.to_string()),
+                Some(e.amount),
+                None,
+            ),
+            TallyEvent::Canceled(e) => (
+                "canceled".to_string(),
+                e.merchant.to_string(),
+                Some(e.plan.to_string()),
+                Some(e.subscriber.to_string()),
+                None,
+                None,
+            ),
+            TallyEvent::PaymentFailed(e) => (
+                "payment_failed".to_string(),
+                e.merchant.to_string(),
+                Some(e.plan.to_string()),
+                Some(e.subscriber.to_string()),
+                None,
+                Some(e.reason.clone()),
+            ),
+        };
+
+        let mut metadata = HashMap::new();
+        if let Some(subscriber) = subscriber {
+            metadata.insert("subscriber".to_string(), subscriber);
+        }
+        if let Some(reason) = reason {
+            metadata.insert("reason".to_string(), reason);
+        }
+        metadata.insert("slot".to_string(), self.slot.to_string());
+        metadata.insert("success".to_string(), self.success.to_string());
+
+        // Generate subscription address for events that have plan + subscriber
+        let subscription_address = if plan_address.is_some() && metadata.contains_key("subscriber") {
+            let subscriber_str = metadata.get("subscriber").map_or("unknown", String::as_str);
+            Some(format!("subscription_{}_{}",
+                plan_address.as_deref().unwrap_or("unknown"),
+                subscriber_str
+            ))
+        } else {
+            None
+        };
+
+        StreamableEventData {
+            event_type,
+            merchant_pda,
+            transaction_signature: self.signature.to_string(),
+            timestamp: self.block_time.unwrap_or(0),
+            metadata,
+            amount,
+            plan_address,
+            subscription_address,
+        }
+    }
+
+    /// Check if this event was successful
+    #[must_use]
+    pub const fn is_successful(&self) -> bool {
+        self.success
+    }
+
+    /// Get the merchant pubkey from the event
+    #[must_use]
+    pub const fn get_merchant(&self) -> Option<Pubkey> {
+        match &self.event {
+            TallyEvent::Subscribed(e) => Some(e.merchant),
+            TallyEvent::Renewed(e) => Some(e.merchant),
+            TallyEvent::Canceled(e) => Some(e.merchant),
+            TallyEvent::PaymentFailed(e) => Some(e.merchant),
+        }
+    }
+
+    /// Get the plan pubkey from the event
+    #[must_use]
+    pub const fn get_plan(&self) -> Option<Pubkey> {
+        match &self.event {
+            TallyEvent::Subscribed(e) => Some(e.plan),
+            TallyEvent::Renewed(e) => Some(e.plan),
+            TallyEvent::Canceled(e) => Some(e.plan),
+            TallyEvent::PaymentFailed(e) => Some(e.plan),
+        }
+    }
+
+    /// Get the subscriber pubkey from the event
+    #[must_use]
+    pub const fn get_subscriber(&self) -> Option<Pubkey> {
+        match &self.event {
+            TallyEvent::Subscribed(e) => Some(e.subscriber),
+            TallyEvent::Renewed(e) => Some(e.subscriber),
+            TallyEvent::Canceled(e) => Some(e.subscriber),
+            TallyEvent::PaymentFailed(e) => Some(e.subscriber),
+        }
+    }
+
+    /// Get the amount from the event (if applicable)
+    #[must_use]
+    pub const fn get_amount(&self) -> Option<u64> {
+        match &self.event {
+            TallyEvent::Subscribed(e) => Some(e.amount),
+            TallyEvent::Renewed(e) => Some(e.amount),
+            TallyEvent::Canceled(_) | TallyEvent::PaymentFailed(_) => None,
+        }
+    }
+
+    /// Get event type as string for display
+    #[must_use]
+    pub fn get_event_type_string(&self) -> String {
+        match &self.event {
+            TallyEvent::Subscribed(_) => "Subscribed".to_string(),
+            TallyEvent::Renewed(_) => "Renewed".to_string(),
+            TallyEvent::Canceled(_) => "Canceled".to_string(),
+            TallyEvent::PaymentFailed(_) => "PaymentFailed".to_string(),
+        }
+    }
+
+    /// Format amount as USDC (6 decimal places)
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn format_amount(&self) -> Option<f64> {
+        self.get_amount().map(|amount| amount as f64 / 1_000_000.0)
+    }
+
+    /// Get timestamp as formatted string
+    #[must_use]
+    pub fn format_timestamp(&self) -> String {
+        self.block_time.map_or_else(|| "Pending".to_string(), |timestamp| chrono::DateTime::from_timestamp(timestamp, 0)
+                    .map_or_else(|| "Unknown".to_string(), |dt| dt.to_rfc3339()))
+    }
+
+    /// Check if this event affects revenue
+    #[must_use]
+    pub const fn affects_revenue(&self) -> bool {
+        matches!(
+            &self.event,
+            TallyEvent::Subscribed(_) | TallyEvent::Renewed(_)
+        )
+    }
+
+    /// Check if this event affects subscription count
+    #[must_use]
+    pub const fn affects_subscription_count(&self) -> bool {
+        matches!(
+            &self.event,
+            TallyEvent::Subscribed(_) | TallyEvent::Canceled(_)
+        )
+    }
+
+    /// Get the payment failure reason (if applicable)
+    #[must_use]
+    pub fn get_failure_reason(&self) -> Option<&str> {
+        match &self.event {
+            TallyEvent::PaymentFailed(e) => Some(&e.reason),
+            _ => None,
+        }
+    }
+}
+
 /// Compute the 8-byte discriminator for an Anchor event
 /// Formula: first 8 bytes of SHA256("event:<EventName>")
 fn compute_event_discriminator(event_name: &str) -> [u8; 8] {
@@ -123,6 +356,44 @@ pub struct TallyReceipt {
     pub compute_units_consumed: Option<u64>,
     /// Transaction fee in lamports
     pub fee: u64,
+}
+
+/// Parse Tally events from transaction logs with transaction context
+///
+/// # Arguments
+/// * `logs` - The transaction logs to parse
+/// * `program_id` - The Tally program ID to filter events
+/// * `signature` - Transaction signature
+/// * `slot` - Transaction slot
+/// * `block_time` - Block time
+/// * `success` - Transaction success status
+///
+/// # Returns
+/// * `Ok(Vec<ParsedEventWithContext>)` - Parsed events with context
+/// * `Err(TallyError)` - If parsing fails
+pub fn parse_events_with_context(
+    logs: &[String],
+    program_id: &Pubkey,
+    signature: Signature,
+    slot: u64,
+    block_time: Option<i64>,
+    success: bool,
+) -> Result<Vec<ParsedEventWithContext>> {
+    let events = parse_events_from_logs(logs, program_id)?;
+    let mut parsed_events = Vec::new();
+
+    for (log_index, event) in events.into_iter().enumerate() {
+        parsed_events.push(ParsedEventWithContext::new(
+            signature,
+            slot,
+            block_time,
+            success,
+            event,
+            log_index,
+        ));
+    }
+
+    Ok(parsed_events)
 }
 
 /// Parse Tally events from transaction logs
