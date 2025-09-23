@@ -63,7 +63,8 @@ pub use dashboard_types::{
 pub use error::{Result, TallyError};
 pub use events::{
     create_receipt, create_receipt_legacy, extract_memo_from_logs, parse_events_from_logs,
-    Canceled, PaymentFailed, ReceiptParams, Renewed, Subscribed, TallyEvent, TallyReceipt,
+    parse_events_with_context, Canceled, ParsedEventWithContext, PaymentFailed, ReceiptParams,
+    Renewed, StreamableEventData, Subscribed, TallyEvent, TallyReceipt,
 };
 pub use keypair::load_keypair;
 pub use program_types::*;

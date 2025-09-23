@@ -12,7 +12,7 @@ use crate::{
         PlanAnalytics,
     },
     error::{Result, TallyError},
-    events::TallyEvent,
+    events::{ParsedEventWithContext, TallyEvent},
     program_types::{CreatePlanArgs, InitMerchantArgs, Merchant, Plan},
     simple_client::SimpleTallyClient,
     validation::validate_platform_fee_bps,
@@ -466,7 +466,7 @@ impl DashboardClient {
     /// * `limit` - Maximum number of events to return
     ///
     /// # Returns
-    /// * `Ok(Vec<ParsedEvent>)` - List of parsed events from blockchain
+    /// * `Ok(Vec<ParsedEventWithContext>)` - List of parsed events from blockchain
     ///
     /// # Errors
     /// Returns an error if blockchain queries fail or event parsing fails
@@ -474,7 +474,7 @@ impl DashboardClient {
         &self,
         _merchant: &Pubkey,
         _limit: usize,
-    ) -> Result<Vec<ParsedEvent>> {
+    ) -> Result<Vec<ParsedEventWithContext>> {
         // TODO: Implement real blockchain querying
         // For now, return empty events to satisfy the interface
         // In a full implementation, this would:
@@ -493,6 +493,130 @@ impl DashboardClient {
         // Return empty events for now
         // Note: limit parameter available for future implementation
         Ok(vec![])
+    }
+
+    /// Get recent events with transaction context for a merchant
+    ///
+    /// This is a high-level method that provides the parsed events with context
+    /// that the tally-actions project needs for analytics and dashboard display.
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant PDA address
+    /// * `limit` - Maximum number of events to return
+    ///
+    /// # Returns
+    /// * `Ok(Vec<ParsedEventWithContext>)` - List of recent events with context
+    ///
+    /// # Errors
+    /// Returns an error if RPC queries fail or event parsing fails
+    pub const fn get_recent_events_with_context(
+        &self,
+        merchant: &Pubkey,
+        limit: usize,
+    ) -> Result<Vec<ParsedEventWithContext>> {
+        // For now, delegate to get_event_history
+        // In a full implementation, this would:
+        // 1. Get transaction signatures for merchant's program accounts
+        // 2. Batch fetch transaction details with metadata
+        // 3. Parse events from logs and add transaction context
+        // 4. Sort by most recent first
+
+        self.get_event_history(merchant, limit)
+    }
+
+    /// Get events by date range with transaction context
+    ///
+    /// This method provides date-filtered events with full transaction context
+    /// for analytics and reporting.
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant PDA address
+    /// * `from` - Start date (inclusive)
+    /// * `to` - End date (inclusive)
+    ///
+    /// # Returns
+    /// * `Ok(Vec<ParsedEventWithContext>)` - List of events in date range
+    ///
+    /// # Errors
+    /// Returns an error if RPC queries fail or slot conversion fails
+    pub fn get_events_by_date_range_with_context(
+        &self,
+        merchant: &Pubkey,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<ParsedEventWithContext>> {
+        // For now, get recent events and filter by timestamp
+        // In a full implementation, this would:
+        // 1. Convert dates to approximate slots for efficient filtering
+        // 2. Get merchant signatures within slot range
+        // 3. Parse events and filter by actual block time
+        // 4. Sort by block time
+
+        let events = self.get_event_history(merchant, 5000)?;
+        let from_timestamp = from.timestamp();
+        let to_timestamp = to.timestamp();
+
+        let filtered_events: Vec<ParsedEventWithContext> = events
+            .into_iter()
+            .filter(|event| {
+                event.block_time.is_some_and(|block_time| block_time >= from_timestamp && block_time <= to_timestamp)
+            })
+            .collect();
+
+        Ok(filtered_events)
+    }
+
+    /// Get streamable event data for WebSocket broadcasting
+    ///
+    /// Converts parsed events to WebSocket-friendly format for real-time streaming.
+    ///
+    /// # Arguments
+    /// * `events` - Parsed events with context
+    ///
+    /// # Returns
+    /// * `Vec<StreamableEventData>` - Events in streamable format
+    #[must_use]
+    pub fn convert_to_streamable_events(
+        events: &[ParsedEventWithContext],
+    ) -> Vec<crate::events::StreamableEventData> {
+        events.iter().map(ParsedEventWithContext::to_streamable).collect()
+    }
+
+    /// Validate merchant and get basic info
+    ///
+    /// Helper method for the actions project to validate merchant existence
+    /// and get basic merchant information in one call.
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant PDA address
+    ///
+    /// # Returns
+    /// * `Ok(Some(Merchant))` - Merchant data if found
+    /// * `Ok(None)` - If merchant doesn't exist
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn validate_and_get_merchant(&self, merchant: &Pubkey) -> Result<Option<Merchant>> {
+        self.client.get_merchant(merchant)
+    }
+
+    /// Get cached analytics for a merchant
+    ///
+    /// This method provides analytics data that can be cached by the actions project
+    /// for better performance in dashboard endpoints.
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant PDA address
+    ///
+    /// # Returns
+    /// * `Ok((Overview, Vec<PlanAnalytics>))` - Overview and plan analytics
+    ///
+    /// # Errors
+    /// Returns an error if merchant doesn't exist or data fetching fails
+    pub fn get_cached_analytics(&self, merchant: &Pubkey) -> Result<(Overview, Vec<PlanAnalytics>)> {
+        let overview = self.get_merchant_overview(merchant)?;
+        let plan_analytics = self.get_all_plan_analytics(merchant)?;
+        Ok((overview, plan_analytics))
     }
 
     /// Poll for recent events manually
@@ -703,8 +827,8 @@ impl DashboardClient {
         }
     }
 
-    /// Convert `ParsedEvent` to `DashboardEvent`
-    fn convert_parsed_event_to_dashboard_event(parsed_event: &ParsedEvent) -> DashboardEvent {
+    /// Convert `ParsedEventWithContext` to `DashboardEvent`
+    fn convert_parsed_event_to_dashboard_event(parsed_event: &ParsedEventWithContext) -> DashboardEvent {
         let (event_type, plan_address, subscription_address, subscriber, amount) =
             match &parsed_event.event {
                 TallyEvent::Subscribed(event) => (
@@ -769,28 +893,8 @@ impl DashboardClient {
     }
 }
 
-// We need to define ParsedEvent here since it's from tally-actions
-// This is a temporary solution - in a real implementation, we'd either:
-// 1. Move ParsedEvent to tally-sdk
-// 2. Create a bridge module
-// 3. Use a different approach
-
-/// A parsed event with transaction context (temporary definition)
-#[derive(Debug, Clone)]
-pub struct ParsedEvent {
-    /// Transaction signature that contains this event
-    pub signature: solana_sdk::signature::Signature,
-    /// Slot number where transaction was processed
-    pub slot: u64,
-    /// Block time (Unix timestamp)
-    pub block_time: Option<i64>,
-    /// Transaction success status
-    pub success: bool,
-    /// The parsed Tally event
-    pub event: TallyEvent,
-    /// Log index within the transaction
-    pub log_index: usize,
-}
+// ParsedEvent is now available as ParsedEventWithContext from crate::events
+// The duplicate definition has been removed and replaced with the SDK version
 
 #[cfg(test)]
 mod tests {
@@ -1120,7 +1224,7 @@ mod tests {
         use solana_sdk::signature::Signature;
         use std::str::FromStr;
 
-        // Create a mock ParsedEvent with SubscribedEvent
+        // Create a mock ParsedEventWithContext with SubscribedEvent
         let subscriber = Keypair::new().pubkey();
         let plan = Keypair::new().pubkey();
         let _subscription = Keypair::new().pubkey();
@@ -1133,7 +1237,7 @@ mod tests {
             amount: 10_000_000, // 10 USDC
         });
 
-        let parsed_event = ParsedEvent {
+        let parsed_event = ParsedEventWithContext {
             event: subscribed_event,
             signature: Signature::from_str("5VfYmGBjvxKjKjuxV7XFQTdLX2L5VVXJGVCbNH1ZyHUJKpYzKtXs1sVs5VKjKjKjKjKjKjKjKjKjKjKjKjKjKjKj").unwrap(),
             slot: 12345,
@@ -1174,7 +1278,7 @@ mod tests {
             reason: "Insufficient allowance".to_string(),
         });
 
-        let parsed_payment_failed = ParsedEvent {
+        let parsed_payment_failed = ParsedEventWithContext {
             event: payment_failed_event,
             signature: Signature::from_str("5VfYmGBjvxKjKjuxV7XFQTdLX2L5VVXJGVCbNH1ZyHUJKpYzKtXs1sVs5VKjKjKjKjKjKjKjKjKjKjKjKjKjKjKj").unwrap(),
             slot: 12346,
