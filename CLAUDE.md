@@ -197,3 +197,12 @@ Keeper exports Prometheus metrics for subscription renewals, failures, and syste
 - **Code Quality**: Run `cargo fmt` and `cargo clippy` before committing Rust changes
 - **Architecture Decisions**: Refer to the PRD for context on why certain design decisions were made
 - **Future Extensions**: The PRD outlines V2+ features that may be implemented later (Token-2022, multi-chain, etc.)
+- remember to always use the ast-grep mcp server when you need to search or analyze the codebase by first asking to see it's list of available tools and then selecting the correct one for the job
+
+## Tooling for shell interactions
+Is it about finding FILES? use 'fd'
+Is it about finding TEXT/strings? use 'rg'
+Is it about finding CODE STRUCTURE? use 'ast-grep' or the ast-grep-mcp server
+Is it about SELECTING from multiple results? pipe to 'fzf'
+Is it about interacting with JSON? use 'jq'
+Is it about interacting with YAML or XML? use 'yq'
