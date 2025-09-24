@@ -6,9 +6,10 @@ use std::str::FromStr;
 use tally_sdk::{
     ata::{get_associated_token_address_with_program, TokenProgram},
     get_usdc_mint, load_keypair,
-    solana_sdk::{pubkey::Pubkey, signature::Signer},
     validate_usdc_token_account, SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use tracing::info;
 
 /// Execute the withdraw fees command
@@ -53,11 +54,12 @@ pub async fn execute(
     info!("Using destination ATA: {}", destination_ata);
 
     // Validate destination ATA using tally-sdk
+    let platform_authority_pubkey = Pubkey::from(platform_authority.pubkey().to_bytes());
     validate_usdc_token_account(
         tally_client,
         &destination_ata,
         &usdc_mint,
-        &platform_authority.pubkey(),
+        &platform_authority_pubkey,
         "destination",
     )
     .map_err(|e| anyhow!("Destination ATA validation failed: {}", e))?;
@@ -66,7 +68,7 @@ pub async fn execute(
     // NOTE: This assumes the platform treasury ATA is the platform authority's ATA for USDC
     // In a real implementation, this might be a specific PDA or a hardcoded treasury account
     let platform_treasury_ata = get_associated_token_address_with_program(
-        &platform_authority.pubkey(),
+        &platform_authority_pubkey,
         &usdc_mint,
         TokenProgram::Token,
     )

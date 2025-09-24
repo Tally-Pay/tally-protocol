@@ -19,9 +19,10 @@ use std::{
 };
 use tally_sdk::{
     events::{Canceled, PaymentFailed, Renewed, Subscribed, TallyEvent},
-    solana_sdk::{pubkey::Pubkey, signature::Signature},
     SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signature;
 use tokio::{sync::mpsc, time::interval};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tracing::{debug, error, info};

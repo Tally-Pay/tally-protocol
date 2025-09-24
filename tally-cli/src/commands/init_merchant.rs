@@ -5,9 +5,10 @@ use anyhow::{anyhow, Result};
 use std::str::FromStr;
 use tally_sdk::{
     get_usdc_mint, load_keypair,
-    solana_sdk::{pubkey::Pubkey, signature::Signer},
     validate_usdc_token_account, SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use tracing::info;
 
 /// Execute the init merchant command
@@ -40,11 +41,12 @@ pub async fn execute(
     info!("Using treasury ATA: {}", treasury_ata);
 
     // Validate treasury ATA using tally-sdk
+    let authority_pubkey = Pubkey::from(authority.pubkey().to_bytes());
     validate_usdc_token_account(
         tally_client,
         &treasury_ata,
         &usdc_mint,
-        &authority.pubkey(),
+        &authority_pubkey,
         "treasury",
     )
     .map_err(|e| anyhow!("Treasury ATA validation failed: {}", e))?;

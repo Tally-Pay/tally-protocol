@@ -107,7 +107,7 @@ pub mod subs {
     /// # Errors
     /// Returns an error if:
     /// - Subscription is not active or has been cancelled
-    /// - Renewal is not yet due (before next_renewal_ts)
+    /// - Renewal is not yet due (before `next_renewal_ts`)
     /// - Insufficient USDC balance for renewal
     /// - Token transfer operations fail
     /// - Subscription has exceeded grace period

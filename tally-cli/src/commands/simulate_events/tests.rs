@@ -1,7 +1,7 @@
 //! Tests for event simulation functionality
 
 use super::*;
-use solana_sdk::signature::{Keypair, Signer};
+use anchor_client::solana_sdk::signature::{Keypair, Signer};
 use std::time::Duration;
 use tokio::time::timeout;
 

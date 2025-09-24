@@ -18,7 +18,7 @@ pub struct Merchant {
 }
 
 /// Plan account defines subscription plan details
-/// PDA seeds: ["plan", merchant, plan_id]
+/// PDA seeds: ["plan", merchant, `plan_id`]
 #[account]
 #[derive(InitSpace)]
 pub struct Plan {
@@ -77,7 +77,7 @@ impl Subscription {
 }
 
 /// Global configuration account for program constants and settings
-/// PDA seeds: ["config"]
+/// PDA seeds: `["config"]`
 #[account]
 #[derive(InitSpace)]
 pub struct Config {

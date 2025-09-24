@@ -4,9 +4,10 @@ use anyhow::{anyhow, Result};
 use std::str::FromStr;
 use tally_sdk::{
     load_keypair, pda,
-    solana_sdk::{pubkey::Pubkey, signature::Signer},
     SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use tracing::info;
 
 /// Execute the deactivate plan command
@@ -36,7 +37,8 @@ pub async fn execute(
         .ok_or_else(|| anyhow!("Plan account does not exist at address: {}", plan_pda))?;
 
     // Validate authority matches merchant authority by computing expected merchant PDA
-    let expected_merchant_pda = pda::merchant_address(&authority.pubkey())?;
+    let authority_pubkey = Pubkey::from(authority.pubkey().to_bytes());
+    let expected_merchant_pda = pda::merchant_address(&authority_pubkey)?;
     if plan.merchant != expected_merchant_pda {
         return Err(anyhow!(
             "Authority mismatch: this authority ({}) does not own the merchant ({}) for this plan. Expected merchant: {}",

@@ -6,9 +6,10 @@ use std::str::FromStr;
 use tally_sdk::{
     load_keypair,
     program_types::CreatePlanArgs,
-    solana_sdk::{pubkey::Pubkey, signature::Signer},
     SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use tracing::info;
 
 /// Arguments for creating a plan
@@ -49,7 +50,8 @@ pub async fn execute(
     info!("Using authority: {}", authority.pubkey());
 
     // Validate authority matches the provided merchant PDA
-    let computed_merchant_pda = tally_client.merchant_address(&authority.pubkey());
+    let authority_pubkey = Pubkey::from(authority.pubkey().to_bytes());
+    let computed_merchant_pda = tally_client.merchant_address(&authority_pubkey);
     if expected_merchant_pda != computed_merchant_pda {
         return Err(anyhow!(
             "Authority mismatch: expected merchant PDA {} for authority {}, but got {}",

@@ -4,7 +4,7 @@ use crate::config::TallyCliConfig;
 use anyhow::{anyhow, Result};
 use serde_json;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tally_sdk::solana_sdk::pubkey::Pubkey;
+use anchor_lang::prelude::Pubkey;
 
 /// Plan information for display
 #[derive(Debug)]

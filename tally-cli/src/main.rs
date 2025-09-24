@@ -12,7 +12,8 @@ mod utils;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use config::TallyCliConfig;
-use tally_sdk::{solana_sdk::pubkey::Pubkey, SimpleTallyClient};
+use tally_sdk::SimpleTallyClient;
+use anchor_lang::prelude::Pubkey;
 
 #[derive(Parser, Debug)]
 #[command(

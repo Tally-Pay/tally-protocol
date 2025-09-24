@@ -6,10 +6,11 @@ use std::str::FromStr;
 use tally_sdk::{
     load_keypair,
     program_types::InitConfigArgs,
-    solana_sdk::{pubkey::Pubkey, signature::Signer},
     transaction_builder::init_config,
     SimpleTallyClient,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use tracing::info;
 
 /// Execute the init config command
