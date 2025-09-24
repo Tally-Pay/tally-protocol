@@ -32,12 +32,12 @@ pub async fn execute(
 
     // Parse USDC mint
     let usdc_mint =
-        get_usdc_mint(usdc_mint_str).map_err(|e| anyhow!("Failed to parse USDC mint: {}", e))?;
+        get_usdc_mint(usdc_mint_str).map_err(|e| anyhow!("Failed to parse USDC mint: {e}"))?;
     info!("Using USDC mint: {}", usdc_mint);
 
     // Parse treasury ATA
     let treasury_ata = Pubkey::from_str(treasury_str)
-        .map_err(|e| anyhow!("Invalid treasury ATA address '{}': {}", treasury_str, e))?;
+        .map_err(|e| anyhow!("Invalid treasury ATA address '{treasury_str}': {e}"))?;
     info!("Using treasury ATA: {}", treasury_ata);
 
     // Validate treasury ATA using tally-sdk
@@ -49,12 +49,12 @@ pub async fn execute(
         &authority_pubkey,
         "treasury",
     )
-    .map_err(|e| anyhow!("Treasury ATA validation failed: {}", e))?;
+    .map_err(|e| anyhow!("Treasury ATA validation failed: {e}"))?;
 
     // Use tally-sdk's high-level convenience method
     let (merchant_pda, signature) = tally_client
         .create_merchant(&authority, &usdc_mint, &treasury_ata, fee_bps)
-        .map_err(|e| anyhow!("Failed to create merchant: {}", e))?;
+        .map_err(|e| anyhow!("Failed to create merchant: {e}"))?;
 
     info!("Transaction confirmed: {}", signature);
 

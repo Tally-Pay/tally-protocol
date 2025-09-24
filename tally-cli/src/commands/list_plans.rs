@@ -28,14 +28,13 @@ pub async fn execute(
 
     // Parse merchant PDA address
     let merchant_pda = Pubkey::from_str(merchant_str)
-        .map_err(|e| anyhow!("Invalid merchant PDA address '{}': {}", merchant_str, e))?;
+        .map_err(|e| anyhow!("Invalid merchant PDA address '{merchant_str}': {e}"))?;
     info!("Using merchant PDA: {}", merchant_pda);
 
     // Validate merchant exists
     if !tally_client.account_exists(&merchant_pda)? {
         return Err(anyhow!(
-            "Merchant account does not exist at address: {}",
-            merchant_pda
+            "Merchant account does not exist at address: {merchant_pda}"
         ));
     }
 

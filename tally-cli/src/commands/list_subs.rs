@@ -32,14 +32,13 @@ pub async fn execute(
 
     // Parse plan PDA address
     let plan_pda = Pubkey::from_str(plan_str)
-        .map_err(|e| anyhow!("Invalid plan PDA address '{}': {}", plan_str, e))?;
+        .map_err(|e| anyhow!("Invalid plan PDA address '{plan_str}': {e}"))?;
     info!("Using plan PDA: {}", plan_pda);
 
     // Validate plan exists
     if !tally_client.account_exists(&plan_pda)? {
         return Err(anyhow!(
-            "Plan account does not exist at address: {}",
-            plan_pda
+            "Plan account does not exist at address: {plan_pda}"
         ));
     }
 

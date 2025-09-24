@@ -64,8 +64,7 @@ impl EventDistribution {
         let total = self.subscribed + self.renewed + self.canceled + self.payment_failed;
         if (total - 1.0).abs() > 0.001 {
             return Err(anyhow!(
-                "Event distribution percentages must sum to 1.0, got: {}",
-                total
+                "Event distribution percentages must sum to 1.0, got: {total}"
             ));
         }
         Ok(())
@@ -255,7 +254,7 @@ impl EventGenerator {
             // Use deterministic plan ID generation
             let plan_id = format!("plan_{i}");
             if let Ok((plan_pda, _)) = tally_sdk::pda::plan_from_string(&merchant, &plan_id) {
-                plans.push(plan_pda)
+                plans.push(plan_pda);
             } else {
                 // Fallback to generated pubkey if PDA computation fails
                 let mut hasher = DefaultHasher::new();
@@ -700,7 +699,7 @@ impl EventSimulator {
 
         let (ws_stream, _) = connect_async(&websocket_url)
             .await
-            .map_err(|e| anyhow!("Failed to connect to WebSocket: {}", e))?;
+            .map_err(|e| anyhow!("Failed to connect to WebSocket: {e}"))?;
 
         let (mut write, _read) = ws_stream.split();
 
@@ -712,7 +711,7 @@ impl EventSimulator {
 
                 if let Err(e) = write.send(Message::Text(message)).await {
                     error!("Failed to send WebSocket message: {}", e);
-                    return Err(anyhow!("WebSocket send failed: {}", e));
+                    return Err(anyhow!("WebSocket send failed: {e}"));
                 }
 
                 debug!("Sent event via WebSocket: {:?}", event);
@@ -739,20 +738,20 @@ impl EventSimulator {
             .truncate(true)
             .open(&file_path)
             .await
-            .map_err(|e| anyhow!("Failed to open output file: {}", e))?;
+            .map_err(|e| anyhow!("Failed to open output file: {e}"))?;
 
         while let Some(events) = rx.recv().await {
             for event in events {
                 let line = format!("{}\n", serde_json::to_string(&event)?);
                 file.write_all(line.as_bytes())
                     .await
-                    .map_err(|e| anyhow!("Failed to write to file: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to write to file: {e}"))?;
             }
         }
 
         file.flush()
             .await
-            .map_err(|e| anyhow!("Failed to flush file: {}", e))?;
+            .map_err(|e| anyhow!("Failed to flush file: {e}"))?;
 
         info!("File output completed");
         Ok(())
@@ -793,7 +792,7 @@ impl EventSimulator {
         });
 
         serde_json::to_string(&mock_notification)
-            .map_err(|e| anyhow!("Failed to serialize WebSocket message: {}", e))
+            .map_err(|e| anyhow!("Failed to serialize WebSocket message: {e}"))
     }
 
     /// Create mock transaction logs that contain the event data

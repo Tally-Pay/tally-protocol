@@ -92,7 +92,7 @@ pub async fn execute(
     // Use tally-sdk's high-level convenience method
     let (plan_pda, signature) = tally_client
         .create_plan(&authority, plan_args)
-        .map_err(|e| anyhow!("Failed to create plan: {}", e))?;
+        .map_err(|e| anyhow!("Failed to create plan: {e}"))?;
 
     info!("Transaction confirmed: {}", signature);
 

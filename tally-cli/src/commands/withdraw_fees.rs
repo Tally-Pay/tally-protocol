@@ -40,15 +40,13 @@ pub async fn execute(
 
     // Parse USDC mint using tally-sdk
     let usdc_mint =
-        get_usdc_mint(usdc_mint_str).map_err(|e| anyhow!("Failed to parse USDC mint: {}", e))?;
+        get_usdc_mint(usdc_mint_str).map_err(|e| anyhow!("Failed to parse USDC mint: {e}"))?;
     info!("Using USDC mint: {}", usdc_mint);
 
     // Parse destination ATA
     let destination_ata = Pubkey::from_str(destination_str).map_err(|e| {
         anyhow!(
-            "Invalid destination ATA address '{}': {}",
-            destination_str,
-            e
+            "Invalid destination ATA address '{destination_str}': {e}"
         )
     })?;
     info!("Using destination ATA: {}", destination_ata);
@@ -62,7 +60,7 @@ pub async fn execute(
         &platform_authority_pubkey,
         "destination",
     )
-    .map_err(|e| anyhow!("Destination ATA validation failed: {}", e))?;
+    .map_err(|e| anyhow!("Destination ATA validation failed: {e}"))?;
 
     // Compute platform treasury ATA (this would be the platform's central USDC treasury)
     // NOTE: This assumes the platform treasury ATA is the platform authority's ATA for USDC
@@ -72,7 +70,7 @@ pub async fn execute(
         &usdc_mint,
         TokenProgram::Token,
     )
-    .map_err(|e| anyhow!("Failed to compute platform treasury ATA: {}", e))?;
+    .map_err(|e| anyhow!("Failed to compute platform treasury ATA: {e}"))?;
     info!("Using platform treasury ATA: {}", platform_treasury_ata);
 
     // Use tally-sdk's high-level convenience method
@@ -84,7 +82,7 @@ pub async fn execute(
             &usdc_mint,
             amount,
         )
-        .map_err(|e| anyhow!("Failed to withdraw platform fees: {}", e))?;
+        .map_err(|e| anyhow!("Failed to withdraw platform fees: {e}"))?;
 
     info!("Transaction confirmed: {}", signature);
 

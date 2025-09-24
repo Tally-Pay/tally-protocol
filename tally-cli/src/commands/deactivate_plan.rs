@@ -24,7 +24,7 @@ pub async fn execute(
 
     // Parse plan PDA address
     let plan_pda = Pubkey::from_str(plan_str)
-        .map_err(|e| anyhow!("Invalid plan PDA address '{}': {}", plan_str, e))?;
+        .map_err(|e| anyhow!("Invalid plan PDA address '{plan_str}': {e}"))?;
     info!("Using plan PDA: {}", plan_pda);
 
     // Load authority keypair
@@ -34,7 +34,7 @@ pub async fn execute(
     // Fetch and validate plan account using tally-sdk
     let plan = tally_client
         .get_plan(&plan_pda)?
-        .ok_or_else(|| anyhow!("Plan account does not exist at address: {}", plan_pda))?;
+        .ok_or_else(|| anyhow!("Plan account does not exist at address: {plan_pda}"))?;
 
     // Validate authority matches merchant authority by computing expected merchant PDA
     let authority_pubkey = Pubkey::from(authority.pubkey().to_bytes());

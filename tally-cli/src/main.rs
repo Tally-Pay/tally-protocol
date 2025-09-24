@@ -311,7 +311,7 @@ fn parse_output_format(format_str: &str) -> Result<OutputFormat> {
     match format_str.to_lowercase().as_str() {
         "human" => Ok(OutputFormat::Human),
         "json" => Ok(OutputFormat::Json),
-        _ => Err(anyhow::anyhow!("Invalid output format: {}", format_str)),
+        _ => Err(anyhow::anyhow!("Invalid output format: {format_str}")),
     }
 }
 
@@ -443,13 +443,13 @@ async fn execute_command(
 
             // Parse merchant pubkey
             let merchant_pubkey = Pubkey::from_str(merchant)
-                .map_err(|e| anyhow::anyhow!("Invalid merchant pubkey '{}': {}", merchant, e))?;
+                .map_err(|e| anyhow::anyhow!("Invalid merchant pubkey '{merchant}': {e}"))?;
 
             // Parse plan pubkey if provided
             let plan_pubkey =
                 if let Some(plan_str) = plan {
                     Some(Pubkey::from_str(plan_str).map_err(|e| {
-                        anyhow::anyhow!("Invalid plan pubkey '{}': {}", plan_str, e)
+                        anyhow::anyhow!("Invalid plan pubkey '{plan_str}': {e}")
                     })?)
                 } else {
                     None
@@ -466,16 +466,16 @@ async fn execute_command(
 
                 let subscribed: f32 = parts[0]
                     .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid subscribed percentage: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid subscribed percentage: {e}"))?;
                 let renewed: f32 = parts[1]
                     .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid renewed percentage: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid renewed percentage: {e}"))?;
                 let canceled: f32 = parts[2]
                     .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid canceled percentage: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid canceled percentage: {e}"))?;
                 let payment_failed: f32 = parts[3]
                     .parse()
-                    .map_err(|e| anyhow::anyhow!("Invalid payment_failed percentage: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Invalid payment_failed percentage: {e}"))?;
 
                 Some(EventDistribution {
                     subscribed,

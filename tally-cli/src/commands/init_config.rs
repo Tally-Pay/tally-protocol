@@ -37,9 +37,7 @@ pub async fn execute(
     // Parse platform authority
     let platform_authority = Pubkey::from_str(platform_authority_str).map_err(|e| {
         anyhow!(
-            "Invalid platform authority address '{}': {}",
-            platform_authority_str,
-            e
+            "Invalid platform authority address '{platform_authority_str}': {e}"
         )
     })?;
     info!("Using platform authority: {}", platform_authority);
@@ -66,8 +64,7 @@ pub async fn execute(
     let config_pda = tally_sdk::pda::config_address()?;
     if tally_client.account_exists(&config_pda)? {
         return Err(anyhow!(
-            "Config account already exists at address: {}",
-            config_pda
+            "Config account already exists at address: {config_pda}"
         ));
     }
 

@@ -93,7 +93,7 @@ pub fn format_plans_json(plans: &[PlanInfo]) -> Result<String> {
         .collect();
 
     serde_json::to_string_pretty(&json_plans)
-        .map_err(|e| anyhow!("Failed to serialize plans to JSON: {}", e))
+        .map_err(|e| anyhow!("Failed to serialize plans to JSON: {e}"))
 }
 
 /// Format subscriptions for human-readable output
@@ -177,7 +177,7 @@ pub fn format_subscriptions_json(
         .collect();
 
     serde_json::to_string_pretty(&json_subscriptions)
-        .map_err(|e| anyhow!("Failed to serialize subscriptions to JSON: {}", e))
+        .map_err(|e| anyhow!("Failed to serialize subscriptions to JSON: {e}"))
 }
 
 /// Format unix timestamp to human-readable date
