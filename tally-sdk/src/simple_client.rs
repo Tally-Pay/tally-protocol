@@ -7,13 +7,15 @@ use crate::{
 };
 use anchor_client::solana_client::rpc_client::RpcClient;
 use anchor_lang::AnchorDeserialize;
-use solana_account_decoder::UiAccountEncoding;
-use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-use solana_client::rpc_filter::{Memcmp, RpcFilterType};
-use solana_sdk::{
-    commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Signer,
+use anchor_client::solana_account_decoder::UiAccountEncoding;
+use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
+use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
+use anchor_client::solana_sdk::{
+    signature::Signer,
     transaction::Transaction,
 };
+use anchor_lang::prelude::Pubkey;
 use std::str::FromStr;
 
 /// Simple Tally client for basic operations
@@ -297,7 +299,7 @@ impl SimpleTallyClient {
     /// Returns an error if transaction submission or confirmation fails
     pub fn submit_instruction<T: Signer>(
         &self,
-        instruction: solana_sdk::instruction::Instruction,
+        instruction: anchor_client::solana_sdk::instruction::Instruction,
         signers: &[&T],
     ) -> Result<String> {
         let payer = signers.first().ok_or("At least one signer is required")?;

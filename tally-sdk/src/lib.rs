@@ -11,7 +11,8 @@
 //!
 //! ```no_run
 //! use tally_sdk::{pda, ata, SimpleTallyClient};
-//! use solana_sdk::{pubkey::Pubkey, signature::{Keypair, Signer}};
+//! use anchor_lang::prelude::Pubkey;
+//! use anchor_client::solana_sdk::signature::{Keypair, Signer};
 //! use std::str::FromStr;
 //!
 //! # fn main() -> tally_sdk::Result<()> {
@@ -19,12 +20,12 @@
 //! let client = SimpleTallyClient::new("https://api.devnet.solana.com")?;
 //!
 //! // Compute PDAs
-//! let authority = Keypair::new().pubkey();
+//! let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 //! let merchant_pda = pda::merchant_address(&authority)?;
 //! let plan_pda = pda::plan_address_from_string(&merchant_pda, "premium_plan")?;
 //!
 //! // Compute ATAs
-//! let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")?;
+//! let usdc_mint = Pubkey::try_from("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").map_err(|_| tally_sdk::TallyError::from("Invalid pubkey"))?;
 //! let user_ata = ata::get_associated_token_address_for_mint(&authority, &usdc_mint)?;
 //!
 //! # Ok(())
@@ -101,6 +102,6 @@ pub fn program_id_string() -> String {
 /// # Panics
 /// Panics if the program ID (from environment or default) is not a valid Pubkey
 #[must_use]
-pub fn program_id() -> solana_sdk::pubkey::Pubkey {
+pub fn program_id() -> anchor_lang::prelude::Pubkey {
     program_id_string().parse().expect("Valid program ID")
 }

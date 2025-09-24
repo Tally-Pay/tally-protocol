@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use base64::prelude::*;
 use chrono;
 use serde::{Deserialize, Serialize};
-use solana_sdk::{pubkey::Pubkey, signature::Signature, transaction::TransactionError};
+use anchor_client::solana_sdk::{signature::Signature, transaction::TransactionError};
 use std::collections::HashMap;
 
 /// Event emitted when a subscription is successfully started
@@ -658,7 +658,7 @@ impl TallyReceipt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::{Keypair, Signer};
+    use anchor_client::solana_sdk::signature::{Keypair, Signer};
 
     #[test]
     fn test_extract_memo_from_logs() {
@@ -696,9 +696,9 @@ mod tests {
     #[test]
     fn test_tally_receipt_event_getters() {
         let signature = Signature::default();
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let subscribed_event = Subscribed {
             merchant,
@@ -812,9 +812,9 @@ mod tests {
 
     #[test]
     fn test_parse_subscribed_event() {
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = Subscribed {
             merchant,
@@ -839,9 +839,9 @@ mod tests {
 
     #[test]
     fn test_parse_renewed_event() {
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = Renewed {
             merchant,
@@ -866,9 +866,9 @@ mod tests {
 
     #[test]
     fn test_parse_canceled_event() {
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = Canceled {
             merchant,
@@ -891,9 +891,9 @@ mod tests {
 
     #[test]
     fn test_parse_payment_failed_event() {
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = PaymentFailed {
             merchant,
@@ -970,9 +970,9 @@ mod tests {
     #[test]
     fn test_parse_events_from_logs() {
         let program_id = crate::program_id();
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let subscribed_event = Subscribed {
             merchant,
@@ -1026,9 +1026,9 @@ mod tests {
     #[test]
     fn test_parse_events_from_logs_with_malformed_data() {
         let program_id = crate::program_id();
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let valid_event = Subscribed {
             merchant,
@@ -1075,11 +1075,11 @@ mod tests {
     #[test]
     fn test_parse_events_from_logs_different_program() {
         let program_id = crate::program_id();
-        let other_program_id = Keypair::new().pubkey();
+        let other_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let merchant = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = Subscribed {
             merchant,

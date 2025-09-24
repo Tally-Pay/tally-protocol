@@ -6,7 +6,7 @@ use crate::{
     program_types::{Plan, UpdatePlanArgs},
     SimpleTallyClient,
 };
-use solana_sdk::pubkey::Pubkey;
+use anchor_lang::prelude::Pubkey;
 use std::str::FromStr;
 
 /// Get and validate USDC mint address
@@ -403,10 +403,10 @@ mod tests {
     #[test]
     fn test_validate_plan_update_args_with_current_plan() {
         use crate::program_types::{Plan, UpdatePlanArgs};
-        use solana_sdk::{signature::Keypair, signer::Signer};
+        use anchor_client::solana_sdk::signature::{Keypair, Signer};
 
         let current_plan = Plan {
-            merchant: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             plan_id: [0u8; 32],
             price_usdc: 5_000_000,
             period_secs: 86400, // 1 day
@@ -439,10 +439,10 @@ mod tests {
     #[test]
     fn test_validate_plan_update_safety() {
         use crate::program_types::{Plan, UpdatePlanArgs};
-        use solana_sdk::{signature::Keypair, signer::Signer};
+        use anchor_client::solana_sdk::signature::{Keypair, Signer};
 
         let current_plan = Plan {
-            merchant: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             plan_id: [0u8; 32],
             price_usdc: 5_000_000,
             period_secs: 86400, // 1 day

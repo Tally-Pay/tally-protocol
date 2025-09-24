@@ -1,7 +1,7 @@
 //! Program Derived Address (PDA) computation utilities
 
 use crate::{error::Result, program_id_string};
-use solana_sdk::pubkey::Pubkey;
+use anchor_lang::prelude::Pubkey;
 
 /// Compute the Merchant PDA
 ///
@@ -365,12 +365,12 @@ pub fn delegate_address_with_program_id(merchant: &Pubkey, program_id: &Pubkey) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::{Keypair, Signer};
+    use anchor_client::solana_sdk::signature::{Keypair, Signer};
     use std::str::FromStr;
 
     #[test]
     fn test_merchant_pda() {
-        let authority = Keypair::new().pubkey();
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let (merchant_pda, _bump) = merchant(&authority).unwrap();
 
         // PDA should be different from authority
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_plan_pda() {
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_id = b"premium_plan";
 
         let (plan_pda, _bump) = plan(&merchant, plan_id).unwrap();
@@ -399,8 +399,8 @@ mod tests {
 
     #[test]
     fn test_subscription_pda() {
-        let plan = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let (sub_pda, _bump) = subscription(&plan, &subscriber).unwrap();
 
@@ -409,14 +409,14 @@ mod tests {
         assert_eq!(sub_pda, sub_pda2);
 
         // Different subscribers should produce different PDAs
-        let subscriber2 = Keypair::new().pubkey();
+        let subscriber2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let (sub_pda3, _) = subscription(&plan, &subscriber2).unwrap();
         assert_ne!(sub_pda, sub_pda3);
     }
 
     #[test]
     fn test_plan_string_functions() {
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_id = "premium_plan";
 
         let (pda1, bump1) = plan_from_string(&merchant, plan_id).unwrap();
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_address_only_functions() {
-        let authority = Keypair::new().pubkey();
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant_addr = merchant_address(&authority).unwrap();
         let (merchant_pda, _) = merchant(&authority).unwrap();
         assert_eq!(merchant_addr, merchant_pda);
@@ -443,7 +443,7 @@ mod tests {
         let (plan_pda, _) = plan(&merchant_addr, plan_id).unwrap();
         assert_eq!(plan_addr, plan_pda);
 
-        let subscriber = Keypair::new().pubkey();
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let sub_addr = subscription_address(&plan_addr, &subscriber).unwrap();
         let (sub_pda, _) = subscription(&plan_addr, &subscriber).unwrap();
         assert_eq!(sub_addr, sub_pda);
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn test_plan_id_raw_bytes() {
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test short plan ID (uses raw bytes directly)
         let short_id = b"short";
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_delegate_pda() {
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let (delegate_pda, _bump) = delegate(&merchant).unwrap();
 
@@ -509,7 +509,7 @@ mod tests {
         assert_eq!(delegate_pda, delegate_addr);
 
         // Different merchants should produce different delegate PDAs
-        let merchant2 = Keypair::new().pubkey();
+        let merchant2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let (delegate_pda3, _) = delegate(&merchant2).unwrap();
         assert_ne!(delegate_pda, delegate_pda3);
     }

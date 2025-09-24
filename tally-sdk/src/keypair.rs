@@ -1,7 +1,7 @@
 //! Keypair loading utilities for the Tally SDK
 
 use crate::error::{Result, TallyError};
-use solana_sdk::signature::{read_keypair_file, Keypair};
+use anchor_client::solana_sdk::signature::{read_keypair_file, Keypair};
 
 /// Load a keypair from file path or use default Solana CLI keypair
 ///
@@ -36,7 +36,7 @@ pub fn load_keypair(keypair_path: Option<&str>) -> Result<Keypair> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::Signer;
+    use anchor_client::solana_sdk::signature::Signer;
     use std::fs;
     use tempfile::tempdir;
 

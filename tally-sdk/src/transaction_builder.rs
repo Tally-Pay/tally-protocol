@@ -10,12 +10,8 @@ use crate::{
     },
 };
 use anchor_lang::prelude::*;
-#[allow(deprecated)]
-use solana_sdk::{
-    instruction::{AccountMeta, Instruction},
-    pubkey::Pubkey,
-    system_program,
-};
+use anchor_client::solana_sdk::instruction::{AccountMeta, Instruction};
+use anchor_lang::system_program;
 use spl_token::instruction::{approve_checked as approve_checked_token, revoke as revoke_token};
 use spl_token_2022::instruction::{
     approve_checked as approve_checked_token2022, revoke as revoke_token2022,
@@ -232,7 +228,7 @@ impl StartSubscriptionBuilder {
             AccountMeta::new_readonly(merchant.usdc_mint, false), // usdc_mint
             AccountMeta::new_readonly(delegate_pda, false), // program_delegate
             AccountMeta::new_readonly(token_program.program_id(), false), // token_program
-            AccountMeta::new_readonly(system_program::id(), false), // system_program
+            AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
         let start_sub_args = StartSubscriptionArgs { allowance_periods };
@@ -441,7 +437,7 @@ impl CreateMerchantBuilder {
             AccountMeta::new_readonly(treasury_ata, false), // treasury_ata
             AccountMeta::new_readonly(spl_token::id(), false), // token_program
             AccountMeta::new_readonly(spl_associated_token_account::id(), false), // associated_token_program
-            AccountMeta::new_readonly(system_program::id(), false),               // system_program
+            AccountMeta::new_readonly(system_program::ID, false),               // system_program
         ];
 
         let args = InitMerchantArgs {
@@ -525,7 +521,7 @@ impl CreatePlanBuilder {
             AccountMeta::new(plan_pda, false),              // plan (PDA)
             AccountMeta::new_readonly(merchant_pda, false), // merchant
             AccountMeta::new(authority, true),              // authority (signer)
-            AccountMeta::new_readonly(system_program::id(), false), // system_program
+            AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
         let data = {
@@ -794,7 +790,7 @@ impl InitConfigBuilder {
         let accounts = vec![
             AccountMeta::new(config_pda, false), // config (PDA)
             AccountMeta::new(authority, true),   // authority (signer)
-            AccountMeta::new_readonly(system_program::id(), false), // system_program
+            AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
         let data = {
@@ -861,21 +857,21 @@ pub fn update_plan() -> UpdatePlanBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::{Keypair, Signer};
+    use anchor_client::solana_sdk::signature::{Keypair, Signer};
     use std::str::FromStr;
 
     fn create_test_merchant() -> Merchant {
         Merchant {
-            authority: Keypair::new().pubkey(),
+            authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
-            treasury_ata: Keypair::new().pubkey(),
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
             bump: 255,
         }
     }
 
     fn create_test_plan() -> Plan {
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let mut plan_id = [0u8; 32];
         plan_id[..12].copy_from_slice(b"premium_plan");
         let mut name = [0u8; 32];
@@ -896,9 +892,9 @@ mod tests {
     fn test_start_subscription_builder() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
-        let plan_key = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
-        let platform_treasury_ata = Keypair::new().pubkey();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let instructions = start_subscription()
             .plan(plan_key)
@@ -920,8 +916,8 @@ mod tests {
     #[test]
     fn test_cancel_subscription_builder() {
         let merchant = create_test_merchant();
-        let plan_key = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let instructions = cancel_subscription()
             .plan(plan_key)
@@ -941,9 +937,9 @@ mod tests {
 
     #[test]
     fn test_create_merchant_builder() {
-        let authority = Keypair::new().pubkey();
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
-        let treasury_ata = Keypair::new().pubkey();
+        let treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let instruction = create_merchant()
             .authority(authority)
@@ -960,7 +956,7 @@ mod tests {
 
     #[test]
     fn test_create_plan_builder() {
-        let authority = Keypair::new().pubkey();
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_id_bytes = {
             let mut bytes = [0u8; 32];
             let id_bytes = b"premium";
@@ -993,11 +989,11 @@ mod tests {
     fn test_builder_missing_required_fields() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
-        let platform_treasury_ata = Keypair::new().pubkey();
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test missing plan
         let result = start_subscription()
-            .subscriber(Keypair::new().pubkey())
+            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .allowance_periods(3)
             .build_instructions(&merchant, &plan_data, &platform_treasury_ata);
         assert!(result.is_err());
@@ -1005,7 +1001,7 @@ mod tests {
 
         // Test missing subscriber
         let result = start_subscription()
-            .plan(Keypair::new().pubkey())
+            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .allowance_periods(3)
             .build_instructions(&merchant, &plan_data, &platform_treasury_ata);
         assert!(result.is_err());
@@ -1019,25 +1015,25 @@ mod tests {
     fn test_token_program_variants() {
         // Create separate merchants for different token programs to avoid compatibility issues
         let merchant_token = Merchant {
-            authority: Keypair::new().pubkey(),
-            usdc_mint: Keypair::new().pubkey(), // Use a test mint for classic token
-            treasury_ata: Keypair::new().pubkey(),
+            authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a test mint for classic token
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
             bump: 255,
         };
 
         let merchant_token2022 = Merchant {
-            authority: Keypair::new().pubkey(),
-            usdc_mint: Keypair::new().pubkey(), // Use a different test mint for Token-2022
-            treasury_ata: Keypair::new().pubkey(),
+            authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a different test mint for Token-2022
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
             bump: 255,
         };
 
         let plan_data = create_test_plan();
-        let plan_key = Keypair::new().pubkey();
-        let subscriber = Keypair::new().pubkey();
-        let platform_treasury_ata = Keypair::new().pubkey();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test with Token-2022
         let instructions_token2022 = start_subscription()
@@ -1064,7 +1060,7 @@ mod tests {
 
     #[test]
     fn test_init_config_builder() {
-        let authority = Keypair::new().pubkey();
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let config_args = InitConfigArgs {
             platform_authority: authority,
             max_platform_fee_bps: 1000,
@@ -1097,7 +1093,7 @@ mod tests {
         // Test missing authority
         let result = init_config()
             .config_args(InitConfigArgs {
-                platform_authority: Keypair::new().pubkey(),
+                platform_authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
                 max_platform_fee_bps: 1000,
                 fee_basis_points_divisor: 10000,
                 min_period_seconds: 86400,
@@ -1112,7 +1108,7 @@ mod tests {
 
         // Test missing config args
         let result = init_config()
-            .authority(Keypair::new().pubkey())
+            .authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .build_instruction();
         assert!(result.is_err());
         assert!(result
@@ -1124,7 +1120,7 @@ mod tests {
     #[test]
     fn test_update_plan_builder() {
         let merchant = create_test_merchant();
-        let plan_key = Keypair::new().pubkey();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let update_args = UpdatePlanArgs::new()
             .with_name("Updated Plan".to_string())
@@ -1156,7 +1152,7 @@ mod tests {
     #[test]
     fn test_update_plan_builder_missing_required_fields() {
         let merchant = create_test_merchant();
-        let plan_key = Keypair::new().pubkey();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let update_args = UpdatePlanArgs::new().with_name("Test".to_string());
 
         // Test missing authority
@@ -1193,8 +1189,8 @@ mod tests {
     #[test]
     fn test_update_plan_builder_validation() {
         let merchant = create_test_merchant();
-        let wrong_authority = Keypair::new().pubkey();
-        let plan_key = Keypair::new().pubkey();
+        let wrong_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test wrong authority
         let update_args = UpdatePlanArgs::new().with_name("Test".to_string());

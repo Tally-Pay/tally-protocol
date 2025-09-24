@@ -332,7 +332,7 @@ impl TallyClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::Keypair;
+    use anchor_client::solana_sdk::signature::Keypair;
 
     #[test]
     fn test_load_idl() {

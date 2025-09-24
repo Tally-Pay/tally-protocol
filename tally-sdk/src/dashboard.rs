@@ -18,7 +18,8 @@ use crate::{
     validation::validate_platform_fee_bps,
 };
 use chrono::{DateTime, Utc};
-use solana_sdk::{pubkey::Pubkey, signature::Signer};
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::signature::Signer;
 use std::collections::HashMap;
 
 /// Time period for statistics calculation
@@ -900,7 +901,7 @@ impl DashboardClient {
 mod tests {
     use super::*;
     use crate::program_types::InitMerchantArgs;
-    use solana_sdk::{signature::Keypair, signer::Signer};
+    use anchor_client::solana_sdk::signature::{Keypair, Signer};
 
     #[test]
     fn test_dashboard_client_creation() {
@@ -921,7 +922,7 @@ mod tests {
     #[test]
     fn test_event_stream_creation() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // This will fail because merchant doesn't exist, but tests the error path
         let result = client.subscribe_to_events(&merchant);
@@ -935,8 +936,8 @@ mod tests {
 
         // Test invalid platform fee (over 1000 basis points)
         let invalid_args = InitMerchantArgs {
-            usdc_mint: Keypair::new().pubkey(),
-            treasury_ata: Keypair::new().pubkey(),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 1001, // Invalid: over 10%
         };
 
@@ -957,8 +958,8 @@ mod tests {
             monthly_new_subscriptions: 10,
             monthly_canceled_subscriptions: 5,
             average_revenue_per_user: 10_000_000, // 10 USDC
-            merchant_authority: Keypair::new().pubkey(),
-            usdc_mint: Keypair::new().pubkey(),
+            merchant_authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
         };
 
         // Use epsilon comparison for float values
@@ -978,9 +979,9 @@ mod tests {
 
         let event = DashboardEvent {
             event_type: DashboardEventType::SubscriptionStarted,
-            plan_address: Some(Keypair::new().pubkey()),
-            subscription_address: Some(Keypair::new().pubkey()),
-            subscriber: Some(Keypair::new().pubkey()),
+            plan_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
+            subscription_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
+            subscriber: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
             amount: Some(5_000_000), // 5 USDC
             transaction_signature: Some("test_sig_123".to_string()),
             timestamp: chrono::Utc::now().timestamp(),
@@ -1174,29 +1175,29 @@ mod tests {
 
         // Create mock events to test event type name extraction
         let subscribed_event = TallyEvent::Subscribed(Subscribed {
-            merchant: Keypair::new().pubkey(),
-            plan: Keypair::new().pubkey(),
-            subscriber: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             amount: 5_000_000,
         });
 
         let renewed_event = TallyEvent::Renewed(Renewed {
-            merchant: Keypair::new().pubkey(),
-            plan: Keypair::new().pubkey(),
-            subscriber: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             amount: 5_000_000,
         });
 
         let canceled_event = TallyEvent::Canceled(Canceled {
-            merchant: Keypair::new().pubkey(),
-            plan: Keypair::new().pubkey(),
-            subscriber: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
         });
 
         let payment_failed_event = TallyEvent::PaymentFailed(PaymentFailed {
-            merchant: Keypair::new().pubkey(),
-            plan: Keypair::new().pubkey(),
-            subscriber: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             reason: "Insufficient allowance".to_string(),
         });
 
@@ -1221,17 +1222,17 @@ mod tests {
     #[test]
     fn test_convert_parsed_event_to_dashboard_event() {
         use crate::events::{PaymentFailed, Subscribed, TallyEvent};
-        use solana_sdk::signature::Signature;
+        use anchor_client::solana_sdk::signature::Signature;
         use std::str::FromStr;
 
         // Create a mock ParsedEventWithContext with SubscribedEvent
-        let subscriber = Keypair::new().pubkey();
-        let plan = Keypair::new().pubkey();
-        let _subscription = Keypair::new().pubkey();
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let _subscription = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let timestamp = chrono::Utc::now().timestamp();
 
         let subscribed_event = TallyEvent::Subscribed(Subscribed {
-            merchant: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             plan,
             subscriber,
             amount: 10_000_000, // 10 USDC
@@ -1272,7 +1273,7 @@ mod tests {
 
         // Test PaymentFailed event with failure reason metadata
         let payment_failed_event = TallyEvent::PaymentFailed(PaymentFailed {
-            merchant: Keypair::new().pubkey(),
+            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             plan,
             subscriber,
             reason: "Insufficient allowance".to_string(),
@@ -1303,7 +1304,7 @@ mod tests {
     #[test]
     fn test_get_event_history() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test that method returns empty result for non-existent merchant
         // (This is expected since we're using a placeholder implementation)
@@ -1318,7 +1319,7 @@ mod tests {
         use chrono::{TimeZone, Utc};
 
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test various periods
         let day_stats = client.get_event_statistics(&merchant, Period::Day);
@@ -1347,7 +1348,7 @@ mod tests {
     #[test]
     fn test_subscribe_to_live_events() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test event stream creation for live events
         let result = client.subscribe_to_live_events(&merchant);
@@ -1368,7 +1369,7 @@ mod tests {
     #[test]
     fn test_poll_recent_events_integration() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Keypair::new().pubkey();
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test that poll_recent_events now uses get_event_history
         let events = client.poll_recent_events(&merchant, chrono::Utc::now().timestamp() - 3600);

@@ -20,7 +20,7 @@
 //!
 //! ```rust
 //! use tally_sdk::{SimpleTallyClient, error::TallyError};
-//! use solana_sdk::pubkey::Pubkey;
+//! use anchor_lang::prelude::Pubkey;
 //!
 //! async fn handle_transaction_error() {
 //!     let client = SimpleTallyClient::new("https://api.devnet.solana.com").unwrap();
@@ -60,7 +60,7 @@ pub enum TallyError {
 
     /// Error from Solana SDK
     #[error("Solana SDK error: {0}")]
-    Solana(#[from] solana_sdk::pubkey::ParsePubkeyError),
+    Solana(#[from] anchor_client::solana_sdk::pubkey::ParsePubkeyError),
 
     /// Error from SPL Token
     #[error("SPL Token error: {0}")]
@@ -168,6 +168,12 @@ impl From<&str> for TallyError {
     }
 }
 
+impl From<anchor_lang::prelude::ProgramError> for TallyError {
+    fn from(error: anchor_lang::prelude::ProgramError) -> Self {
+        Self::Generic(format!("Program error: {error:?}"))
+    }
+}
+
 impl TallyError {
     /// Map program error codes to specific `TallyError` variants
     ///
@@ -217,9 +223,9 @@ impl TallyError {
         // Check if the client error contains a program error we can map
         if let anchor_client::ClientError::SolanaClientError(solana_err) = &client_error {
             // Use get_transaction_error() method as suggested by the compiler
-            if let Some(solana_sdk::transaction::TransactionError::InstructionError(
+            if let Some(anchor_client::solana_sdk::transaction::TransactionError::InstructionError(
                 _,
-                solana_program::instruction::InstructionError::Custom(error_code),
+                anchor_client::solana_sdk::instruction::InstructionError::Custom(error_code),
             )) = solana_err.get_transaction_error()
             {
                 // Map specific program error codes

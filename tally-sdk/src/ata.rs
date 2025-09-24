@@ -2,9 +2,11 @@
 
 use crate::{error::Result, TallyError};
 use anchor_client::solana_client::rpc_client::RpcClient;
-use solana_sdk::{
-    account::Account, commitment_config::CommitmentConfig, program_pack::Pack, pubkey::Pubkey,
+use anchor_client::solana_sdk::{
+    account::Account, program_pack::Pack,
 };
+use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::{Account as TokenAccount, Mint};
 
@@ -193,14 +195,14 @@ pub fn get_token_account_info(
 /// * `token_program` - The token program to use
 ///
 /// # Returns
-/// * `Ok(solana_sdk::instruction::Instruction)` - The create ATA instruction
+/// * `Ok(anchor_client::solana_sdk::instruction::Instruction)` - The create ATA instruction
 /// * `Err(TallyError)` - If instruction creation fails
 pub fn create_associated_token_account_instruction(
     payer: &Pubkey,
     wallet: &Pubkey,
     mint: &Pubkey,
     token_program: TokenProgram,
-) -> Result<solana_sdk::instruction::Instruction> {
+) -> Result<anchor_client::solana_sdk::instruction::Instruction> {
     Ok(
         spl_associated_token_account::instruction::create_associated_token_account(
             payer,
@@ -214,7 +216,7 @@ pub fn create_associated_token_account_instruction(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use solana_sdk::signature::{Keypair, Signer};
+    use anchor_client::solana_sdk::signature::{Keypair, Signer};
     use std::str::FromStr;
 
     #[test]
@@ -225,8 +227,8 @@ mod tests {
 
     #[test]
     fn test_get_associated_token_address() {
-        let wallet = Keypair::new().pubkey();
-        let mint = Keypair::new().pubkey();
+        let wallet = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let mint = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let ata = get_associated_token_address_for_mint(&wallet, &mint).unwrap();
 
@@ -235,15 +237,15 @@ mod tests {
         assert_eq!(ata, ata2);
 
         // Different wallets should have different ATAs
-        let wallet2 = Keypair::new().pubkey();
+        let wallet2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let ata3 = get_associated_token_address_for_mint(&wallet2, &mint).unwrap();
         assert_ne!(ata, ata3);
     }
 
     #[test]
     fn test_get_associated_token_address_with_program() {
-        let wallet = Keypair::new().pubkey();
-        let mint = Keypair::new().pubkey();
+        let wallet = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let mint = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let ata_token =
             get_associated_token_address_with_program(&wallet, &mint, TokenProgram::Token).unwrap();
@@ -259,7 +261,7 @@ mod tests {
     fn test_usdc_mainnet_ata() {
         // Test with real USDC mint on mainnet
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
-        let wallet = Keypair::new().pubkey();
+        let wallet = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let ata = get_associated_token_address_for_mint(&wallet, &usdc_mint).unwrap();
 
@@ -277,9 +279,9 @@ mod tests {
 
     #[test]
     fn test_create_ata_instruction() {
-        let payer = Keypair::new().pubkey();
-        let wallet = Keypair::new().pubkey();
-        let mint = Keypair::new().pubkey();
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let wallet = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let mint = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let ix_token = create_associated_token_account_instruction(
             &payer,

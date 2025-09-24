@@ -7,7 +7,7 @@
 
 use crate::program_types::{Plan, Subscription};
 use serde::{Deserialize, Serialize};
-use solana_sdk::pubkey::Pubkey;
+use anchor_lang::prelude::Pubkey;
 use std::collections::HashMap;
 
 /// Overview statistics for a merchant dashboard
