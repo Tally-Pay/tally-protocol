@@ -11,7 +11,7 @@
 //!
 //! ```no_run
 //! use tally_sdk::{pda, ata, SimpleTallyClient};
-//! use anchor_lang::prelude::Pubkey;
+//! use anchor_client::solana_sdk::pubkey::Pubkey;
 //! use anchor_client::solana_sdk::signature::{Keypair, Signer};
 //! use std::str::FromStr;
 //!
@@ -84,7 +84,7 @@ pub use signature::{
 };
 
 // Re-export commonly used external types
-pub use solana_sdk;
+pub use anchor_client::solana_sdk;
 pub use spl_associated_token_account;
 pub use spl_token;
 
@@ -102,6 +102,6 @@ pub fn program_id_string() -> String {
 /// # Panics
 /// Panics if the program ID (from environment or default) is not a valid Pubkey
 #[must_use]
-pub fn program_id() -> anchor_lang::prelude::Pubkey {
+pub fn program_id() -> anchor_client::solana_sdk::pubkey::Pubkey {
     program_id_string().parse().expect("Valid program ID")
 }

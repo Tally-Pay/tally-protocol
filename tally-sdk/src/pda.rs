@@ -1,7 +1,7 @@
 //! Program Derived Address (PDA) computation utilities
 
 use crate::{error::Result, program_id_string};
-use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::pubkey::Pubkey;
 
 /// Compute the Merchant PDA
 ///

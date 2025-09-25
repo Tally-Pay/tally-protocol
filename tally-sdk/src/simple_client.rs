@@ -15,7 +15,7 @@ use anchor_client::solana_sdk::{
     signature::Signer,
     transaction::Transaction,
 };
-use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
 /// Simple Tally client for basic operations

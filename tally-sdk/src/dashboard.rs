@@ -18,7 +18,7 @@ use crate::{
     validation::validate_platform_fee_bps,
 };
 use chrono::{DateTime, Utc};
-use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Signer;
 use std::collections::HashMap;
 

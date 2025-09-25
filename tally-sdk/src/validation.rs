@@ -6,7 +6,7 @@ use crate::{
     program_types::{Plan, UpdatePlanArgs},
     SimpleTallyClient,
 };
-use anchor_lang::prelude::Pubkey;
+use anchor_client::solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
 /// Get and validate USDC mint address
