@@ -101,6 +101,10 @@ pub use utils::{
 
 // Re-export commonly used external types
 pub use anchor_client::solana_sdk;
+pub use anchor_client::solana_client;
+pub use anchor_client::solana_account_decoder;
+pub use anchor_client::ClientError;
+pub use anchor_lang::AnchorDeserialize;
 pub use spl_associated_token_account;
 pub use spl_token;
 
