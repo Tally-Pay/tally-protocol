@@ -343,6 +343,97 @@ impl SimpleTallyClient {
         Ok((merchant_pda, signature))
     }
 
+    /// High-level method to initialize merchant with treasury management
+    ///
+    /// This method handles both cases:
+    /// - Treasury ATA exists + Merchant missing → Create merchant only
+    /// - Treasury ATA missing + Merchant missing → Create both ATA and merchant
+    ///
+    /// # Arguments
+    /// * `authority` - The wallet that will own the merchant account and treasury ATA
+    /// * `usdc_mint` - The USDC mint address
+    /// * `treasury_ata` - The expected treasury ATA address
+    /// * `platform_fee_bps` - Platform fee in basis points
+    ///
+    /// # Returns
+    /// * `Ok((merchant_pda, signature, created_ata))` - The merchant PDA, transaction signature, and whether ATA was created
+    /// * `Err(TallyError)` - If merchant already exists or other validation/execution failures
+    ///
+    /// # Errors
+    /// Returns an error if merchant already exists, validation fails, or transaction execution fails
+    pub fn initialize_merchant_with_treasury<T: Signer>(
+        &self,
+        authority: &T,
+        usdc_mint: &Pubkey,
+        treasury_ata: &Pubkey,
+        platform_fee_bps: u16,
+    ) -> Result<(Pubkey, String, bool)> {
+        use anchor_client::solana_sdk::transaction::Transaction;
+
+        // Validate parameters
+        crate::validation::validate_platform_fee_bps(platform_fee_bps)?;
+
+        // Check if merchant already exists
+        let merchant_pda = self.merchant_address(&authority.pubkey());
+        if self.account_exists(&merchant_pda)? {
+            return Err(TallyError::Generic(format!(
+                "Merchant account already exists at address: {merchant_pda}"
+            )));
+        }
+
+        // Check if treasury ATA exists
+        let treasury_exists = crate::ata::get_token_account_info(self.rpc(), treasury_ata)?.is_some();
+
+        let mut instructions = Vec::new();
+        let created_ata = !treasury_exists;
+
+        // If treasury ATA doesn't exist, add create ATA instruction
+        if !treasury_exists {
+            // Validate the expected ATA address matches computed ATA
+            let computed_ata = crate::ata::get_associated_token_address_for_mint(&authority.pubkey(), usdc_mint)?;
+            if computed_ata != *treasury_ata {
+                return Err(TallyError::Generic(format!(
+                    "Treasury ATA mismatch: expected {treasury_ata}, computed {computed_ata}"
+                )));
+            }
+
+            // Detect token program and create ATA instruction
+            let token_program = crate::ata::detect_token_program(self.rpc(), usdc_mint)?;
+            let create_ata_ix = crate::ata::create_associated_token_account_instruction(
+                &authority.pubkey(), // payer
+                &authority.pubkey(), // wallet owner
+                usdc_mint,
+                token_program,
+            )?;
+            instructions.push(create_ata_ix);
+        } else {
+            // Validate existing treasury ATA
+            crate::validation::validate_usdc_token_account(
+                self,
+                treasury_ata,
+                usdc_mint,
+                &authority.pubkey(),
+                "treasury",
+            )?;
+        }
+
+        // Always add the create merchant instruction
+        let create_merchant_ix = crate::transaction_builder::create_merchant()
+            .authority(authority.pubkey())
+            .usdc_mint(*usdc_mint)
+            .treasury_ata(*treasury_ata)
+            .platform_fee_bps(platform_fee_bps)
+            .program_id(self.program_id)
+            .build_instruction()?;
+        instructions.push(create_merchant_ix);
+
+        // Submit transaction with all instructions
+        let mut transaction = Transaction::new_with_payer(&instructions, Some(&authority.pubkey()));
+        let signature = self.submit_transaction(&mut transaction, &[authority])?;
+
+        Ok((merchant_pda, signature, created_ata))
+    }
+
     /// High-level method to create a subscription plan
     ///
     /// # Errors

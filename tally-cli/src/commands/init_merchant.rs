@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use std::str::FromStr;
 use tally_sdk::{
     get_usdc_mint, load_keypair,
-    validate_usdc_token_account, SimpleTallyClient,
+    SimpleTallyClient,
 };
 use anchor_lang::prelude::Pubkey;
 use anchor_client::solana_sdk::signature::Signer;
@@ -40,28 +40,28 @@ pub async fn execute(
         .map_err(|e| anyhow!("Invalid treasury ATA address '{treasury_str}': {e}"))?;
     info!("Using treasury ATA: {}", treasury_ata);
 
-    // Validate treasury ATA using tally-sdk
-    let authority_pubkey = Pubkey::from(authority.pubkey().to_bytes());
-    validate_usdc_token_account(
-        tally_client,
-        &treasury_ata,
-        &usdc_mint,
-        &authority_pubkey,
-        "treasury",
-    )
-    .map_err(|e| anyhow!("Treasury ATA validation failed: {e}"))?;
+    // Use the new unified method that handles both ATA existence scenarios
+    let (merchant_pda, signature, created_ata) = tally_client
+        .initialize_merchant_with_treasury(&authority, &usdc_mint, &treasury_ata, fee_bps)
+        .map_err(|e| anyhow!("Failed to initialize merchant: {e}"))?;
 
-    // Use tally-sdk's high-level convenience method
-    let (merchant_pda, signature) = tally_client
-        .create_merchant(&authority, &usdc_mint, &treasury_ata, fee_bps)
-        .map_err(|e| anyhow!("Failed to create merchant: {e}"))?;
+    info!(
+        "Transaction confirmed: {}, created_ata: {}",
+        signature,
+        created_ata
+    );
 
-    info!("Transaction confirmed: {}", signature);
-
-    // Return success message with merchant PDA and transaction signature
+    // Return success message with merchant PDA, transaction signature, and ATA creation info
     let fee_percentage = config.format_fee_percentage(fee_bps);
+    let ata_message = if created_ata {
+        "Treasury ATA created and merchant initialized"
+    } else {
+        "Merchant initialized with existing treasury ATA"
+    };
+
     Ok(format!(
-        "Merchant initialized successfully!\nMerchant PDA: {}\nTransaction signature: {}\nAuthority: {}\nTreasury ATA: {}\nPlatform fee: {} bps ({:.1}%)",
+        "Merchant initialization successful!\n{}\nMerchant PDA: {}\nTransaction signature: {}\nAuthority: {}\nTreasury ATA: {}\nPlatform fee: {} bps ({:.1}%)",
+        ata_message,
         merchant_pda,
         signature,
         authority.pubkey(),

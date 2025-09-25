@@ -13,3 +13,7 @@ test-ledger/
 
 # Database data directory
 data/
+.env.devnet
+.surreal-data
+priv_key
+prog_keypair
