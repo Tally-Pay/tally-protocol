@@ -52,6 +52,8 @@ pub mod pda;
 pub mod program_types;
 pub mod signature;
 pub mod transaction_builder;
+pub mod transaction_utils;
+pub mod utils;
 pub mod validation;
 
 // Re-export commonly used items
@@ -83,6 +85,18 @@ pub use signature::{
     extract_transaction_signature, is_valid_wallet_address, normalize_signature_format,
     prepare_transaction_for_signing, transaction_signing, verify_signed_transaction,
     verify_wallet_signature,
+};
+
+// Re-export transaction utilities
+pub use transaction_utils::{
+    build_transaction, convert_anchor_pubkey, create_memo_instruction,
+    get_user_usdc_ata, map_tally_error_to_string, SubscribeTransactionParams,
+};
+
+// Re-export general utilities
+pub use utils::{
+    calculate_next_renewal, format_duration, is_renewal_due, is_subscription_overdue,
+    is_valid_pubkey, micro_lamports_to_usdc, system_programs, usdc_to_micro_lamports,
 };
 
 // Re-export commonly used external types
