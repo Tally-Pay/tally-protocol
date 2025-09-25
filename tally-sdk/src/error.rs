@@ -106,6 +106,10 @@ pub enum TallyError {
     #[error("Failed to detect token program for mint: {mint}")]
     TokenProgramDetectionFailed { mint: String },
 
+    /// RPC error for blockchain queries
+    #[error("RPC error: {0}")]
+    RpcError(String),
+
     // Specific program error variants (maps to Anchor error codes 6012-6019)
     /// Invalid subscriber token account (program error 6012)
     #[error("Invalid subscriber token account. Ensure the account is a valid USDC token account owned by the subscriber.")]
@@ -171,6 +175,12 @@ impl From<&str> for TallyError {
 impl From<anchor_lang::prelude::ProgramError> for TallyError {
     fn from(error: anchor_lang::prelude::ProgramError) -> Self {
         Self::Generic(format!("Program error: {error:?}"))
+    }
+}
+
+impl From<anyhow::Error> for TallyError {
+    fn from(error: anyhow::Error) -> Self {
+        Self::Generic(error.to_string())
     }
 }
 

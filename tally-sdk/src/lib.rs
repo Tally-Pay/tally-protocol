@@ -45,6 +45,7 @@ pub mod ata;
 pub mod dashboard;
 pub mod dashboard_types;
 pub mod error;
+pub mod event_query;
 pub mod events;
 pub mod keypair;
 pub mod pda;
@@ -62,6 +63,7 @@ pub use dashboard_types::{
     PlanAnalytics, SubscriptionStatus,
 };
 pub use error::{Result, TallyError};
+pub use event_query::{EventQueryClient, EventQueryClientConfig, EventQueryConfig, ParsedEvent};
 pub use events::{
     create_receipt, create_receipt_legacy, extract_memo_from_logs, parse_events_from_logs,
     parse_events_with_context, Canceled, ParsedEventWithContext, PaymentFailed, ReceiptParams,
