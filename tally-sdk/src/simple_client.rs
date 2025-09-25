@@ -10,7 +10,9 @@ use anchor_lang::AnchorDeserialize;
 use anchor_client::solana_account_decoder::UiAccountEncoding;
 use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
 use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use anchor_client::solana_client::rpc_client::{GetConfirmedSignaturesForAddress2Config};
 use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
+use anchor_client::solana_client::rpc_response::RpcConfirmedTransactionStatusWithSignature;
 use anchor_client::solana_sdk::{
     signature::Signer,
     transaction::Transaction,
@@ -307,6 +309,30 @@ impl SimpleTallyClient {
         self.submit_transaction(&mut transaction, signers)
     }
 
+    /// Get latest blockhash
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn get_latest_blockhash(&self) -> Result<anchor_client::solana_sdk::hash::Hash> {
+        self.rpc_client
+            .get_latest_blockhash_with_commitment(CommitmentConfig::confirmed())
+            .map(|(hash, _slot)| hash)
+            .map_err(|e| TallyError::Generic(format!("Failed to get latest blockhash: {e}")))
+    }
+
+    /// Get latest blockhash with commitment
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn get_latest_blockhash_with_commitment(
+        &self,
+        commitment: CommitmentConfig,
+    ) -> Result<(anchor_client::solana_sdk::hash::Hash, u64)> {
+        self.rpc_client
+            .get_latest_blockhash_with_commitment(commitment)
+            .map_err(|e| TallyError::Generic(format!("Failed to get latest blockhash: {e}")))
+    }
+
     /// High-level method to create a merchant account
     ///
     /// # Errors
@@ -531,6 +557,93 @@ impl SimpleTallyClient {
 
         self.submit_instruction(instruction, &[platform_authority])
     }
+
+    /// Get confirmed signatures for a program address
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn get_confirmed_signatures_for_address(
+        &self,
+        address: &Pubkey,
+        config: Option<GetConfirmedSignaturesForAddress2Config>,
+    ) -> Result<Vec<RpcConfirmedTransactionStatusWithSignature>> {
+        self.rpc_client
+            .get_signatures_for_address_with_config(address, config.unwrap_or_default())
+            .map_err(|e| TallyError::Generic(format!("Failed to get signatures for address {address}: {e}")))
+    }
+
+    /// Get transaction details
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails or transaction not found
+    pub fn get_transaction(
+        &self,
+        signature: &anchor_client::solana_sdk::signature::Signature,
+    ) -> Result<serde_json::Value> {
+        self.rpc_client
+            .get_transaction_with_config(signature, Default::default())
+            .map(|tx| serde_json::to_value(tx).unwrap_or_default())
+            .map_err(|e| TallyError::Generic(format!("Failed to get transaction {signature}: {e}")))
+    }
+
+    /// Get multiple transactions in batch
+    ///
+    /// # Errors
+    /// Returns an error if any RPC calls fail
+    pub fn get_transactions(
+        &self,
+        signatures: &[anchor_client::solana_sdk::signature::Signature],
+    ) -> Result<Vec<Option<serde_json::Value>>> {
+        // Process transactions in chunks to avoid overwhelming the RPC
+        const CHUNK_SIZE: usize = 10;
+        let mut results = Vec::new();
+
+        for chunk in signatures.chunks(CHUNK_SIZE) {
+            for signature in chunk {
+                let transaction_result = self.rpc_client.get_transaction_with_config(signature, Default::default());
+                match transaction_result {
+                    Ok(tx) => results.push(Some(serde_json::to_value(tx).unwrap_or_default())),
+                    Err(_) => results.push(None), // Transaction not found or other error
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Submit and confirm a pre-signed transaction
+    ///
+    /// # Errors
+    /// Returns an error if transaction submission or confirmation fails
+    pub fn send_and_confirm_transaction(
+        &self,
+        transaction: &anchor_client::solana_sdk::transaction::VersionedTransaction,
+    ) -> Result<anchor_client::solana_sdk::signature::Signature> {
+        self.rpc_client
+            .send_and_confirm_transaction(transaction)
+            .map_err(|e| TallyError::Generic(format!("Transaction submission failed: {e}")))
+    }
+
+    /// Get current slot
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn get_slot(&self) -> Result<u64> {
+        self.rpc_client
+            .get_slot()
+            .map_err(|e| TallyError::Generic(format!("Failed to get slot: {e}")))
+    }
+
+    /// Get health status
+    ///
+    /// # Errors
+    /// Returns an error if RPC call fails
+    pub fn get_health(&self) -> Result<()> {
+        self.rpc_client
+            .get_health()
+            .map_err(|e| TallyError::Generic(format!("Health check failed: {e}")))
+    }
+
 }
 
 #[cfg(test)]
