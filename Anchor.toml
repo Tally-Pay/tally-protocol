@@ -13,6 +13,9 @@ anchor_version = "0.31.1"
 [programs.localnet]
 tally-subs = "Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV"
 
+[programs.devnet]
+tally-subs = "6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+
 [registry]
 url = "https://anchor.projectserum.com"
 

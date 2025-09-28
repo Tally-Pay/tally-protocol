@@ -44,7 +44,7 @@ use init_merchant::*;
 use renew_subscription::*;
 use start_subscription::*;
 
-declare_id!("Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV");
+declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
 
 #[program]
 pub mod subs {
