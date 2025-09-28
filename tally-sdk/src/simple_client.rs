@@ -414,7 +414,16 @@ impl SimpleTallyClient {
         let created_ata = !treasury_exists;
 
         // If treasury ATA doesn't exist, add create ATA instruction
-        if !treasury_exists {
+        if treasury_exists {
+            // Validate existing treasury ATA
+            crate::validation::validate_usdc_token_account(
+                self,
+                treasury_ata,
+                usdc_mint,
+                &authority.pubkey(),
+                "treasury",
+            )?;
+        } else {
             // Validate the expected ATA address matches computed ATA
             let computed_ata = crate::ata::get_associated_token_address_for_mint(&authority.pubkey(), usdc_mint)?;
             if computed_ata != *treasury_ata {
@@ -432,15 +441,6 @@ impl SimpleTallyClient {
                 token_program,
             )?;
             instructions.push(create_ata_ix);
-        } else {
-            // Validate existing treasury ATA
-            crate::validation::validate_usdc_token_account(
-                self,
-                treasury_ata,
-                usdc_mint,
-                &authority.pubkey(),
-                "treasury",
-            )?;
         }
 
         // Always add the create merchant instruction

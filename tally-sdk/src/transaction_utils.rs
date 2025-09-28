@@ -40,7 +40,7 @@ pub struct SubscribeTransactionParams<'a> {
 /// # Returns
 /// The same pubkey (no conversion needed)
 #[must_use]
-pub fn convert_anchor_pubkey(pk: &Pubkey) -> Pubkey {
+pub const fn convert_anchor_pubkey(pk: &Pubkey) -> Pubkey {
     *pk  // No conversion needed since types are now the same
 }
 
@@ -118,10 +118,10 @@ pub fn get_user_usdc_ata(user: &Pubkey, usdc_mint: &Pubkey) -> Result<Pubkey> {
 /// Map `TallyError` to a generic error message string
 ///
 /// This provides a way to convert SDK errors into string messages suitable
-/// for external applications that don't want to depend on TallyError directly.
+/// for external applications that don't want to depend on `TallyError` directly.
 ///
 /// # Arguments
-/// * `err` - The TallyError to convert
+/// * `err` - The `TallyError` to convert
 ///
 /// # Returns
 /// String representation of the error

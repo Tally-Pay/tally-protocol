@@ -6,7 +6,7 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{events::*, error::Result, SimpleTallyClient, TallyError};
+use crate::{events::TallyEvent, error::Result, SimpleTallyClient, TallyError};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use lru::LruCache;
@@ -138,7 +138,7 @@ pub struct EventQueryClient {
 }
 
 impl EventQueryClient {
-    /// Create a new EventQueryClient
+    /// Create a new `EventQueryClient`
     ///
     /// # Arguments
     ///
@@ -174,7 +174,7 @@ impl EventQueryClient {
         })
     }
 
-    /// Create a new EventQueryClient with program ID from environment
+    /// Create a new `EventQueryClient` with program ID from environment
     ///
     /// # Arguments
     ///
@@ -499,7 +499,7 @@ impl EventQueryClient {
             let plan_signatures = self
                 .sdk_client
                 .get_confirmed_signatures_for_address(
-                    &plan_address,
+                    plan_address,
                     Some(GetConfirmedSignaturesForAddress2Config {
                         limit: Some(limit.min(1000)),
                         commitment: Some(self.config.commitment),
@@ -773,6 +773,7 @@ impl EventQueryClient {
     }
 
     /// Get cache statistics
+    #[must_use] 
     pub fn get_cache_stats(&self) -> HashMap<String, u64> {
         let mut stats = HashMap::new();
 
@@ -787,7 +788,7 @@ impl EventQueryClient {
     /// Health check for the RPC client
     pub fn health_check(&self) -> bool {
         match self.sdk_client.get_health() {
-            Ok(_) => {
+            Ok(()) => {
                 debug!(
                     service = "tally-sdk",
                     component = "event_query_client",
