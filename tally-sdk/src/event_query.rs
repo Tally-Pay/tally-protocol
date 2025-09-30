@@ -511,27 +511,12 @@ impl EventQueryClient {
         merchant: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
-        let query_key = QueryKey {
-            merchant: *merchant,
-            query_type: QueryType::MerchantEvents,
-            limit,
-            from_slot: None,
-            to_slot: None,
-        };
+        let start_time = Instant::now();
+        let query_key = Self::build_merchant_events_query_key(merchant, limit);
 
-        // Check cache first
-        if self.config.enable_cache {
-            if let Some(cached_events) = self.get_from_cache(&query_key) {
-                debug!(
-                    service = "tally-sdk",
-                    component = "event_query_client",
-                    event = "cache_hit",
-                    merchant = %merchant,
-                    cached_event_count = cached_events.len(),
-                    "Returning cached merchant events"
-                );
-                return Ok(cached_events);
-            }
+        // Check cache and return early if hit
+        if let Some(cached) = self.try_get_cached_merchant_events(&query_key, merchant) {
+            return Ok(cached);
         }
 
         debug!(
@@ -543,7 +528,59 @@ impl EventQueryClient {
             "Querying all events for merchant"
         );
 
-        // Get transaction signatures for all merchant accounts
+        // Fetch, parse, and sort events
+        let sorted_events = self.fetch_parse_and_sort_merchant_events(merchant, limit).await?;
+
+        // Store results in cache
+        self.try_cache_events(query_key, &sorted_events);
+
+        Self::log_merchant_events_success(merchant, &sorted_events, start_time);
+
+        Ok(sorted_events)
+    }
+
+    /// Build query key for merchant events queries
+    const fn build_merchant_events_query_key(merchant: &Pubkey, limit: usize) -> QueryKey {
+        QueryKey {
+            merchant: *merchant,
+            query_type: QueryType::MerchantEvents,
+            limit,
+            from_slot: None,
+            to_slot: None,
+        }
+    }
+
+    /// Try to get cached merchant events, returning Some if cache hit
+    fn try_get_cached_merchant_events(
+        &self,
+        query_key: &QueryKey,
+        merchant: &Pubkey,
+    ) -> Option<Vec<ParsedEvent>> {
+        if !self.config.enable_cache {
+            return None;
+        }
+
+        if let Some(cached_events) = self.get_from_cache(query_key) {
+            debug!(
+                service = "tally-sdk",
+                component = "event_query_client",
+                event = "cache_hit",
+                merchant = %merchant,
+                cached_event_count = cached_events.len(),
+                "Returning cached merchant events"
+            );
+            return Some(cached_events);
+        }
+
+        None
+    }
+
+    /// Fetch signatures, parse events, and sort for merchant
+    async fn fetch_parse_and_sort_merchant_events(
+        &self,
+        merchant: &Pubkey,
+        limit: usize,
+    ) -> Result<Vec<ParsedEvent>> {
         // Get more signatures to ensure we have enough events (2x buffer with overflow protection)
         let signature_limit = limit.saturating_mul(2);
         let signatures = self.get_merchant_signatures(merchant, signature_limit).await?;
@@ -551,29 +588,25 @@ impl EventQueryClient {
         // Parse events from transactions
         let events = self.parse_events_from_signatures(&signatures).await?;
 
-        // Sort by slot number (most recent first)
-        let mut sorted_events = events;
-        sorted_events.sort_by(|a, b| b.slot.cmp(&a.slot));
+        // Sort and limit events
+        Ok(Self::sort_and_limit_events(events, limit))
+    }
 
-        // Limit results
-        sorted_events.truncate(limit);
-
-        // Cache the results
-        if self.config.enable_cache {
-            self.store_in_cache(query_key, sorted_events.clone());
-        }
-
+    /// Log successful merchant events query completion with metrics
+    fn log_merchant_events_success(
+        merchant: &Pubkey,
+        events: &[ParsedEvent],
+        start_time: Instant,
+    ) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
             event = "merchant_events_retrieved",
             merchant = %merchant,
-            event_count = sorted_events.len(),
-            signatures_processed = signatures.len(),
+            event_count = events.len(),
+            duration_ms = start_time.elapsed().as_millis(),
             "Successfully retrieved merchant events"
         );
-
-        Ok(sorted_events)
     }
 
     /// Get transaction signatures for merchant's program accounts
@@ -689,55 +722,92 @@ impl EventQueryClient {
         &self,
         signatures: &[Signature],
     ) -> Result<Vec<ParsedEvent>> {
+        let all_events = self.process_signature_batches(signatures).await;
+
+        Self::log_parsed_events_summary(signatures, &all_events);
+
+        Ok(all_events)
+    }
+
+    /// Process signatures in batches with rate limiting
+    async fn process_signature_batches(&self, signatures: &[Signature]) -> Vec<ParsedEvent> {
         let mut all_events = Vec::new();
 
-        // Process signatures in batches to avoid overwhelming RPC
         for chunk in signatures.chunks(self.config.max_signatures_per_batch) {
-            let batch_events = Vec::new();
-
-            for signature in chunk {
-                match self.sdk_client.get_transaction(signature) {
-                    Ok(_transaction) => {
-                        // TODO: Implement proper JSON-based event parsing after refactor
-                        debug!(
-                            service = "tally-sdk",
-                            component = "event_query_client",
-                            event = "transaction_received",
-                            signature = %signature,
-                            "Transaction data received - event parsing temporarily disabled"
-                        );
-                    }
-                    Err(e) => {
-                        trace!(
-                            service = "tally-sdk",
-                            component = "event_query_client",
-                            event = "transaction_fetch_error",
-                            signature = %signature,
-                            error = %e,
-                            "Failed to fetch transaction details"
-                        );
-                    }
-                }
-            }
-
+            let batch_events = self.process_signature_chunk(chunk);
             all_events.extend(batch_events);
 
             // Small delay between batches to be respectful to RPC
-            if chunk.len() == self.config.max_signatures_per_batch {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
+            self.apply_batch_rate_limit(chunk.len()).await;
         }
 
+        all_events
+    }
+
+    /// Process a single chunk of signatures
+    fn process_signature_chunk(&self, chunk: &[Signature]) -> Vec<ParsedEvent> {
+        let batch_events = Vec::new();
+
+        for signature in chunk {
+            self.try_fetch_and_log_transaction(signature);
+        }
+
+        batch_events
+    }
+
+    /// Try to fetch transaction and log result
+    fn try_fetch_and_log_transaction(&self, signature: &Signature) {
+        match self.sdk_client.get_transaction(signature) {
+            Ok(_transaction) => {
+                Self::log_transaction_received(signature);
+            }
+            Err(e) => {
+                Self::log_transaction_fetch_error(signature, &e);
+            }
+        }
+    }
+
+    /// Log successful transaction fetch
+    fn log_transaction_received(signature: &Signature) {
+        // TODO: Implement proper JSON-based event parsing after refactor
+        debug!(
+            service = "tally-sdk",
+            component = "event_query_client",
+            event = "transaction_received",
+            signature = %signature,
+            "Transaction data received - event parsing temporarily disabled"
+        );
+    }
+
+    /// Log transaction fetch error
+    fn log_transaction_fetch_error<E: std::fmt::Display>(signature: &Signature, error: &E) {
+        trace!(
+            service = "tally-sdk",
+            component = "event_query_client",
+            event = "transaction_fetch_error",
+            signature = %signature,
+            error = %error,
+            "Failed to fetch transaction details"
+        );
+    }
+
+    /// Apply rate limiting delay between batches if needed
+    async fn apply_batch_rate_limit(&self, chunk_len: usize) {
+        if chunk_len == self.config.max_signatures_per_batch {
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+    }
+
+    /// Log summary of parsed events
+    fn log_parsed_events_summary(signatures: &[Signature], events: &[ParsedEvent]) {
         debug!(
             service = "tally-sdk",
             component = "event_query_client",
             event = "events_parsed",
             signature_count = signatures.len(),
-            event_count = all_events.len(),
+            event_count = events.len(),
             "Parsed events from transaction signatures"
         );
-
-        Ok(all_events)
     }
 
     /// Get plan addresses for a merchant using getProgramAccounts
