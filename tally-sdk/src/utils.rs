@@ -223,10 +223,11 @@ mod tests {
 
     #[test]
     fn test_micro_lamports_to_usdc() {
-        assert_eq!(micro_lamports_to_usdc(1_000_000), 1.0);
-        assert_eq!(micro_lamports_to_usdc(5_500_000), 5.5);
-        assert_eq!(micro_lamports_to_usdc(0), 0.0);
-        assert_eq!(micro_lamports_to_usdc(500_000), 0.5);
+        const EPSILON: f64 = 1e-10;
+        assert!((micro_lamports_to_usdc(1_000_000) - 1.0).abs() < EPSILON);
+        assert!((micro_lamports_to_usdc(5_500_000) - 5.5).abs() < EPSILON);
+        assert!((micro_lamports_to_usdc(0) - 0.0).abs() < EPSILON);
+        assert!((micro_lamports_to_usdc(500_000) - 0.5).abs() < EPSILON);
     }
 
     #[test]
@@ -276,13 +277,13 @@ mod tests {
     #[test]
     fn test_calculate_next_renewal() {
         let start = 1000_i64;
-        let period = 2592000_u64; // 30 days in seconds
+        let period = 2_592_000_u64; // 30 days in seconds
 
         // First renewal (0 periods elapsed)
-        assert_eq!(calculate_next_renewal(start, period, 0), start + period as i64);
+        assert_eq!(calculate_next_renewal(start, period, 0), start + i64::try_from(period).unwrap());
 
         // Second renewal (1 period elapsed)
-        assert_eq!(calculate_next_renewal(start, period, 1), start + (2 * period) as i64);
+        assert_eq!(calculate_next_renewal(start, period, 1), start + i64::try_from(2 * period).unwrap());
     }
 
     #[test]

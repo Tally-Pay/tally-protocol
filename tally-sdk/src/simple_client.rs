@@ -8,7 +8,7 @@ use crate::{
 use anchor_client::solana_client::rpc_client::RpcClient;
 use anchor_lang::AnchorDeserialize;
 use anchor_client::solana_account_decoder::UiAccountEncoding;
-use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
+use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTransactionConfig};
 use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
 use anchor_client::solana_client::rpc_client::{GetConfirmedSignaturesForAddress2Config};
 use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
@@ -581,7 +581,7 @@ impl SimpleTallyClient {
         signature: &anchor_client::solana_sdk::signature::Signature,
     ) -> Result<serde_json::Value> {
         self.rpc_client
-            .get_transaction_with_config(signature, Default::default())
+            .get_transaction_with_config(signature, RpcTransactionConfig::default())
             .map(|tx| serde_json::to_value(tx).unwrap_or_default())
             .map_err(|e| TallyError::Generic(format!("Failed to get transaction {signature}: {e}")))
     }
@@ -600,7 +600,7 @@ impl SimpleTallyClient {
 
         for chunk in signatures.chunks(CHUNK_SIZE) {
             for signature in chunk {
-                let transaction_result = self.rpc_client.get_transaction_with_config(signature, Default::default());
+                let transaction_result = self.rpc_client.get_transaction_with_config(signature, RpcTransactionConfig::default());
                 match transaction_result {
                     Ok(tx) => results.push(Some(serde_json::to_value(tx).unwrap_or_default())),
                     Err(_) => results.push(None), // Transaction not found or other error
