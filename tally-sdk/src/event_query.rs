@@ -351,6 +351,8 @@ impl EventQueryClient {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> Result<Vec<ParsedEvent>> {
+        let start_time = Instant::now();
+
         debug!(
             service = "tally-sdk",
             component = "event_query_client",
@@ -361,77 +363,133 @@ impl EventQueryClient {
             "Querying events by date range"
         );
 
-        // Convert dates to approximate slots for filtering
+        // Convert dates to slots and build query key
+        let (from_slot, to_slot) = self.convert_date_range_to_slots(from, to)?;
+        let query_key = Self::build_date_range_query_key(merchant, from_slot, to_slot, self.config.max_events_per_query);
+
+        // Check cache and return early if hit
+        if let Some(cached) = self.try_get_cached_date_range_events(&query_key, merchant) {
+            return Ok(cached);
+        }
+
+        // Fetch, filter, and sort events
+        let sorted_events = self.fetch_filter_and_sort_events_by_date(merchant, from, to, from_slot, to_slot).await?;
+
+        // Store results in cache
+        self.try_cache_events(query_key.clone(), &sorted_events);
+
+        Self::log_date_range_query_success(merchant, &sorted_events, from_slot, to_slot, start_time);
+
+        Ok(sorted_events)
+    }
+
+    /// Convert date range to approximate slot range
+    fn convert_date_range_to_slots(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<(u64, u64)> {
         let from_slot = self.timestamp_to_approximate_slot(from.timestamp())?;
         let to_slot = self.timestamp_to_approximate_slot(to.timestamp())?;
+        Ok((from_slot, to_slot))
+    }
 
-        let query_key = QueryKey {
+    /// Build query key for date range queries
+    const fn build_date_range_query_key(
+        merchant: &Pubkey,
+        from_slot: u64,
+        to_slot: u64,
+        limit: usize,
+    ) -> QueryKey {
+        QueryKey {
             merchant: *merchant,
             query_type: QueryType::DateRange,
-            limit: self.config.max_events_per_query,
+            limit,
             from_slot: Some(from_slot),
             to_slot: Some(to_slot),
-        };
+        }
+    }
 
-        // Check cache first
-        if self.config.enable_cache {
-            if let Some(cached_events) = self.get_from_cache(&query_key) {
-                debug!(
-                    service = "tally-sdk",
-                    component = "event_query_client",
-                    event = "cache_hit",
-                    merchant = %merchant,
-                    cached_event_count = cached_events.len(),
-                    "Returning cached date range events"
-                );
-                return Ok(cached_events);
-            }
+    /// Try to get cached date range events, returning Some if cache hit
+    fn try_get_cached_date_range_events(
+        &self,
+        query_key: &QueryKey,
+        merchant: &Pubkey,
+    ) -> Option<Vec<ParsedEvent>> {
+        if !self.config.enable_cache {
+            return None;
         }
 
-        // Get merchant signatures within the slot range
-        let signatures = self
-            .get_merchant_signatures_in_slot_range(merchant, from_slot, to_slot)
-            .await?;
+        if let Some(cached_events) = self.get_from_cache(query_key) {
+            debug!(
+                service = "tally-sdk",
+                component = "event_query_client",
+                event = "cache_hit",
+                merchant = %merchant,
+                cached_event_count = cached_events.len(),
+                "Returning cached date range events"
+            );
+            return Some(cached_events);
+        }
 
-        // Parse events from transactions
+        None
+    }
+
+    /// Fetch signatures, parse, filter by date, and sort events
+    async fn fetch_filter_and_sort_events_by_date(
+        &self,
+        merchant: &Pubkey,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+        from_slot: u64,
+        to_slot: u64,
+    ) -> Result<Vec<ParsedEvent>> {
+        let signatures = self.get_merchant_signatures_in_slot_range(merchant, from_slot, to_slot).await?;
         let events = self.parse_events_from_signatures(&signatures).await?;
+        let filtered_events = Self::filter_events_by_date_range(events, from, to);
+        Ok(Self::sort_events_by_block_time(filtered_events))
+    }
 
-        // Filter by actual block time
-        let filtered_events: Vec<ParsedEvent> = events
+    /// Filter events to only those within the specified date range
+    fn filter_events_by_date_range(
+        events: Vec<ParsedEvent>,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Vec<ParsedEvent> {
+        events
             .into_iter()
-            .filter(|event| {
-                if let Some(block_time) = event.block_time {
-                    let event_time = DateTime::from_timestamp(block_time, 0);
-                    if let Some(event_time) = event_time {
-                        return event_time >= from && event_time <= to;
-                    }
-                }
-                false
-            })
-            .collect();
+            .filter(|event| Self::is_event_in_date_range(event, from, to))
+            .collect()
+    }
 
-        // Sort by block time (most recent first)
-        let mut sorted_events = filtered_events;
-        sorted_events.sort_by(|a, b| b.block_time.unwrap_or(0).cmp(&a.block_time.unwrap_or(0)));
+    /// Check if an event is within the specified date range
+    fn is_event_in_date_range(event: &ParsedEvent, from: DateTime<Utc>, to: DateTime<Utc>) -> bool {
+        event.block_time
+            .and_then(|block_time| DateTime::from_timestamp(block_time, 0))
+            .is_some_and(|event_time| event_time >= from && event_time <= to)
+    }
 
-        // Cache the results
-        if self.config.enable_cache {
-            self.store_in_cache(query_key, sorted_events.clone());
-        }
+    /// Sort events by block time (most recent first)
+    fn sort_events_by_block_time(mut events: Vec<ParsedEvent>) -> Vec<ParsedEvent> {
+        events.sort_by(|a, b| b.block_time.unwrap_or(0).cmp(&a.block_time.unwrap_or(0)));
+        events
+    }
 
+    /// Log successful date range query completion with metrics
+    fn log_date_range_query_success(
+        merchant: &Pubkey,
+        events: &[ParsedEvent],
+        from_slot: u64,
+        to_slot: u64,
+        start_time: Instant,
+    ) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
             event = "date_range_events_retrieved",
             merchant = %merchant,
-            event_count = sorted_events.len(),
-            signatures_processed = signatures.len(),
+            event_count = events.len(),
             from_slot = from_slot,
             to_slot = to_slot,
+            duration_ms = start_time.elapsed().as_millis(),
             "Successfully retrieved events by date range"
         );
-
-        Ok(sorted_events)
     }
 
     /// Get all events for a merchant (up to configured limit)
