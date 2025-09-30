@@ -103,7 +103,10 @@ impl CacheEntry {
     }
 
     fn is_expired(&self) -> bool {
-        let expiry = self.cached_at + chrono::Duration::seconds(self.ttl_seconds as i64);
+        // Use checked conversion to i64 and saturating addition to prevent overflow
+        let ttl_i64 = i64::try_from(self.ttl_seconds).unwrap_or(i64::MAX);
+        let duration = chrono::Duration::seconds(ttl_i64);
+        let expiry = self.cached_at.checked_add_signed(duration).unwrap_or(self.cached_at);
         Utc::now() > expiry
     }
 }
@@ -216,27 +219,11 @@ impl EventQueryClient {
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
         let start_time = Instant::now();
-        let query_key = QueryKey {
-            merchant: *merchant,
-            query_type: QueryType::Recent,
-            limit,
-            from_slot: None,
-            to_slot: None,
-        };
+        let query_key = Self::build_query_key(merchant, QueryType::Recent, limit, None, None);
 
-        // Check cache first
-        if self.config.enable_cache {
-            if let Some(cached_events) = self.get_from_cache(&query_key) {
-                debug!(
-                    service = "tally-sdk",
-                    component = "event_query_client",
-                    event = "cache_hit",
-                    merchant = %merchant,
-                    cached_event_count = cached_events.len(),
-                    "Returning cached recent events"
-                );
-                return Ok(cached_events);
-            }
+        // Check cache and return early if hit
+        if let Some(cached) = self.try_get_cached_events(&query_key, merchant) {
+            return Ok(cached);
         }
 
         debug!(
@@ -248,36 +235,99 @@ impl EventQueryClient {
             "Querying recent events for merchant"
         );
 
-        // Get transaction signatures for the merchant's accounts
-        let signatures = self.get_merchant_signatures(merchant, limit).await?;
+        // Fetch and process events
+        let sorted_events = self.fetch_and_sort_events(merchant, limit).await?;
 
-        // Parse events from transactions
-        let events = self.parse_events_from_signatures(&signatures).await?;
+        // Store results in cache
+        self.try_cache_events(query_key, &sorted_events);
 
-        // Sort by slot number (most recent first)
-        let mut sorted_events = events;
-        sorted_events.sort_by(|a, b| b.slot.cmp(&a.slot));
+        Self::log_query_success(merchant, &sorted_events, start_time);
 
-        // Limit results
-        sorted_events.truncate(limit);
+        Ok(sorted_events)
+    }
 
-        // Cache the results
-        if self.config.enable_cache {
-            self.store_in_cache(query_key, sorted_events.clone());
+    /// Build a query key for cache operations
+    const fn build_query_key(
+        merchant: &Pubkey,
+        query_type: QueryType,
+        limit: usize,
+        from_slot: Option<u64>,
+        to_slot: Option<u64>,
+    ) -> QueryKey {
+        QueryKey {
+            merchant: *merchant,
+            query_type,
+            limit,
+            from_slot,
+            to_slot,
+        }
+    }
+
+    /// Try to get cached events, returning Some if cache hit
+    fn try_get_cached_events(
+        &self,
+        query_key: &QueryKey,
+        merchant: &Pubkey,
+    ) -> Option<Vec<ParsedEvent>> {
+        if !self.config.enable_cache {
+            return None;
         }
 
+        if let Some(cached_events) = self.get_from_cache(query_key) {
+            debug!(
+                service = "tally-sdk",
+                component = "event_query_client",
+                event = "cache_hit",
+                merchant = %merchant,
+                cached_event_count = cached_events.len(),
+                "Returning cached recent events"
+            );
+            return Some(cached_events);
+        }
+
+        None
+    }
+
+    /// Fetch signatures, parse events, and sort by most recent first
+    async fn fetch_and_sort_events(
+        &self,
+        merchant: &Pubkey,
+        limit: usize,
+    ) -> Result<Vec<ParsedEvent>> {
+        let signatures = self.get_merchant_signatures(merchant, limit).await?;
+        let events = self.parse_events_from_signatures(&signatures).await?;
+        Ok(Self::sort_and_limit_events(events, limit))
+    }
+
+    /// Sort events by slot (most recent first) and apply limit
+    fn sort_and_limit_events(mut events: Vec<ParsedEvent>, limit: usize) -> Vec<ParsedEvent> {
+        events.sort_by(|a, b| b.slot.cmp(&a.slot));
+        events.truncate(limit);
+        events
+    }
+
+    /// Try to cache events if caching is enabled
+    fn try_cache_events(&self, query_key: QueryKey, events: &[ParsedEvent]) {
+        if self.config.enable_cache {
+            self.store_in_cache(query_key, events.to_vec());
+        }
+    }
+
+    /// Log successful query completion with metrics
+    fn log_query_success(
+        merchant: &Pubkey,
+        events: &[ParsedEvent],
+        start_time: Instant,
+    ) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
             event = "recent_events_retrieved",
             merchant = %merchant,
-            event_count = sorted_events.len(),
-            signatures_processed = signatures.len(),
+            event_count = events.len(),
             duration_ms = start_time.elapsed().as_millis(),
             "Successfully retrieved recent events"
         );
-
-        Ok(sorted_events)
     }
 
     /// Get events for a merchant within a date range
@@ -436,7 +486,9 @@ impl EventQueryClient {
         );
 
         // Get transaction signatures for all merchant accounts
-        let signatures = self.get_merchant_signatures(merchant, limit * 2).await?; // Get more signatures to ensure we have enough events
+        // Get more signatures to ensure we have enough events (2x buffer with overflow protection)
+        let signature_limit = limit.saturating_mul(2);
+        let signatures = self.get_merchant_signatures(merchant, signature_limit).await?;
 
         // Parse events from transactions
         let events = self.parse_events_from_signatures(&signatures).await?;
@@ -561,8 +613,10 @@ impl EventQueryClient {
         _from_slot: u64,
         _to_slot: u64,
     ) -> Result<Vec<Signature>> {
+        // Get signatures with 2x buffer, using saturating multiplication to prevent overflow
+        let signature_limit = self.config.max_events_per_query.saturating_mul(2);
         let signatures = self
-            .get_merchant_signatures(merchant, self.config.max_events_per_query * 2)
+            .get_merchant_signatures(merchant, signature_limit)
             .await?;
 
         // We would need to fetch transaction details to filter by slot, which is expensive
@@ -707,20 +761,24 @@ impl EventQueryClient {
 
     /// Convert Unix timestamp to approximate slot number
     fn timestamp_to_approximate_slot(&self, timestamp: i64) -> Result<u64> {
+        // Estimate slot time (approximately 400ms per slot on Solana)
+        const SLOT_DURATION_MS: i64 = 400;
+
         // Get current slot and time
         let current_slot = self.sdk_client.get_slot().map_err(|e| TallyError::RpcError(format!("Failed to get current slot: {e}")))?;
         let current_time = Utc::now().timestamp();
+        let time_diff_seconds = current_time.saturating_sub(timestamp);
+        let time_diff_ms = time_diff_seconds.saturating_mul(1000);
+        let slot_diff = time_diff_ms / SLOT_DURATION_MS;
 
-        // Estimate slot time (approximately 400ms per slot on Solana)
-        let slot_duration_ms = 400;
-        let time_diff_ms = (current_time - timestamp) * 1000;
-        let slot_diff = time_diff_ms / slot_duration_ms;
-
-        // Calculate approximate slot
+        // Calculate approximate slot using checked arithmetic
         let approximate_slot = if slot_diff > 0 {
-            current_slot.saturating_sub(slot_diff as u64)
+            // slot_diff is positive, so safe to cast to u64 since it came from positive time difference
+            current_slot.saturating_sub(u64::try_from(slot_diff).unwrap_or(u64::MAX))
         } else {
-            current_slot.saturating_add((-slot_diff) as u64)
+            // slot_diff is negative or zero, use absolute value
+            let abs_diff = slot_diff.unsigned_abs();
+            current_slot.saturating_add(abs_diff)
         };
 
         trace!(
