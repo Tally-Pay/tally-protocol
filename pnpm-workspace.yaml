@@ -1,7 +1,5 @@
 packages:
-  - tally-pkgs/*
-  - tally-web3
-  - tests
+  - packages/*
 
 onlyBuiltDependencies:
   - '@parcel/watcher'
