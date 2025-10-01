@@ -5,7 +5,7 @@ edition = "2021"
 description = "Rust SDK for the Tally Solana subscriptions platform"
 authors = ["Tally Team"]
 license = "MIT"
-repository = "https://github.com/tally-team/solana-subscriptions"
+repository = "https://github.com/Govcraft/tally-protocol"
 
 [lints]
 workspace = true
