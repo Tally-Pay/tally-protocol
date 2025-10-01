@@ -1,11 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "tally-subs",
-    "tally-keeper",
-    "tally-cli",
-    "tally-actions",
-    "tally-sdk"
+    "program",
+    "sdk",
+    "cli"
 ]
 
 [workspace.package]
