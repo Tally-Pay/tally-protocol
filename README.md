@@ -1,359 +1,446 @@
-# Tally Web3 Frontend
+# Tally Protocol
 
-Modern HTMX-powered frontend for the Tally subscription platform - a Blink-native subscription engine for Solana.
+A Solana-native subscription platform implementing delegate-based recurring payments using SPL Token delegate approvals. Tally enables merchants to create subscription plans and collect automated USDC payments without requiring user signatures on each renewal.
 
 ## Overview
 
-The Tally Web3 frontend provides a merchant dashboard for managing subscription plans, monitoring customer subscriptions, and viewing analytics. Built with HTMX for seamless server-side rendering, Basecoat UI components for consistent design, and Tailwind CSS for modern styling.
+Tally Protocol provides a complete subscription infrastructure on Solana with:
+
+- **On-Chain Program**: Anchor-based Solana program for subscription management
+- **Rust SDK**: Comprehensive SDK for building subscription integrations
+- **CLI Tool**: Command-line interface for merchants and developers
+- **TypeScript Packages**: IDL and type definitions for web integrations
 
 ### Key Features
 
-- **Merchant Dashboard**: Comprehensive subscription and plan management
-- **Real-time Updates**: HTMX-powered dynamic content loading
-- **Responsive Design**: Mobile-first approach with full accessibility support
-- **Modern UI**: Basecoat UI components with Tally branding
-- **Performance Optimized**: Minimal JavaScript footprint, fast loading times
-- **Developer Friendly**: Hot reloading, TypeScript support, modern tooling
-
-## Tech Stack
-
-- **HTMX** - Dynamic content loading and server-side rendering
-- **Basecoat UI** - Consistent, accessible component system
-- **Tailwind CSS v3.4** - Utility-first CSS framework
-- **Alpine.js** - Lightweight client-side interactivity
-- **Vite** - Modern build tool and development server
-- **Askama** - Rust templating (backend integration)
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js 18+ and pnpm
-- Running tally-actions backend service
-- Access to Solana network (localnet/devnet/mainnet)
-
-### Installation
-
-```bash
-# Clone and navigate to the workspace
-cd tally-web3-workspace/tally-web3
-
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-```
-
-The development server will start at `http://localhost:5173` with hot reloading enabled.
-
-### Development Workflow
-
-1. **Start Backend**: Ensure the tally-actions service is running
-2. **Start Frontend**: Run `pnpm dev` for development server
-3. **Make Changes**: Edit templates, styles, or JavaScript
-4. **Test**: Verify changes in browser with responsive design testing
-5. **Validate**: Run linting and formatting before committing
+- **Delegate-Based Payments**: Users approve once, renewals happen automatically
+- **USDC Native**: Built on SPL Token standard with USDC support
+- **Flexible Plans**: Configure pricing, periods, and grace periods
+- **Platform Fees**: Configurable merchant fees with admin controls
+- **Event System**: Comprehensive event logging for subscriptions
+- **Dashboard API**: Real-time subscription metrics and analytics
 
 ## Project Structure
 
 ```
-tally-web3/
-├── static/                     # Static assets
-│   ├── css/
-│   │   ├── input.css          # Tailwind CSS source
-│   │   └── styles.css         # Generated CSS bundle
-│   ├── js/
-│   │   └── app.js             # Main application JavaScript
-│   └── favicon.ico            # Site icon
-├── templates/                  # Askama templates
-│   ├── partials/
-│   │   ├── fragments/         # HTMX fragments
-│   │   └── header.html        # Shared header component
-│   ├── index.html             # Landing page
-│   ├── overview.html          # Dashboard overview
-│   ├── plans.html             # Subscription plans
-│   ├── subscriptions.html     # Customer subscriptions
-│   ├── analytics.html         # Analytics dashboard
-│   └── settings.html          # Account settings
-├── dist/                      # Build output
-├── node_modules/              # Dependencies
-├── package.json               # Project configuration
-├── tailwind.config.js         # Tailwind configuration
-├── vite.config.js            # Vite build configuration
-├── eslint.config.js          # ESLint configuration
-└── prettier.config.js        # Prettier configuration
+tally-protocol/
+├── program/           # Solana program (Anchor)
+│   └── src/
+│       ├── lib.rs                    # Program entry point
+│       ├── state.rs                  # Account structures
+│       ├── init_config.rs            # Global config initialization
+│       ├── init_merchant.rs          # Merchant registration
+│       ├── create_plan.rs            # Subscription plan creation
+│       ├── start_subscription.rs     # New subscription with delegate
+│       ├── renew_subscription.rs     # Automated renewal via delegate
+│       ├── cancel_subscription.rs    # Subscription cancellation
+│       ├── admin_withdraw_fees.rs    # Platform fee withdrawal
+│       ├── events.rs                 # Event definitions
+│       └── errors.rs                 # Error types
+├── sdk/              # Rust SDK
+│   └── src/
+│       ├── lib.rs                    # SDK entry point
+│       ├── simple_client.rs          # High-level client API
+│       ├── transaction_builder.rs    # Transaction construction
+│       ├── pda.rs                    # PDA computation utilities
+│       ├── ata.rs                    # Associated token account helpers
+│       ├── events.rs                 # Event parsing
+│       ├── event_query.rs            # Event querying with caching
+│       ├── dashboard.rs              # Dashboard data aggregation
+│       ├── validation.rs             # Input validation
+│       └── error.rs                  # SDK error types
+├── cli/              # Command-line interface
+│   └── src/
+│       ├── main.rs                   # CLI entry point
+│       ├── commands/
+│       │   ├── init_config.rs        # Initialize config
+│       │   ├── init_merchant.rs      # Register merchant
+│       │   ├── create_plan.rs        # Create subscription plan
+│       │   ├── list_plans.rs         # List all plans
+│       │   ├── list_subs.rs          # List subscriptions
+│       │   ├── dashboard.rs          # View dashboard metrics
+│       │   ├── deactivate_plan.rs    # Deactivate plan
+│       │   ├── withdraw_fees.rs      # Withdraw merchant fees
+│       │   └── simulate_events/      # Event simulation tools
+│       └── utils/
+│           └── formatting.rs         # CLI output formatting
+├── packages/         # TypeScript packages
+│   ├── idl/          # Program IDL
+│   ├── sdk/          # TypeScript SDK (WIP)
+│   └── types/        # Type definitions (WIP)
+└── examples/         # Usage examples (WIP)
 ```
 
-## Build & Deployment
+## Installation
 
-### Development Build
+### Prerequisites
+
+- Rust 1.75+ with Cargo
+- Solana CLI 1.18+
+- Anchor CLI 0.31.1
+- Node.js 18+ with pnpm (for TypeScript packages)
+
+### Building from Source
 
 ```bash
-# Build CSS
-pnpm build:css
+# Clone the repository
+git clone https://github.com/Govcraft/tally-protocol
+cd tally-protocol
 
-# Build all assets
+# Build the entire workspace
+cargo build --release
+
+# Build specific components
+cargo build -p tally_subs    # Solana program
+cargo build -p tally-sdk     # Rust SDK
+cargo build -p tally-cli     # CLI tool
+
+# Build TypeScript packages
+pnpm install
 pnpm build
-
-# Start development server
-pnpm dev
 ```
 
-### Production Build
+### Running Tests
 
 ```bash
-# Production build with optimization
-pnpm build:prod
+# Run all tests
+cargo nextest run
 
-# Preview production build
-pnpm preview
+# Test specific packages
+cargo nextest run -p tally_subs
+cargo nextest run -p tally-sdk
+cargo nextest run -p tally-cli
 ```
 
-### Build Outputs
+## Quick Start
 
-- **CSS**: `dist/css/styles.css` (~36KB, ~7KB gzipped)
-- **JavaScript**: `static/js/app.js` (~16KB, ~3.6KB gzipped)
-- **Templates**: Served by tally-actions backend
-
-## Integration with tally-actions
-
-The frontend integrates with the tally-actions Rust backend service:
-
-### API Endpoints
-
-- **Static Assets**: Served from `/static/` path
-- **Templates**: Rendered by Askama template engine
-- **HTMX Fragments**: Dynamic content from `/x/` endpoints
-- **Authentication**: Wallet-based auth with session management
-
-### Template Integration
-
-Templates use Askama (Jinja2-style) syntax compatible with the Rust backend:
-
-```html
-<!-- Example template syntax -->
-{% for plan in plans %}
-  <div class="card">
-    <h3>{{ plan.name }}</h3>
-    <p>{{ plan.price }} USDC/{{ plan.period }}</p>
-  </div>
-{% endfor %}
-```
-
-### HTMX Fragments
-
-Dynamic content is loaded via HTMX fragments:
-
-```html
-<!-- Triggers request to /x/plans/table -->
-<div hx-get="/x/plans/table" hx-trigger="load" hx-swap="innerHTML">
-  <!-- Loading skeleton -->
-</div>
-```
-
-## Configuration
-
-### Environment Variables
-
-Create `.env.local` for local development:
+### 1. Deploy the Program
 
 ```bash
-# Frontend configuration
-PORT=5173
-PUBLIC_API_URL=http://localhost:8787
+# Build and deploy to localnet
+anchor build
+anchor deploy
 
-# Backend integration
-BACKEND_URL=http://localhost:8787
+# Or deploy to devnet
+anchor deploy --provider.cluster devnet
 ```
 
-### Tailwind Configuration
+**Program IDs:**
+- Localnet: `Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV`
+- Devnet: `6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5`
 
-Customized for Tally branding in `tailwind.config.js`:
+### 2. Initialize Configuration
 
-```javascript
-module.exports = {
-  content: ['./templates/**/*.html', './static/**/*.js'],
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          DEFAULT: '#6366f1',
-          foreground: '#ffffff',
-        },
-        // ... Tally brand colors
-      },
-    },
-  },
-}
+```bash
+# Initialize global program config (admin only)
+tally-cli init-config \
+  --platform-authority <ADMIN_PUBKEY> \
+  --max-fee-bps 1000 \
+  --min-period 86400
+
+# Initialize merchant account
+tally-cli init-merchant \
+  --usdc-mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+  --platform-fee-bps 500
 ```
 
-## Development Guidelines
+### 3. Create a Subscription Plan
+
+```bash
+tally-cli create-plan \
+  --plan-id "premium" \
+  --name "Premium Plan" \
+  --price 10000000 \
+  --period 2592000 \
+  --grace 86400
+```
+
+### 4. Using the Rust SDK
+
+```rust
+use tally_sdk::{SimpleTallyClient, pda, ata};
+use anchor_client::solana_sdk::signature::{Keypair, Signer};
+use anchor_client::solana_sdk::pubkey::Pubkey;
+use std::str::FromStr;
+
+// Initialize client
+let client = SimpleTallyClient::new("https://api.devnet.solana.com")?;
+
+// Compute addresses
+let merchant = Keypair::new();
+let merchant_pda = pda::merchant_address(&merchant.pubkey())?;
+let plan_pda = pda::plan_address_from_string(&merchant_pda, "premium")?;
+
+// Get merchant's USDC ATA
+let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")?;
+let treasury_ata = ata::get_associated_token_address_for_mint(
+    &merchant.pubkey(),
+    &usdc_mint
+)?;
+
+// Fetch subscription data
+let subscription = client.get_subscription(&plan_pda, &user.pubkey()).await?;
+println!("Next renewal: {}", subscription.next_renewal_ts);
+println!("Renewals: {}", subscription.renewals);
+```
+
+## Architecture
+
+### Program Accounts
+
+**Config Account** (PDA: `["config"]`)
+- Global program configuration
+- Platform authority and fee settings
+- Min/max validation parameters
+
+**Merchant Account** (PDA: `["merchant", authority]`)
+- Merchant registration and settings
+- USDC mint and treasury configuration
+- Platform fee percentage
+
+**Plan Account** (PDA: `["plan", merchant, plan_id]`)
+- Subscription plan definition
+- Pricing, period, and grace period
+- Active/inactive status
+
+**Subscription Account** (PDA: `["subscription", plan, subscriber]`)
+- Individual user subscription state
+- Next renewal timestamp
+- Renewal count and last amount charged
+
+### Payment Flow
+
+1. **Start Subscription**
+   - User approves USDC delegate to program
+   - Program transfers initial payment
+   - Creates subscription account with renewal schedule
+
+2. **Automated Renewal** (via off-chain keeper)
+   - Keeper calls `renew_subscription` when due
+   - Program pulls funds via delegate approval
+   - Updates next renewal timestamp
+   - Emits renewal event
+
+3. **Cancel Subscription**
+   - User or merchant cancels subscription
+   - Program revokes delegate approval
+   - Marks subscription as inactive
+
+### Fee Distribution
+
+For each payment:
+- **Merchant Fee**: `amount * (1 - platform_fee_bps / 10000)` → Merchant treasury
+- **Platform Fee**: `amount * (platform_fee_bps / 10000)` → Platform fee vault
+
+## CLI Commands
+
+### Configuration
+
+```bash
+# Initialize global config (admin only)
+tally-cli init-config [OPTIONS]
+
+# Initialize merchant account
+tally-cli init-merchant --usdc-mint <MINT> --platform-fee-bps <BPS>
+```
+
+### Plan Management
+
+```bash
+# Create subscription plan
+tally-cli create-plan --plan-id <ID> --name <NAME> --price <AMOUNT> --period <SECONDS>
+
+# List all plans for merchant
+tally-cli list-plans
+
+# Deactivate plan
+tally-cli deactivate-plan --plan-id <ID>
+```
+
+### Subscription Management
+
+```bash
+# List subscriptions for merchant
+tally-cli list-subs
+
+# View dashboard metrics
+tally-cli dashboard
+```
+
+### Fee Management
+
+```bash
+# Withdraw accumulated fees (merchant)
+tally-cli withdraw-fees --amount <AMOUNT>
+```
+
+### Development Tools
+
+```bash
+# Simulate subscription events
+tally-cli simulate-events
+```
+
+## SDK Features
+
+### Transaction Building
+
+The SDK provides high-level transaction builders:
+
+```rust
+use tally_sdk::transaction_builder::TransactionBuilder;
+
+// Start subscription transaction
+let tx = TransactionBuilder::start_subscription(
+    &subscriber_keypair,
+    &plan_pda,
+    &usdc_mint,
+    approval_amount,
+)?;
+
+// Cancel subscription transaction
+let tx = TransactionBuilder::cancel_subscription(
+    &subscriber_keypair,
+    &plan_pda,
+)?;
+```
+
+### Event Querying
+
+```rust
+use tally_sdk::event_query::EventQuery;
+
+// Query subscription events with caching
+let query = EventQuery::new(client, program_id);
+let events = query.query_subscription_events(
+    &subscription_pda,
+    start_time,
+    end_time
+).await?;
+```
+
+### Dashboard Data
+
+```rust
+use tally_sdk::dashboard::Dashboard;
+
+// Aggregate subscription metrics
+let dashboard = Dashboard::new(&client);
+let metrics = dashboard.get_merchant_metrics(&merchant_pda).await?;
+
+println!("Active subscriptions: {}", metrics.active_count);
+println!("Total revenue: {}", metrics.total_revenue);
+println!("MRR: {}", metrics.monthly_recurring_revenue);
+```
+
+## Events
+
+The program emits comprehensive events for off-chain indexing:
+
+- **SubscriptionStarted**: New subscription created
+- **SubscriptionRenewed**: Successful renewal payment
+- **SubscriptionCancelled**: Subscription cancelled
+- **PlanCreated**: New plan created
+- **PlanDeactivated**: Plan deactivated
+- **MerchantInitialized**: Merchant registered
+- **FeesWithdrawn**: Platform fees withdrawn
+
+## Development
 
 ### Code Quality
 
-```bash
-# Linting and formatting
-pnpm lint          # ESLint check
-pnpm format        # Prettier formatting
-pnpm type-check    # TypeScript validation
-```
+The project enforces strict code quality standards:
 
-### Testing
+- **Zero Unsafe Code**: `#![forbid(unsafe_code)]` across all crates
+- **Clippy Lints**: `all`, `pedantic`, `nursery` enabled
+- **Test Coverage**: Comprehensive unit and integration tests
+- **Test Runner**: Uses `cargo nextest` for parallel test execution
 
-```bash
-# Accessibility testing
-pnpm test:a11y
+### Safety Standards
 
-# Visual regression testing
-pnpm test:visual
+Following Solana SDK patterns:
+- Arithmetic overflow checks in release builds
+- No unsafe code blocks allowed
+- Strict clippy lints for security-critical operations
+- Comprehensive input validation
 
-# Performance testing
-pnpm test:perf
-```
+### Contributing
 
-### Responsive Design
-
-Test across breakpoints:
-- **Mobile**: 320px - 767px
-- **Tablet**: 768px - 1023px
-- **Desktop**: 1024px - 1439px
-- **Large**: 1440px+
-
-### Accessibility
-
-- WCAG 2.1 AA compliance required
-- Semantic HTML structure
-- Proper ARIA labels and roles
-- Keyboard navigation support
-- Screen reader compatibility
-
-## Performance Guidelines
-
-### Optimization Targets
-
-- **CSS Bundle**: <50KB uncompressed, <10KB gzipped
-- **JavaScript**: <20KB uncompressed, <5KB gzipped
-- **First Contentful Paint**: <1.5s
-- **Largest Contentful Paint**: <2.5s
-- **Cumulative Layout Shift**: <0.1
-
-### Best Practices
-
-- Use Basecoat UI components for consistency
-- Minimize custom CSS and JavaScript
-- Leverage HTMX for dynamic content
-- Optimize images and assets
-- Enable gzip compression
-
-## Browser Support
-
-- **Modern Browsers**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
-- **Mobile**: iOS Safari 14+, Chrome Mobile 90+
-- **Features**: ES2020, CSS Grid, Flexbox, Custom Properties
-
-## Troubleshooting
-
-### Common Issues
-
-**HTMX endpoints return 404**
-- Ensure tally-actions backend is running
-- Check endpoint paths match backend routes
-- Verify authentication headers
-
-**CSS not updating**
-- Run `pnpm build:css` to rebuild Tailwind
-- Clear browser cache
-- Check for CSS syntax errors
-
-**JavaScript errors**
-- Check browser console for error details
-- Verify all dependencies are installed
-- Ensure Alpine.js and HTMX are loaded
-
-**Template rendering issues**
-- Verify Askama template syntax
-- Check variable names match backend data
-- Ensure proper HTML escaping
-
-### Debug Mode
-
-Enable debug mode in `static/js/app.js`:
-
-```javascript
-TallyApp.config.enableDebugMode = true
-```
-
-This enables:
-- Console logging for HTMX events
-- Request/response debugging
-- Performance monitoring
-- Error tracking
-
-### Performance Debugging
-
-```bash
-# Bundle analysis
-pnpm analyze
-
-# Lighthouse audit
-pnpm audit:lighthouse
-
-# Memory usage check
-pnpm audit:memory
-```
-
-## Contributing
-
-1. **Setup**: Follow quick start instructions
-2. **Branch**: Create feature branch from main
-3. **Develop**: Make changes following code quality guidelines
-4. **Test**: Verify responsive design and accessibility
-5. **Format**: Run `pnpm format` and `pnpm lint`
-6. **Commit**: Use conventional commit messages
-7. **PR**: Submit pull request with description
-
-### Code Standards
-
-- Use Basecoat UI components when possible
-- Follow Tailwind utility-first approach
-- Maintain accessibility standards
-- Write semantic HTML
-- Keep JavaScript minimal and functional
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new functionality
+4. Ensure `cargo nextest run` passes
+5. Ensure `cargo clippy` shows no warnings
+6. Submit a pull request
 
 ## Deployment
 
-### Production Checklist
+### Localnet
 
-- [ ] Run production build (`pnpm build:prod`)
-- [ ] Verify all assets are optimized
-- [ ] Test across supported browsers
-- [ ] Validate accessibility compliance
-- [ ] Check performance metrics
-- [ ] Confirm backend integration
-- [ ] Test responsive design
-- [ ] Verify error handling
+```bash
+# Start local validator
+solana-test-validator
 
-### Static Asset Deployment
+# Deploy program
+anchor build
+anchor deploy
 
-The frontend is designed to be served by the tally-actions backend. Static assets should be available at `/static/` path with proper caching headers.
+# Run CLI commands against localnet
+tally-cli --url http://localhost:8899 <COMMAND>
+```
 
-### CDN Configuration
+### Devnet
 
-For optimal performance:
-- Enable gzip compression
-- Set cache headers for static assets
-- Use HTTP/2 for improved loading
-- Consider using a CDN for global distribution
+```bash
+# Configure CLI for devnet
+solana config set --url https://api.devnet.solana.com
+
+# Deploy to devnet
+anchor deploy --provider.cluster devnet
+
+# Run CLI commands
+tally-cli --cluster devnet <COMMAND>
+```
+
+### Mainnet
+
+**⚠️ Not recommended for production yet - under active development**
+
+## Security
+
+### Audit Status
+
+This project has not been formally audited. Use at your own risk.
+
+### Known Limitations
+
+- Relies on off-chain keeper for renewal timing
+- Delegate approval must be maintained by users
+- No automatic grace period recovery mechanism
+- Platform fee changes don't affect existing subscriptions
+
+### Reporting Issues
+
+Please report security issues privately to the maintainers.
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Resources
+
+- [Anchor Framework](https://www.anchor-lang.com/)
+- [Solana Documentation](https://docs.solana.com/)
+- [SPL Token Program](https://spl.solana.com/token)
+
+## Support
+
+For questions and support:
+- GitHub Issues: [tally-protocol/issues](https://github.com/Govcraft/tally-protocol/issues)
+- Documentation: Coming soon
 
 ---
 
-## Related Documentation
-
-- [Tally Platform PRD](../solana-subscriptions/tally-platform-prd.md)
-- [Tally Web3 PRD](../solana-subscriptions/tally-web3-prd.md)
-- [Basecoat UI Documentation](https://basecoatui.com/)
-- [HTMX Documentation](https://htmx.org/)
-- [Tailwind CSS Documentation](https://tailwindcss.com/)
-
-For questions or support, refer to the main Tally documentation or create an issue in the repository.
+**Status**: Active Development
+**Version**: 0.1.0
+**Last Updated**: 2025-10-01
