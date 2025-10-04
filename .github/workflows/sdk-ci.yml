@@ -1,0 +1,33 @@
+name: SDK CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'sdk/**'
+      - '.github/workflows/sdk-ci.yml'
+  pull_request:
+    paths:
+      - 'sdk/**'
+
+jobs:
+  lint-and-test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest --locked
+
+      - name: Run clippy
+        run: cargo clippy -p tally-sdk --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo nextest run -p tally-sdk
