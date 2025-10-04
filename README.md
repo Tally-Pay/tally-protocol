@@ -8,8 +8,9 @@ Tally Protocol provides a complete subscription infrastructure on Solana with:
 
 - **On-Chain Program**: Anchor-based Solana program for subscription management
 - **Rust SDK**: Comprehensive SDK for building subscription integrations
-- **CLI Tool**: Command-line interface for merchants and developers
 - **TypeScript Packages**: IDL and type definitions for web integrations
+
+> **Note**: The CLI tool has been moved to a separate repository: [tally-cli](https://github.com/Tally-Pay/tally-cli)
 
 ### Key Features
 
@@ -49,21 +50,6 @@ tally-protocol/
 │       ├── dashboard.rs              # Dashboard data aggregation
 │       ├── validation.rs             # Input validation
 │       └── error.rs                  # SDK error types
-├── cli/              # Command-line interface
-│   └── src/
-│       ├── main.rs                   # CLI entry point
-│       ├── commands/
-│       │   ├── init_config.rs        # Initialize config
-│       │   ├── init_merchant.rs      # Register merchant
-│       │   ├── create_plan.rs        # Create subscription plan
-│       │   ├── list_plans.rs         # List all plans
-│       │   ├── list_subs.rs          # List subscriptions
-│       │   ├── dashboard.rs          # View dashboard metrics
-│       │   ├── deactivate_plan.rs    # Deactivate plan
-│       │   ├── withdraw_fees.rs      # Withdraw merchant fees
-│       │   └── simulate_events/      # Event simulation tools
-│       └── utils/
-│           └── formatting.rs         # CLI output formatting
 ├── packages/         # TypeScript packages
 │   ├── idl/          # Program IDL
 │   ├── sdk/          # TypeScript SDK (WIP)
@@ -93,7 +79,7 @@ cargo build --release
 # Build specific components
 cargo build -p tally_subs    # Solana program
 cargo build -p tally-sdk     # Rust SDK
-cargo build -p tally-cli     # CLI tool
+# CLI tool is now in a separate repository: https://github.com/Tally-Pay/tally-cli
 
 # Build TypeScript packages
 pnpm install
@@ -109,7 +95,7 @@ cargo nextest run
 # Test specific packages
 cargo nextest run -p tally_subs
 cargo nextest run -p tally-sdk
-cargo nextest run -p tally-cli
+# CLI tests are now in tally-cli repository
 ```
 
 ## Quick Start
@@ -131,6 +117,12 @@ anchor deploy --provider.cluster devnet
 
 ### 2. Initialize Configuration
 
+Install the CLI tool first:
+```bash
+cargo install --git https://github.com/Tally-Pay/tally-cli
+```
+
+Then initialize the configuration:
 ```bash
 # Initialize global program config (admin only)
 tally-cli init-config \
@@ -142,11 +134,8 @@ tally-cli init-config \
 tally-cli init-merchant \
   --usdc-mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
   --platform-fee-bps 500
-```
 
-### 3. Create a Subscription Plan
-
-```bash
+# Create a subscription plan
 tally-cli create-plan \
   --plan-id "premium" \
   --name "Premium Plan" \
@@ -155,7 +144,9 @@ tally-cli create-plan \
   --grace 86400
 ```
 
-### 4. Using the Rust SDK
+For more CLI commands, see the [tally-cli repository](https://github.com/Tally-Pay/tally-cli).
+
+### 3. Using the Rust SDK
 
 ```rust
 use tally_sdk::{SimpleTallyClient, pda, ata};
@@ -232,54 +223,18 @@ For each payment:
 - **Merchant Fee**: `amount * (1 - platform_fee_bps / 10000)` → Merchant treasury
 - **Platform Fee**: `amount * (platform_fee_bps / 10000)` → Platform fee vault
 
-## CLI Commands
+## CLI Tool
 
-### Configuration
+The CLI tool has been moved to a separate repository for easier distribution and maintenance.
 
+**Repository**: [https://github.com/Tally-Pay/tally-cli](https://github.com/Tally-Pay/tally-cli)
+
+**Installation**:
 ```bash
-# Initialize global config (admin only)
-tally-cli init-config [OPTIONS]
-
-# Initialize merchant account
-tally-cli init-merchant --usdc-mint <MINT> --platform-fee-bps <BPS>
+cargo install --git https://github.com/Tally-Pay/tally-cli
 ```
 
-### Plan Management
-
-```bash
-# Create subscription plan
-tally-cli create-plan --plan-id <ID> --name <NAME> --price <AMOUNT> --period <SECONDS>
-
-# List all plans for merchant
-tally-cli list-plans
-
-# Deactivate plan
-tally-cli deactivate-plan --plan-id <ID>
-```
-
-### Subscription Management
-
-```bash
-# List subscriptions for merchant
-tally-cli list-subs
-
-# View dashboard metrics
-tally-cli dashboard
-```
-
-### Fee Management
-
-```bash
-# Withdraw accumulated fees (merchant)
-tally-cli withdraw-fees --amount <AMOUNT>
-```
-
-### Development Tools
-
-```bash
-# Simulate subscription events
-tally-cli simulate-events
-```
+For complete CLI documentation and usage examples, please refer to the [tally-cli repository](https://github.com/Tally-Pay/tally-cli).
 
 ## SDK Features
 

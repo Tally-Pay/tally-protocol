@@ -2,8 +2,7 @@
 resolver = "2"
 members = [
     "program",
-    "sdk",
-    "cli"
+    "sdk"
 ]
 
 [workspace.package]
