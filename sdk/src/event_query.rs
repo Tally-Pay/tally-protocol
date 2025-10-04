@@ -712,7 +712,6 @@ impl EventQueryClient {
 
         // We would need to fetch transaction details to filter by slot, which is expensive
         // For now, return all signatures and filter during event parsing
-        // TODO: Implement more efficient slot-based filtering if needed
 
         Ok(signatures)
     }
@@ -769,7 +768,6 @@ impl EventQueryClient {
 
     /// Log successful transaction fetch
     fn log_transaction_received(signature: &Signature) {
-        // TODO: Implement proper JSON-based event parsing after refactor
         debug!(
             service = "tally-sdk",
             component = "event_query_client",

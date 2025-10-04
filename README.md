@@ -2,6 +2,10 @@
 
 A Solana-native subscription platform implementing delegate-based recurring payments using SPL Token delegate approvals. Tally enables merchants to create subscription plans and collect automated USDC payments without requiring user signatures on each renewal.
 
+**Tally Pay** is an organization of [Govcraft](https://govcraft.ai) enterprise.
+- Web3 App: [tallybl.ink](https://tallybl.ink)
+- Organization: [tallypay.click](https://tallypay.click)
+
 ## Overview
 
 Tally Protocol provides a complete subscription infrastructure on Solana with:
@@ -70,7 +74,7 @@ tally-protocol/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Govcraft/tally-protocol
+git clone https://github.com/Tally-Pay/tally-protocol
 cd tally-protocol
 
 # Build the entire workspace
@@ -391,8 +395,9 @@ MIT License - see LICENSE file for details
 ## Support
 
 For questions and support:
-- GitHub Issues: [tally-protocol/issues](https://github.com/Govcraft/tally-protocol/issues)
-- Documentation: Coming soon
+- GitHub Issues: [tally-protocol/issues](https://github.com/Tally-Pay/tally-protocol/issues)
+- Web3 App: [tallybl.ink](https://tallybl.ink)
+- Organization: [tallypay.click](https://tallypay.click)
 
 ---
 

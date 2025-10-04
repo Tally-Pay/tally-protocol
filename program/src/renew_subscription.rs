@@ -59,7 +59,6 @@ pub struct RenewSubscription<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-// TODO: Refactor this function to reduce complexity and length
 #[allow(clippy::too_many_lines)]
 pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) -> Result<()> {
     let subscription = &mut ctx.accounts.subscription;

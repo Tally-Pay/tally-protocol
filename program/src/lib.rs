@@ -18,7 +18,7 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 #![allow(unexpected_cfgs)]
-#![allow(clippy::wildcard_imports)] // TODO: Fix specific imports in future
+#![allow(clippy::wildcard_imports)]
 #![allow(clippy::needless_pass_by_value)] // Anchor handlers must take owned Context by design
 #![allow(clippy::unnecessary_wraps)] // Anchor handlers return Result<()> for consistency
 #![allow(deprecated)] // Anchor framework uses deprecated AccountInfo::realloc internally

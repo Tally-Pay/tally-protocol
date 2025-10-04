@@ -67,7 +67,6 @@ pub struct StartSubscription<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// TODO: Refactor this function to reduce complexity and length
 #[allow(clippy::too_many_lines)]
 pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> Result<()> {
     let subscription = &mut ctx.accounts.subscription;

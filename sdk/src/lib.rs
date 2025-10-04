@@ -36,8 +36,8 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
-#![allow(clippy::missing_errors_doc)] // TODO: Add comprehensive error documentation
-#![allow(clippy::missing_panics_doc)] // TODO: Add panic documentation where needed
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
 
 pub mod simple_client;
 // pub mod client;  // Disabled for now due to missing discriminator implementations

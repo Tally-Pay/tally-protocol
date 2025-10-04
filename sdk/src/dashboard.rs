@@ -476,15 +476,13 @@ impl DashboardClient {
         _merchant: &Pubkey,
         _limit: usize,
     ) -> Result<Vec<ParsedEventWithContext>> {
-        // TODO: Implement real blockchain querying
         // For now, return empty events to satisfy the interface
         // In a full implementation, this would:
         // 1. Use SimpleTallyClient's RPC client to query transaction signatures
         // 2. Parse program logs from those transactions
         // 3. Convert parsed events to ParsedEvent format
 
-        // TODO: In a real implementation, validate merchant exists
-        // For testing purposes, we'll skip this validation
+        // For testing purposes, we'll skip merchant validation
         // if !self.client.account_exists(merchant)? {
         //     return Err(TallyError::AccountNotFound(format!(
         //         "Merchant not found: {merchant}"
@@ -672,7 +670,6 @@ impl DashboardClient {
     /// Returns an error if data fetching fails
     pub fn get_event_statistics(&self, merchant: &Pubkey, period: Period) -> Result<EventStats> {
         // For now, use the same approach for all periods - get recent events and filter
-        // TODO: Implement custom date range querying when async support is added
         let since_timestamp = Self::period_to_timestamp(period);
         let events = self
             .get_event_history(merchant, 5000)? // Get more events for better statistics
@@ -750,8 +747,7 @@ impl DashboardClient {
     /// # Errors
     /// Returns an error if stream setup fails
     pub fn subscribe_to_live_events(&self, _merchant: &Pubkey) -> Result<EventStream> {
-        // TODO: In a real implementation, validate merchant exists
-        // For testing purposes, we'll skip this validation
+        // For testing purposes, we'll skip merchant validation
         // if !self.client.account_exists(merchant)? {
         //     return Err(TallyError::AccountNotFound(format!(
         //         "Merchant not found: {merchant}"
@@ -761,7 +757,7 @@ impl DashboardClient {
         // Create event stream configured for this merchant
         let stream = EventStream::new();
 
-        // TODO: In a full implementation, this would:
+        // In a full implementation, this would:
         // 1. Set up WebSocket connection to Solana RPC
         // 2. Subscribe to program logs for the merchant's accounts
         // 3. Connect to Socket.IO server for real-time broadcasting
