@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - develop
+    tags-ignore:
+      - 'v*.*.*'
     paths:
       - 'sdk/**'
       - '.github/workflows/sdk-ci.yml'
@@ -15,6 +17,8 @@ on:
 jobs:
   lint-and-test:
     runs-on: self-hosted
+    # Skip if this is a release commit (will be tested by publish workflow)
+    if: "!contains(github.event.head_commit.message, 'chore: Release')"
     steps:
       - uses: actions/checkout@v4
 
