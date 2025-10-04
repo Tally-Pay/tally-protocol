@@ -9,33 +9,38 @@ members = [
 edition = "2021"
 
 [workspace.dependencies]
+# Anchor framework dependencies
 anchor-lang = "0.31.1"
 anchor-client = "0.31.1"
 anchor-spl = "0.31.1"
+
+# Solana core dependencies
 solana-sdk = "3.0"
 solana-program = "3.0"
 solana-client = "3.0"
 solana-account-decoder = "3.0"
+
+# SPL token dependencies
 spl-token = "8.0"
 spl-token-2022 = "9.0"
 spl-associated-token-account = "7.0"
 spl-memo = "6.0"
+
+# Error handling and utilities
 anyhow = "1"
 thiserror = "2.0"
 base64 = "0.22"
 borsh = "1.5"
-axum = "0.8"
-hyper = { version = "1", features = ["full"] }
+
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# Async runtime
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["trace"] }
+
+# Observability
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-askama = "0.14"
-socketioxide = "0.17"
-dotenvy = "0.15"
 
 [profile.release]
 overflow-checks = true
