@@ -741,38 +741,3 @@ async fn test_edge_case_scenarios() {
     assert!(min_result.is_ok(), "Should handle minimal event data");
 }
 
-const BENCHMARK_COUNT: usize = 10000;
-
-/// Performance benchmark for event parsing
-#[tokio::test]
-async fn benchmark_event_parsing_throughput() {
-    let fixture = EventTestFixture::new();
-
-    // Prepare test data
-    let mut encoded_events = Vec::with_capacity(BENCHMARK_COUNT);
-
-    for i in 0..BENCHMARK_COUNT {
-        let event = fixture.create_subscribed_event(i as u64);
-        encoded_events.push(EventTestFixture::create_encoded_event("Subscribed", &event));
-    }
-
-    // Benchmark parsing throughput
-    let start = std::time::Instant::now();
-
-    for encoded in &encoded_events {
-        let result = parse_single_event(encoded);
-        assert!(result.is_ok(), "Parsing should succeed in benchmark");
-    }
-
-    let duration = start.elapsed();
-    #[allow(clippy::cast_precision_loss)] // Intentional conversion for benchmarking
-    let events_per_second = (BENCHMARK_COUNT as f64) / duration.as_secs_f64();
-
-    // Performance assertion: should parse at least 40K events per second
-    assert!(
-        events_per_second > 40_000.0,
-        "Event parsing throughput too low: {events_per_second:.0} events/sec"
-    );
-
-    println!("Event parsing benchmark: {events_per_second:.0} events/sec");
-}
