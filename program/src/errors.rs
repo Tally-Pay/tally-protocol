@@ -118,7 +118,9 @@ pub enum SubscriptionError {
 
     /// Error Code: 6021
     /// When attempting to accept authority transfer but no transfer is pending
-    #[msg("No pending authority transfer. A transfer must be initiated before it can be accepted.")]
+    #[msg(
+        "No pending authority transfer. A transfer must be initiated before it can be accepted."
+    )]
     NoPendingTransfer,
 
     /// Error Code: 6022

@@ -13,8 +13,8 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::state::Plan;
 use tally_subs::errors::SubscriptionError;
+use tally_subs::state::Plan;
 
 /// Test that merchant authority matches correctly
 #[test]
@@ -27,13 +27,19 @@ fn test_merchant_authority_validation() {
     let is_merchant = merchant_authority == merchant_authority;
     let is_platform = merchant_authority == platform_authority;
 
-    assert!(is_merchant || is_platform, "Merchant authority should be authorized");
+    assert!(
+        is_merchant || is_platform,
+        "Merchant authority should be authorized"
+    );
 
     // Simulate unauthorized check
     let is_merchant_fail = random_authority == merchant_authority;
     let is_platform_fail = random_authority == platform_authority;
 
-    assert!(!(is_merchant_fail || is_platform_fail), "Random authority should not be authorized");
+    assert!(
+        !(is_merchant_fail || is_platform_fail),
+        "Random authority should not be authorized"
+    );
 }
 
 /// Test that platform admin matches correctly
@@ -46,7 +52,10 @@ fn test_platform_admin_validation() {
     let is_merchant = platform_authority == merchant_authority;
     let is_platform = platform_authority == platform_authority;
 
-    assert!(is_merchant || is_platform, "Platform admin should be authorized");
+    assert!(
+        is_merchant || is_platform,
+        "Platform admin should be authorized"
+    );
 }
 
 /// Test plan state structure and immutability
@@ -84,7 +93,10 @@ fn test_plan_state_immutability() {
     // Verify immutable fields unchanged
     assert_eq!(plan.price_usdc, price_before, "Price should not change");
     assert_eq!(plan.period_secs, period_before, "Period should not change");
-    assert_eq!(plan.grace_secs, grace_before, "Grace period should not change");
+    assert_eq!(
+        plan.grace_secs, grace_before,
+        "Grace period should not change"
+    );
     assert_eq!(plan.name, name_before, "Name should not change");
     assert_eq!(plan.plan_id, plan_id_before, "Plan ID should not change");
     assert_eq!(plan.merchant, merchant_before, "Merchant should not change");
@@ -100,7 +112,10 @@ fn test_unauthorized_error_code() {
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
-    assert!(matches!(anchor_error, anchor_lang::error::Error::AnchorError(_)));
+    assert!(matches!(
+        anchor_error,
+        anchor_lang::error::Error::AnchorError(_)
+    ));
 }
 
 /// Test config PDA derivation
@@ -108,18 +123,15 @@ fn test_unauthorized_error_code() {
 fn test_config_pda_derivation() {
     let program_id = tally_subs::id();
 
-    let (config_pda, _bump) = Pubkey::find_program_address(
-        &[b"config"],
-        &program_id,
-    );
+    let (config_pda, _bump) = Pubkey::find_program_address(&[b"config"], &program_id);
 
     // Verify PDA is deterministic
-    let (config_pda_2, _bump_2) = Pubkey::find_program_address(
-        &[b"config"],
-        &program_id,
-    );
+    let (config_pda_2, _bump_2) = Pubkey::find_program_address(&[b"config"], &program_id);
 
-    assert_eq!(config_pda, config_pda_2, "Config PDA should be deterministic");
+    assert_eq!(
+        config_pda, config_pda_2,
+        "Config PDA should be deterministic"
+    );
 }
 
 /// Test merchant PDA derivation
@@ -128,18 +140,17 @@ fn test_merchant_pda_derivation() {
     let program_id = tally_subs::id();
     let authority = Pubkey::new_unique();
 
-    let (merchant_pda, _bump) = Pubkey::find_program_address(
-        &[b"merchant", authority.as_ref()],
-        &program_id,
-    );
+    let (merchant_pda, _bump) =
+        Pubkey::find_program_address(&[b"merchant", authority.as_ref()], &program_id);
 
     // Verify PDA is deterministic
-    let (merchant_pda_2, _bump_2) = Pubkey::find_program_address(
-        &[b"merchant", authority.as_ref()],
-        &program_id,
-    );
+    let (merchant_pda_2, _bump_2) =
+        Pubkey::find_program_address(&[b"merchant", authority.as_ref()], &program_id);
 
-    assert_eq!(merchant_pda, merchant_pda_2, "Merchant PDA should be deterministic");
+    assert_eq!(
+        merchant_pda, merchant_pda_2,
+        "Merchant PDA should be deterministic"
+    );
 }
 
 /// Test plan PDA derivation
@@ -150,16 +161,12 @@ fn test_plan_pda_derivation() {
     let mut plan_id = [0u8; 32];
     plan_id[..4].copy_from_slice(b"test");
 
-    let (plan_pda, _bump) = Pubkey::find_program_address(
-        &[b"plan", merchant.as_ref(), &plan_id],
-        &program_id,
-    );
+    let (plan_pda, _bump) =
+        Pubkey::find_program_address(&[b"plan", merchant.as_ref(), &plan_id], &program_id);
 
     // Verify PDA is deterministic
-    let (plan_pda_2, _bump_2) = Pubkey::find_program_address(
-        &[b"plan", merchant.as_ref(), &plan_id],
-        &program_id,
-    );
+    let (plan_pda_2, _bump_2) =
+        Pubkey::find_program_address(&[b"plan", merchant.as_ref(), &plan_id], &program_id);
 
     assert_eq!(plan_pda, plan_pda_2, "Plan PDA should be deterministic");
 }
@@ -176,17 +183,16 @@ fn test_plan_pda_uniqueness() {
     let mut plan_id_2 = [0u8; 32];
     plan_id_2[..5].copy_from_slice(b"test2");
 
-    let (plan_pda_1, _) = Pubkey::find_program_address(
-        &[b"plan", merchant.as_ref(), &plan_id_1],
-        &program_id,
-    );
+    let (plan_pda_1, _) =
+        Pubkey::find_program_address(&[b"plan", merchant.as_ref(), &plan_id_1], &program_id);
 
-    let (plan_pda_2, _) = Pubkey::find_program_address(
-        &[b"plan", merchant.as_ref(), &plan_id_2],
-        &program_id,
-    );
+    let (plan_pda_2, _) =
+        Pubkey::find_program_address(&[b"plan", merchant.as_ref(), &plan_id_2], &program_id);
 
-    assert_ne!(plan_pda_1, plan_pda_2, "Different plan IDs should produce different PDAs");
+    assert_ne!(
+        plan_pda_1, plan_pda_2,
+        "Different plan IDs should produce different PDAs"
+    );
 }
 
 /// Test authorization logic simulation
@@ -203,13 +209,21 @@ fn test_update_plan_authorization_logic() {
 
     // Test merchant authority
     assert!(
-        check_auth(&merchant_authority, &merchant_authority, &platform_authority),
+        check_auth(
+            &merchant_authority,
+            &merchant_authority,
+            &platform_authority
+        ),
         "Merchant authority should be authorized"
     );
 
     // Test platform admin
     assert!(
-        check_auth(&platform_authority, &merchant_authority, &platform_authority),
+        check_auth(
+            &platform_authority,
+            &merchant_authority,
+            &platform_authority
+        ),
         "Platform admin should be authorized"
     );
 
@@ -237,11 +251,17 @@ fn test_changed_by_determination() {
 
     // Test merchant changes plan
     let changed_by_merchant = determine_changed_by(&merchant_authority, &platform_authority);
-    assert_eq!(changed_by_merchant, "merchant", "Should identify merchant as changer");
+    assert_eq!(
+        changed_by_merchant, "merchant",
+        "Should identify merchant as changer"
+    );
 
     // Test platform admin changes plan
     let changed_by_platform = determine_changed_by(&platform_authority, &platform_authority);
-    assert_eq!(changed_by_platform, "platform", "Should identify platform as changer");
+    assert_eq!(
+        changed_by_platform, "platform",
+        "Should identify platform as changer"
+    );
 }
 
 /// Test plan activation/deactivation state transitions
@@ -272,6 +292,10 @@ fn test_plan_status_transitions() {
     // Test multiple toggles
     for i in 0..10 {
         plan.active = i % 2 == 0;
-        assert_eq!(plan.active, i % 2 == 0, "Plan status should match expected value");
+        assert_eq!(
+            plan.active,
+            i % 2 == 0,
+            "Plan status should match expected value"
+        );
     }
 }

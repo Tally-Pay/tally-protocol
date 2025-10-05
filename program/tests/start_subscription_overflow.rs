@@ -87,8 +87,7 @@ fn test_overflow_prevention_with_period_2() {
         .expect("Should be able to add 1");
 
     // Simulate the pre-validation check
-    let is_valid =
-        allowance_periods_u64 > 0 && overflow_price <= u64::MAX / allowance_periods_u64;
+    let is_valid = allowance_periods_u64 > 0 && overflow_price <= u64::MAX / allowance_periods_u64;
 
     assert!(
         !is_valid,
@@ -304,8 +303,7 @@ fn test_realistic_subscription_prices() {
         let allowance_periods_u64 = u64::from(allowance_periods);
 
         // Validate pre-check passes
-        let is_valid =
-            allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
+        let is_valid = allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
 
         assert!(is_valid, "Realistic case should pass: {description}");
 
@@ -378,8 +376,8 @@ fn test_comprehensive_overflow_prevention() {
 
         // Test max_safe_price + 1 (if possible)
         if let Some(overflow_price) = max_safe_price.checked_add(1) {
-            let is_valid_overflow = allowance_periods_u64 > 0
-                && overflow_price <= u64::MAX / allowance_periods_u64;
+            let is_valid_overflow =
+                allowance_periods_u64 > 0 && overflow_price <= u64::MAX / allowance_periods_u64;
 
             assert!(
                 !is_valid_overflow,
@@ -413,8 +411,7 @@ fn test_division_based_validation_correctness() {
         let allowance_periods_u64 = u64::from(allowance_periods);
 
         // Apply pre-validation
-        let is_valid =
-            allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
+        let is_valid = allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
 
         assert_eq!(
             is_valid, expected_pass,
@@ -459,8 +456,8 @@ fn test_prevalidation_equivalence_to_checked_mul() {
             let allowance_periods_u64 = u64::from(allowance_periods);
 
             // Pre-validation result
-            let pre_valid = allowance_periods_u64 > 0
-                && *price_usdc <= u64::MAX / allowance_periods_u64;
+            let pre_valid =
+                allowance_periods_u64 > 0 && *price_usdc <= u64::MAX / allowance_periods_u64;
 
             // Checked_mul result
             let mul_result = price_usdc.checked_mul(allowance_periods_u64);
@@ -523,8 +520,7 @@ fn test_allowance_periods_u8_to_u64_conversion() {
         #[allow(clippy::cast_possible_truncation)]
         let roundtrip = allowance_periods_u64 as u8;
         assert_eq!(
-            roundtrip,
-            allowance_periods,
+            roundtrip, allowance_periods,
             "Round-trip conversion should preserve value"
         );
     }
@@ -584,12 +580,8 @@ fn test_comprehensive_attack_vector_prevention() {
         let allowance_periods_u64 = u64::from(allowance_periods);
 
         // All attack vectors should fail pre-validation
-        let is_valid =
-            allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
+        let is_valid = allowance_periods_u64 > 0 && price_usdc <= u64::MAX / allowance_periods_u64;
 
-        assert!(
-            !is_valid,
-            "Attack vector should be rejected: {description}"
-        );
+        assert!(!is_valid, "Attack vector should be rejected: {description}");
     }
 }

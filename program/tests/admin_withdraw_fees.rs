@@ -210,18 +210,9 @@ fn test_prevents_cross_authority_withdrawal() {
     let merchant_1_valid = merchant_1_ata == expected_platform_ata;
     let merchant_2_valid = merchant_2_ata == expected_platform_ata;
 
-    assert!(
-        platform_valid,
-        "Platform ATA should pass validation"
-    );
-    assert!(
-        !merchant_1_valid,
-        "Merchant 1 ATA should fail validation"
-    );
-    assert!(
-        !merchant_2_valid,
-        "Merchant 2 ATA should fail validation"
-    );
+    assert!(platform_valid, "Platform ATA should pass validation");
+    assert!(!merchant_1_valid, "Merchant 1 ATA should fail validation");
+    assert!(!merchant_2_valid, "Merchant 2 ATA should fail validation");
 }
 
 /// Test config PDA derivation
@@ -286,9 +277,7 @@ fn test_admin_withdraw_authorization_logic() {
     let unauthorized_user = Pubkey::new_unique();
 
     // Simulate the authorization check from handler (line 42-44)
-    let check_auth = |signer: &Pubkey, platform_auth: &Pubkey| -> bool {
-        signer == platform_auth
-    };
+    let check_auth = |signer: &Pubkey, platform_auth: &Pubkey| -> bool { signer == platform_auth };
 
     // Test platform authority
     assert!(
@@ -506,12 +495,21 @@ fn test_same_mint_different_authorities_validation() {
     let user_ata = get_associated_token_address(&user, &usdc_mint);
 
     // Verify platform ATA is unique
-    assert_ne!(platform_ata, merchant_1_ata, "Platform ATA != Merchant 1 ATA");
-    assert_ne!(platform_ata, merchant_2_ata, "Platform ATA != Merchant 2 ATA");
+    assert_ne!(
+        platform_ata, merchant_1_ata,
+        "Platform ATA != Merchant 1 ATA"
+    );
+    assert_ne!(
+        platform_ata, merchant_2_ata,
+        "Platform ATA != Merchant 2 ATA"
+    );
     assert_ne!(platform_ata, user_ata, "Platform ATA != User ATA");
 
     // Verify all merchant ATAs are unique
-    assert_ne!(merchant_1_ata, merchant_2_ata, "Merchant 1 ATA != Merchant 2 ATA");
+    assert_ne!(
+        merchant_1_ata, merchant_2_ata,
+        "Merchant 1 ATA != Merchant 2 ATA"
+    );
     assert_ne!(merchant_1_ata, user_ata, "Merchant 1 ATA != User ATA");
     assert_ne!(merchant_2_ata, user_ata, "Merchant 2 ATA != User ATA");
 

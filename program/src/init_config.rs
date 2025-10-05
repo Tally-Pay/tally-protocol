@@ -43,10 +43,8 @@ pub struct InitConfig<'info> {
 
 /// Gets the expected program data address for the current program
 fn get_program_data_address(program_id: &Pubkey) -> Pubkey {
-    let (program_data_address, _) = Pubkey::find_program_address(
-        &[program_id.as_ref()],
-        &bpf_loader_upgradeable::id(),
-    );
+    let (program_data_address, _) =
+        Pubkey::find_program_address(&[program_id.as_ref()], &bpf_loader_upgradeable::id());
     program_data_address
 }
 
@@ -63,9 +61,8 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     let program_data_bytes = program_data_account.try_borrow_data()?;
 
     // Deserialize the UpgradeableLoaderState
-    let program_data_state: UpgradeableLoaderState =
-        bincode::deserialize(&program_data_bytes)
-            .map_err(|_| crate::errors::SubscriptionError::InvalidProgramData)?;
+    let program_data_state: UpgradeableLoaderState = bincode::deserialize(&program_data_bytes)
+        .map_err(|_| crate::errors::SubscriptionError::InvalidProgramData)?;
 
     // Extract upgrade authority from program data
     let UpgradeableLoaderState::ProgramData {
@@ -116,10 +113,8 @@ mod tests {
         let program_data_address = get_program_data_address(&program_id);
 
         // Verify it's a valid PDA derivation
-        let (expected, _bump) = Pubkey::find_program_address(
-            &[program_id.as_ref()],
-            &bpf_loader_upgradeable::id(),
-        );
+        let (expected, _bump) =
+            Pubkey::find_program_address(&[program_id.as_ref()], &bpf_loader_upgradeable::id());
 
         assert_eq!(program_data_address, expected);
     }

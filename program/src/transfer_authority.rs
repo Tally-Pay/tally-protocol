@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::errors::SubscriptionError;
 use crate::state::Config;
+use anchor_lang::prelude::*;
 
 /// Arguments for initiating authority transfer
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
