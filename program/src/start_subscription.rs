@@ -285,27 +285,86 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Update subscription account based on whether this is new or reactivation
     if is_reactivation {
-        // REACTIVATION PATH: Preserve historical fields while resetting operational state
+        // ============================================================================
+        // REACTIVATION PATH: Preserve Historical Fields While Resetting Billing Cycle
+        // ============================================================================
         //
         // When a previously canceled subscription is reactivated, we intentionally preserve
         // certain historical fields to maintain a complete record of the subscription's
-        // lifetime across all sessions:
+        // lifetime across all sessions.
         //
-        // PRESERVED FIELDS (not modified):
-        //   - created_ts: Original subscription creation timestamp
-        //   - renewals: Cumulative renewal count across all sessions (see state.rs documentation)
-        //   - bump: PDA derivation seed (immutable)
+        // This design supports:
+        // - Loyalty programs based on lifetime subscription duration
+        // - Analytics on long-term customer engagement
+        // - Business intelligence on churn and reactivation patterns
+        // - Tiered benefits based on cumulative renewals
         //
-        // The renewals counter is deliberately preserved to track total renewals across
-        // the entire subscription relationship, including previous sessions. This means
-        // a subscription canceled after 10 renewals will show renewals=10 upon reactivation,
-        // and will continue from 11 on the next renewal.
+        // For comprehensive lifecycle documentation and off-chain integration patterns,
+        // see docs/SUBSCRIPTION_LIFECYCLE.md
         //
-        // RESET FIELDS (updated for new billing cycle):
-        //   - active: Set to true to enable renewals
-        //   - next_renewal_ts: Scheduled time for next billing cycle
-        //   - last_amount: Current plan price (may differ from previous session)
-        //   - last_renewed_ts: Current time to prevent immediate re-renewal
+        // ------------------------------------------------------------------------
+        // PRESERVED FIELDS (Historical Record - Intentionally NOT Modified)
+        // ------------------------------------------------------------------------
+        //
+        // 1. created_ts: Original subscription creation timestamp
+        //    - Purpose: Track the start of the subscriber-merchant relationship
+        //    - Example: A subscription created on 2024-01-01, canceled, and reactivated
+        //              on 2024-06-01 will still show created_ts = 2024-01-01
+        //    - Use Case: Calculate total relationship duration, anniversary rewards
+        //
+        // 2. renewals: Cumulative renewal count across ALL sessions
+        //    - Purpose: Track total billing cycles across the subscription's lifetime
+        //    - Behavior: Continues incrementing from previous session's count
+        //    - Example: A subscription with 10 renewals, when reactivated, continues
+        //              counting from 10 (next renewal will be 11, not 1)
+        //    - Use Case: Lifetime value calculations, tier-based loyalty programs
+        //    - Off-Chain: Systems tracking "current session renewals" must calculate:
+        //                 current_session_renewals = total_renewals - renewals_at_session_start
+        //                 See docs/SUBSCRIPTION_LIFECYCLE.md for indexer examples
+        //
+        // 3. bump: PDA derivation seed (immutable by design)
+        //    - Purpose: Account address derivation parameter
+        //    - Behavior: Never changes (fundamental property of the account)
+        //
+        // ------------------------------------------------------------------------
+        // RESET FIELDS (New Billing Cycle - Updated for Current Session)
+        // ------------------------------------------------------------------------
+        //
+        // 4. active: Set to true
+        //    - Purpose: Re-enable renewal processing for this subscription
+        //    - Previous State: false (set during cancellation)
+        //    - New State: true (enables automated renewals to proceed)
+        //
+        // 5. next_renewal_ts: Current timestamp + period
+        //    - Purpose: Schedule the next billing cycle from reactivation time
+        //    - Calculation: reactivation_time + plan.period_secs
+        //    - Example: Reactivated on 2024-06-01 with monthly plan → next_renewal_ts = 2024-07-01
+        //
+        // 6. last_amount: Current plan.price_usdc
+        //    - Purpose: Track billing amount for upcoming renewals
+        //    - Rationale: Plan pricing may have changed since cancellation
+        //    - Example: Plan was $10/month, now $12/month → last_amount = $12
+        //
+        // 7. last_renewed_ts: Current timestamp
+        //    - Purpose: Prevent immediate double-billing after reactivation
+        //    - Security: Ensures renewals don't trigger immediately after reactivation
+        //    - Validation: Renewal logic checks last_renewed_ts to prevent re-entry
+        //
+        // ------------------------------------------------------------------------
+        // Off-Chain Integration Notes
+        // ------------------------------------------------------------------------
+        //
+        // The SubscriptionReactivated event includes:
+        // - total_renewals: Current renewals count (preserved from previous session)
+        // - original_created_ts: Original creation timestamp
+        //
+        // Off-chain indexers should:
+        // 1. Create a new session record when SubscriptionReactivated is emitted
+        // 2. Store renewals_at_session_start = event.total_renewals
+        // 3. Calculate current session renewals as: on_chain.renewals - renewals_at_session_start
+        //
+        // For detailed integration examples (TypeScript, SQL, GraphQL), see:
+        // docs/SUBSCRIPTION_LIFECYCLE.md#off-chain-integration-guide
 
         subscription.active = true;
         subscription.next_renewal_ts = next_renewal_ts;
