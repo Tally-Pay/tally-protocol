@@ -299,12 +299,13 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Emit appropriate event based on whether this is a new subscription or reactivation
     if is_reactivation {
-        emit!(SubscriptionReactivated {
+        emit!(crate::events::SubscriptionReactivated {
             merchant: merchant.key(),
             plan: plan.key(),
             subscriber: ctx.accounts.subscriber.key(),
             amount: plan.price_usdc,
-            previous_renewals: subscription.renewals,
+            total_renewals: subscription.renewals,
+            original_created_ts: subscription.created_ts,
         });
     } else {
         emit!(Subscribed {

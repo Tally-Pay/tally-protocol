@@ -13,6 +13,23 @@ pub struct Subscribed {
     pub amount: u64,
 }
 
+/// Event emitted when a previously canceled subscription is reactivated
+#[event]
+pub struct SubscriptionReactivated {
+    /// The merchant who owns the subscription plan
+    pub merchant: Pubkey,
+    /// The subscription plan being reactivated
+    pub plan: Pubkey,
+    /// The subscriber's public key
+    pub subscriber: Pubkey,
+    /// The amount paid for reactivation (in USDC micro-units)
+    pub amount: u64,
+    /// Cumulative number of renewals across all subscription sessions
+    pub total_renewals: u32,
+    /// Original subscription creation timestamp (preserved from first session)
+    pub original_created_ts: i64,
+}
+
 /// Event emitted when a subscription is successfully renewed
 #[event]
 pub struct Renewed {
@@ -35,21 +52,6 @@ pub struct Canceled {
     pub plan: Pubkey,
     /// The subscriber's public key
     pub subscriber: Pubkey,
-}
-
-/// Event emitted when a previously canceled subscription is reactivated
-#[event]
-pub struct SubscriptionReactivated {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being reactivated
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount charged for reactivation (current plan price in USDC micro-units)
-    pub amount: u64,
-    /// Number of renewals that occurred before cancellation (preserved from previous session)
-    pub previous_renewals: u32,
 }
 
 /// Event emitted when a subscription payment fails

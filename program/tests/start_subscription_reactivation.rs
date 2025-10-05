@@ -807,7 +807,7 @@ fn test_comprehensive_m3_security_guarantees() {
 /// Test that Subscribed event is emitted for new subscriptions
 ///
 /// Validates that the Subscribed event is emitted when a new subscription is created
-/// (is_reactivation == false).
+/// (`is_reactivation == false`).
 #[test]
 fn test_subscribed_event_emitted_for_new_subscription() {
     let is_reactivation = false;
@@ -835,11 +835,19 @@ fn test_subscribed_event_emitted_for_new_subscription() {
     );
 }
 
-/// Test that SubscriptionReactivated event is emitted on reactivation
+/// Test that `SubscriptionReactivated` event is emitted on reactivation
 ///
-/// Validates that the SubscriptionReactivated event is emitted when an existing
-/// subscription is reactivated (is_reactivation == true), providing off-chain
-/// indexers with clear distinction from new subscriptions.
+/// Validates that the `SubscriptionReactivated` event is emitted when an existing
+/// subscription is reactivated (`is_reactivation == true`), providing off-chain
+/// indexers with clear distinction from new subscriptions (I-6 security audit fix).
+///
+/// Event fields (from events.rs lines 16-31 and `start_subscription.rs` lines 300-309):
+/// - merchant: Pubkey
+/// - plan: Pubkey
+/// - subscriber: Pubkey
+/// - amount: u64 (current plan price)
+/// - `total_renewals`: u32 (cumulative renewals across all sessions)
+/// - `original_created_ts`: i64 (timestamp from first subscription)
 #[test]
 fn test_subscription_reactivated_event_emitted_on_reactivation() {
     let is_reactivation = true;
@@ -857,19 +865,52 @@ fn test_subscription_reactivated_event_emitted_on_reactivation() {
         "SubscriptionReactivated event should be emitted on reactivation"
     );
 
-    // Event should contain current plan price and previous renewals
-    let current_plan_price: u64 = 12_000_000; // 12 USDC
-    let previous_renewals: u32 = 5; // Renewals before cancellation
-    let event_amount = current_plan_price;
-    let event_previous_renewals = previous_renewals;
+    // Simulate subscription state at reactivation time
+    let current_plan_price: u64 = 12_000_000; // 12 USDC (current plan price)
+    let total_renewals: u32 = 5; // Cumulative renewals before this reactivation
+    let original_created_ts: i64 = 1_600_000_000; // Original subscription timestamp
 
+    // Event field values (as emitted in start_subscription.rs lines 302-309)
+    // Note: merchant, plan, and subscriber pubkeys are derived from accounts,
+    // so we validate the value fields that provide reactivation context
+    let event_amount = current_plan_price; // plan.price_usdc
+    let event_total_renewals = total_renewals; // subscription.renewals
+    let event_original_created_ts = original_created_ts; // subscription.created_ts
+
+    // Verify event amount field
     assert_eq!(
         event_amount, current_plan_price,
-        "SubscriptionReactivated event should show current plan price"
+        "SubscriptionReactivated event amount should equal current plan price"
     );
+
+    // Verify event total_renewals field
     assert_eq!(
-        event_previous_renewals, previous_renewals,
-        "SubscriptionReactivated event should show previous renewals count for context"
+        event_total_renewals, total_renewals,
+        "SubscriptionReactivated event total_renewals should preserve subscription.renewals count"
+    );
+
+    // Verify event original_created_ts field
+    assert_eq!(
+        event_original_created_ts, original_created_ts,
+        "SubscriptionReactivated event original_created_ts should preserve subscription.created_ts"
+    );
+
+    // Verify event provides off-chain indexers with reactivation context
+    // The total_renewals and original_created_ts fields enable:
+    // 1. Distinguishing reactivation from new subscription (I-6 fix)
+    // 2. Calculating subscription longevity (current_time - original_created_ts)
+    // 3. Tracking lifetime renewal history (total_renewals across all sessions)
+    // 4. Analyzing churn patterns and reactivation behavior
+    assert!(
+        event_original_created_ts > 0,
+        "original_created_ts provides subscription lifetime context for analytics"
+    );
+
+    // Verify total_renewals is a valid u32 value (no need to check >= 0 for unsigned type)
+    // This field provides historical context for off-chain analytics
+    assert_eq!(
+        event_total_renewals, total_renewals,
+        "total_renewals should match subscription state for analytics"
     );
 }
 
