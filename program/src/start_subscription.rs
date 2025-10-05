@@ -112,6 +112,11 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         return Err(SubscriptionError::BadSeeds.into());
     }
 
+    // Validate platform treasury is owned by platform authority
+    if platform_treasury_data.owner != ctx.accounts.config.platform_authority {
+        return Err(SubscriptionError::Unauthorized.into());
+    }
+
     // Use default from config if allowance_periods is 0
     let allowance_periods = if args.allowance_periods == 0 {
         ctx.accounts.config.default_allowance_periods

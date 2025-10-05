@@ -135,6 +135,11 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::BadSeeds.into());
     }
 
+    // Validate platform treasury is owned by platform authority
+    if platform_treasury_data.owner != ctx.accounts.config.platform_authority {
+        return Err(SubscriptionError::Unauthorized.into());
+    }
+
     // Check delegate allowance >= price
     if subscriber_ata_data.delegated_amount < plan.price_usdc {
         return Err(SubscriptionError::InsufficientAllowance.into());
