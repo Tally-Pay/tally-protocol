@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_pack::Pack;
-use anchor_spl::associated_token::AssociatedToken;
+use anchor_spl::associated_token::{get_associated_token_address, AssociatedToken};
 use anchor_spl::token::{spl_token::state::Account as TokenAccount, spl_token::state::Mint, Token};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -97,6 +97,19 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     require!(
         token_account.owner == ctx.accounts.authority.key(),
         crate::errors::SubscriptionError::Unauthorized
+    );
+
+    // Validate that treasury_ata is the canonical Associated Token Account
+    // derived from the merchant authority and USDC mint.
+    // This ensures compatibility with wallet integrations and off-chain indexing
+    // that expect standard ATA addresses.
+    let expected_treasury_ata = get_associated_token_address(
+        &ctx.accounts.authority.key(),
+        &args.usdc_mint,
+    );
+    require!(
+        ctx.accounts.treasury_ata.key() == expected_treasury_ata,
+        crate::errors::SubscriptionError::BadSeeds
     );
 
     let merchant = &mut ctx.accounts.merchant;
