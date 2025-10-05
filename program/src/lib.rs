@@ -42,6 +42,7 @@ pub mod state;
 mod transfer_authority;
 mod unpause;
 mod update_plan;
+pub mod utils;
 
 use accept_authority::*;
 use admin_withdraw_fees::*;
