@@ -218,3 +218,44 @@ pub struct FeesWithdrawn {
     /// Unix timestamp when withdrawal occurred
     pub timestamp: i64,
 }
+
+/// Event emitted when a delegate mismatch is detected during subscription renewal
+///
+/// This warning event alerts off-chain systems and users when the token account's
+/// current delegate does not match the expected merchant-specific delegate PDA.
+///
+/// **Root Cause**: SPL Token accounts support only ONE delegate at a time. When users
+/// have subscriptions with multiple merchants, starting or canceling a subscription
+/// with one merchant will overwrite or revoke the delegate for ALL other merchants.
+///
+/// This addresses audit finding M-3, documenting the fundamental architectural limitation
+/// of SPL Token's single-delegate design. This is NOT a bug that can be fixed without
+/// migrating to Token-2022 or implementing a global delegate architecture.
+///
+/// **Scenarios that trigger this event:**
+/// 1. User subscribes to Merchant A, then Merchant B → A's delegate is overwritten
+/// 2. User cancels subscription with Merchant B → All delegates are revoked
+/// 3. User manually revokes delegate → All merchant subscriptions become non-functional
+///
+/// Off-chain systems should monitor this event to:
+/// - Alert users that their subscription is non-functional due to delegate mismatch
+/// - Recommend reactivating the subscription (resets delegate correctly)
+/// - Suggest using per-merchant token accounts as a workaround
+/// - Display clear warnings about SPL Token single-delegate limitation
+/// - Reference `docs/MULTI_MERCHANT_LIMITATION.md` for detailed explanation
+///
+/// **Important**: This subscription will NOT renew until the user reactivates it,
+/// which will reset the delegate approval correctly.
+#[event]
+pub struct DelegateMismatchWarning {
+    /// The merchant who owns the subscription plan
+    pub merchant: Pubkey,
+    /// The subscription plan with delegate mismatch
+    pub plan: Pubkey,
+    /// The subscriber whose token account has incorrect delegate
+    pub subscriber: Pubkey,
+    /// The expected delegate PDA for this merchant
+    pub expected_delegate: Pubkey,
+    /// The actual delegate currently set on the token account (may be None or different merchant)
+    pub actual_delegate: Option<Pubkey>,
+}

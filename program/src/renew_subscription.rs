@@ -193,13 +193,6 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         });
     }
 
-    // Validate delegate is our program PDA
-    if subscriber_ata_data.delegate.is_none()
-        || subscriber_ata_data.delegate.unwrap() != ctx.accounts.program_delegate.key()
-    {
-        return Err(SubscriptionError::Unauthorized.into());
-    }
-
     // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
     let (expected_delegate_pda, _expected_bump) =
         Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
@@ -207,6 +200,36 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
         SubscriptionError::BadSeeds
     );
+
+    // Detect delegate mismatch: SPL Token limitation (M-3)
+    //
+    // SPL Token accounts support only ONE delegate at a time. When users have subscriptions
+    // with multiple merchants, starting or canceling a subscription with one merchant will
+    // overwrite or revoke the delegate for ALL other merchants.
+    //
+    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug. It cannot be
+    // fixed without migrating to Token-2022 with transfer hooks or implementing a global
+    // delegate architecture. See docs/MULTI_MERCHANT_LIMITATION.md for full details.
+    //
+    // Detection logic:
+    // - Check if the token account's current delegate matches our expected merchant delegate
+    // - If mismatch detected, emit DelegateMismatchWarning event before failing
+    // - This provides off-chain systems with actionable information about why renewal failed
+    let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
+
+    if actual_delegate.is_none() || actual_delegate.unwrap() != expected_delegate_pda {
+        // Emit warning event with diagnostic information
+        emit!(crate::events::DelegateMismatchWarning {
+            merchant: merchant.key(),
+            plan: plan.key(),
+            subscriber: subscription.subscriber,
+            expected_delegate: expected_delegate_pda,
+            actual_delegate,
+        });
+
+        // Return unauthorized error (subscription cannot renew with incorrect delegate)
+        return Err(SubscriptionError::Unauthorized.into());
+    }
 
     // Check sufficient funds
     if subscriber_ata_data.amount < plan.price_usdc {
