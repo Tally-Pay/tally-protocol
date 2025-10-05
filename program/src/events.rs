@@ -49,3 +49,16 @@ pub struct PaymentFailed {
     /// The reason for payment failure (encoded as string for off-chain analysis)
     pub reason: String,
 }
+
+/// Event emitted when a plan's active status is changed
+#[event]
+pub struct PlanStatusChanged {
+    /// The merchant who owns the subscription plan
+    pub merchant: Pubkey,
+    /// The subscription plan whose status changed
+    pub plan: Pubkey,
+    /// The new active status
+    pub active: bool,
+    /// Who changed the status: "merchant" or "platform"
+    pub changed_by: String,
+}

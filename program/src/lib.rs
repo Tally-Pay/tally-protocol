@@ -37,6 +37,7 @@ mod renew_subscription;
 mod start_subscription;
 pub mod state;
 mod transfer_authority;
+mod update_plan;
 
 use accept_authority::*;
 use admin_withdraw_fees::*;
@@ -47,6 +48,7 @@ use init_merchant::*;
 use renew_subscription::*;
 use start_subscription::*;
 use transfer_authority::*;
+use update_plan::*;
 
 declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
 
@@ -184,5 +186,19 @@ pub mod subs {
         args: AcceptAuthorityArgs,
     ) -> Result<()> {
         accept_authority::handler(ctx, args)
+    }
+
+    /// Update a subscription plan's active status
+    ///
+    /// Allows the merchant authority or platform admin to toggle whether a plan
+    /// accepts new subscriptions. This does NOT affect existing subscriptions,
+    /// which will continue to renew regardless of plan status.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the merchant authority or platform admin
+    /// - Plan does not exist or is invalid
+    pub fn update_plan(ctx: Context<UpdatePlan>, args: UpdatePlanArgs) -> Result<()> {
+        update_plan::handler(ctx, args)
     }
 }

@@ -21,3 +21,9 @@ trace = []
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
 bincode = "1.3"
+
+[dev-dependencies]
+solana-program-test = { workspace = true }
+solana-sdk = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
