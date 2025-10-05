@@ -80,6 +80,6 @@ mod tests {
         let args = UnpauseArgs {};
 
         // Verify clone trait is implemented
-        let _ = args.clone();
+        let _cloned = args;
     }
 }
