@@ -149,3 +149,21 @@ pub struct PlanCreated {
     /// Unix timestamp when plan was created
     pub timestamp: i64,
 }
+
+/// Event emitted when the program is paused
+#[event]
+pub struct ProgramPaused {
+    /// Platform authority who initiated the pause
+    pub authority: Pubkey,
+    /// Unix timestamp when program was paused
+    pub timestamp: i64,
+}
+
+/// Event emitted when the program is unpaused
+#[event]
+pub struct ProgramUnpaused {
+    /// Platform authority who initiated the unpause
+    pub authority: Pubkey,
+    /// Unix timestamp when program was unpaused
+    pub timestamp: i64,
+}

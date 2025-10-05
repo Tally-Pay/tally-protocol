@@ -371,6 +371,7 @@ fn test_config_state_structure() {
         allowed_mint: usdc_mint,
         max_withdrawal_amount: 1_000_000_000,
         max_grace_period_seconds: 604_800, // 7 days
+        paused: false,
         bump: 255,
     };
 
@@ -409,6 +410,7 @@ fn test_config_state_with_pending_authority() {
         allowed_mint: usdc_mint,
         max_withdrawal_amount: 1_000_000_000,
         max_grace_period_seconds: 604_800, // 7 days
+        paused: false,
         bump: 255,
     };
 

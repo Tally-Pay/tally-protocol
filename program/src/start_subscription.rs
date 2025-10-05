@@ -12,7 +12,8 @@ pub struct StartSubscription<'info> {
     /// Global configuration account
     #[account(
         seeds = [b"config"],
-        bump = config.bump
+        bump = config.bump,
+        constraint = !config.paused @ SubscriptionError::Inactive
     )]
     pub config: Account<'info, Config>,
 

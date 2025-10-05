@@ -320,6 +320,7 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.allowed_mint = args.allowed_mint;
     config.max_withdrawal_amount = args.max_withdrawal_amount;
     config.max_grace_period_seconds = args.max_grace_period_seconds;
+    config.paused = false; // Program starts in unpaused state
     config.bump = ctx.bumps.config;
 
     // Get current timestamp for event
