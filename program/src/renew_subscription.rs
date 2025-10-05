@@ -97,7 +97,7 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         .checked_add(period_i64)
         .ok_or(SubscriptionError::ArithmeticError)?;
 
-    if current_time <= min_next_renewal_time {
+    if current_time < min_next_renewal_time {
         return Err(SubscriptionError::NotDue.into());
     }
 
