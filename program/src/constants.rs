@@ -69,3 +69,42 @@ pub const FEE_BASIS_POINTS_DIVISOR: u128 = 10_000;
 /// - It represents a fundamental security and usability constraint
 /// - All deployments assume this minimum for spam protection
 pub const ABSOLUTE_MIN_PERIOD_SECONDS: u64 = 86400;
+
+/// Maximum plan price limit in USDC (with 6 decimals)
+///
+/// This constant establishes an upper bound for subscription plan pricing to prevent
+/// social engineering attacks where merchants create plans with extreme prices
+/// (e.g., `u64::MAX`) that could mislead subscribers.
+///
+/// # Value
+/// 1,000,000 USDC = `1_000_000_000_000` microlamports (with 6 decimals)
+///
+/// # Security Rationale (M-5)
+/// Without a maximum price limit, malicious or compromised merchants could:
+/// - Create plans with prices near `u64::MAX` (~18.4 quintillion USDC)
+/// - Exploit social engineering to trick users into approving transactions
+/// - Cause UI/UX confusion with unrealistic price displays
+/// - Enable potential overflow scenarios in downstream calculations
+///
+/// This limit provides a reasonable ceiling for subscription services while
+/// preventing extreme values that have no legitimate use case.
+///
+/// # Validation
+/// All plan creation operations must validate: `price_usdc <= MAX_PLAN_PRICE_USDC`
+///
+/// # Examples
+/// ```ignore
+/// // Valid prices (pass validation)
+/// let monthly_saas = 10_000_000; // $10 USDC
+/// let enterprise_plan = 100_000_000_000; // $100,000 USDC
+///
+/// // Invalid price (exceeds limit, fails validation)
+/// let extreme_price = 2_000_000_000_000; // $2,000,000 USDC (exceeds limit)
+/// ```
+///
+/// # Immutability Rationale
+/// This value should remain constant to ensure:
+/// - Consistent security boundaries across all plan creation operations
+/// - Predictable validation behavior for merchants and subscribers
+/// - Protection against extreme price manipulation attacks
+pub const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000; // 1 million USDC
