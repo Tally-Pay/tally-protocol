@@ -1,4 +1,7 @@
-use crate::{constants::FEE_BASIS_POINTS_DIVISOR, errors::SubscriptionError, events::*, state::*};
+use crate::{
+    constants::FEE_BASIS_POINTS_DIVISOR, errors::SubscriptionError, events::*, state::*,
+    utils::validate_platform_treasury,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
@@ -113,6 +116,16 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         Mint::try_deserialize(&mut ctx.accounts.usdc_mint.data.borrow().as_ref())
             .map_err(|_| SubscriptionError::InvalidUsdcMint)?;
 
+    // Runtime validation: Ensure platform treasury ATA remains valid
+    // This prevents denial-of-service if the platform authority closes or modifies
+    // the treasury ATA after config initialization (audit finding L-4)
+    validate_platform_treasury(
+        &ctx.accounts.platform_treasury_ata,
+        &ctx.accounts.config.platform_authority,
+        &ctx.accounts.config.allowed_mint,
+        &ctx.accounts.token_program,
+    )?;
+
     // Validate token account ownership and mints
     if subscriber_ata_data.owner != ctx.accounts.subscriber.key() {
         return Err(SubscriptionError::Unauthorized.into());
@@ -131,11 +144,6 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     if ctx.accounts.merchant_treasury_ata.key() != merchant.treasury_ata {
         return Err(SubscriptionError::BadSeeds.into());
-    }
-
-    // Validate platform treasury is owned by platform authority
-    if platform_treasury_data.owner != ctx.accounts.config.platform_authority {
-        return Err(SubscriptionError::Unauthorized.into());
     }
 
     // Use default from config if allowance_periods is 0
