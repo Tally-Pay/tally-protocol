@@ -27,6 +27,7 @@ use anchor_lang::prelude::*;
 
 mod accept_authority;
 mod admin_withdraw_fees;
+mod cancel_authority_transfer;
 mod cancel_subscription;
 mod close_subscription;
 pub mod constants;
@@ -46,6 +47,7 @@ pub mod utils;
 
 use accept_authority::*;
 use admin_withdraw_fees::*;
+use cancel_authority_transfer::*;
 use cancel_subscription::*;
 use close_subscription::*;
 use create_plan::*;
@@ -213,6 +215,23 @@ pub mod subs {
         args: AcceptAuthorityArgs,
     ) -> Result<()> {
         accept_authority::handler(ctx, args)
+    }
+
+    /// Cancel platform authority transfer
+    ///
+    /// This allows the current platform authority to cancel a pending authority
+    /// transfer. This is useful if the transfer was initiated in error or if
+    /// circumstances have changed.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the current platform authority
+    /// - No pending transfer exists to cancel
+    pub fn cancel_authority_transfer(
+        ctx: Context<CancelAuthorityTransfer>,
+        args: CancelAuthorityTransferArgs,
+    ) -> Result<()> {
+        cancel_authority_transfer::handler(ctx, args)
     }
 
     /// Update a subscription plan's active status
