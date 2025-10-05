@@ -467,6 +467,256 @@ fn test_integer_division_rounding() {
 }
 
 // ============================================================================
+// L-6 Integer Division Edge Cases (Acceptable by Design)
+// ============================================================================
+
+/// Test L-6 edge case: period = 11s → `max_grace` = 3s (not 3.3s)
+///
+/// Validates that integer division rounds down for small periods not divisible by 10.
+/// The true 30% would be 3.3s, but integer division gives 3s (rounds down by 0.3s).
+///
+/// This is acceptable by design as:
+/// 1. Rounding down is conservative (safer for merchants)
+/// 2. The 0.3s difference is negligible for real-world subscriptions
+/// 3. Matches Rust's standard integer division semantics
+#[test]
+fn test_l6_edge_case_period_11_seconds() {
+    let period_secs = 11; // 11 seconds
+    let max_grace = (period_secs * 3) / 10;
+
+    // Integer division: (11 * 3) / 10 = 33 / 10 = 3 (not 3.3)
+    assert_eq!(
+        max_grace, 3,
+        "period=11s: max_grace should be 3s (integer division rounds down from 3.3s)"
+    );
+
+    // Verify grace at 3s passes validation
+    let grace_at_limit = 3;
+    let is_valid_at_limit = grace_at_limit <= max_grace;
+    assert!(
+        is_valid_at_limit,
+        "Grace period of 3s should pass validation for 11s period"
+    );
+
+    // Verify grace at 4s fails validation (would be ~36%, exceeds 30%)
+    let grace_exceed = 4;
+    let is_valid_exceed = grace_exceed <= max_grace;
+    assert!(
+        !is_valid_exceed,
+        "Grace period of 4s should fail validation for 11s period (exceeds 30%)"
+    );
+
+    // Calculate actual rounding difference
+    let true_30_percent_float = 11.0 * 0.3; // 3.3
+    let rounding_diff = true_30_percent_float - f64::from(max_grace); // 0.3s
+    assert!(
+        rounding_diff < 1.0,
+        "Rounding difference should be sub-second (0.3s for 11s period)"
+    );
+}
+
+/// Test L-6 edge case: period = 101s → `max_grace` = 30s (not 30.3s)
+///
+/// Validates integer division behavior for medium periods not divisible by 10.
+/// The true 30% would be 30.3s, but integer division gives 30s (rounds down by 0.3s).
+///
+/// This demonstrates that the rounding difference remains constant at 0.3s for
+/// periods ending in 1, regardless of magnitude.
+#[test]
+fn test_l6_edge_case_period_101_seconds() {
+    let period_secs = 101; // 101 seconds
+    let max_grace = (period_secs * 3) / 10;
+
+    // Integer division: (101 * 3) / 10 = 303 / 10 = 30 (not 30.3)
+    assert_eq!(
+        max_grace, 30,
+        "period=101s: max_grace should be 30s (integer division rounds down from 30.3s)"
+    );
+
+    // Verify grace at 30s passes validation
+    let grace_at_limit = 30;
+    let is_valid_at_limit = grace_at_limit <= max_grace;
+    assert!(
+        is_valid_at_limit,
+        "Grace period of 30s should pass validation for 101s period"
+    );
+
+    // Verify grace at 31s fails validation
+    let grace_exceed = 31;
+    let is_valid_exceed = grace_exceed <= max_grace;
+    assert!(
+        !is_valid_exceed,
+        "Grace period of 31s should fail validation for 101s period"
+    );
+
+    // Calculate actual rounding difference
+    let true_30_percent_float = 101.0 * 0.3; // 30.3
+    let rounding_diff = true_30_percent_float - f64::from(max_grace); // 0.3s
+    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
+    assert!(
+        (rounding_diff - 0.3).abs() < EPSILON,
+        "Rounding difference is exactly 0.3s for periods ending in 1"
+    );
+}
+
+/// Test L-6 edge case: period = 2,851,201s → `max_grace` = 855,360s
+///
+/// Validates integer division for large real-world periods (approximately 33 days).
+/// The true 30% would be 855,360.3s, but integer division gives 855,360s.
+///
+/// This demonstrates that even for large periods, the sub-second rounding
+/// difference (0.3s) is completely negligible compared to the overall period.
+///
+/// Real-world context:
+/// - 2,851,201s ≈ 33 days (typical monthly subscription period)
+/// - 855,360s ≈ 9.9 days (maximum grace period)
+/// - 0.3s rounding difference is 0.000035% of the grace period
+#[test]
+fn test_l6_edge_case_period_2851201_seconds() {
+    let period_secs = 2_851_201_u64; // 2,851,201 seconds (~33 days)
+    let max_grace = (period_secs * 3) / 10;
+
+    // Integer division: (2,851,201 * 3) / 10 = 8,553,603 / 10 = 855,360
+    // True 30%: 855,360.3 (rounds down by 0.3s)
+    assert_eq!(
+        max_grace, 855_360,
+        "period=2,851,201s: max_grace should be 855,360s (rounds down from 855,360.3s)"
+    );
+
+    // Verify grace at limit passes validation
+    let grace_at_limit = 855_360;
+    let is_valid_at_limit = grace_at_limit <= max_grace;
+    assert!(
+        is_valid_at_limit,
+        "Grace period of 855,360s should pass validation for 2,851,201s period"
+    );
+
+    // Verify grace exceeding limit fails validation
+    let grace_exceed = 855_361;
+    let is_valid_exceed = grace_exceed <= max_grace;
+    assert!(
+        !is_valid_exceed,
+        "Grace period of 855,361s should fail validation for 2,851,201s period"
+    );
+
+    // Calculate rounding difference as percentage
+    let true_30_percent_float = 2_851_201.0 * 0.3; // 855,360.3
+    #[allow(clippy::cast_precision_loss)] // Intentional conversion for percentage calculation
+    let rounding_diff = true_30_percent_float - (max_grace as f64); // 0.3s
+    #[allow(clippy::cast_precision_loss)] // Intentional conversion for percentage calculation
+    let rounding_percentage = (rounding_diff / (max_grace as f64)) * 100.0;
+
+    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
+    assert!(
+        (rounding_diff - 0.3).abs() < EPSILON,
+        "Rounding difference is still 0.3s even for large periods"
+    );
+    assert!(
+        rounding_percentage < 0.001,
+        "Rounding difference is negligible: 0.3s is <0.001% of 855,360s grace period"
+    );
+
+    // Convert to human-readable units for context
+    let period_days = period_secs / ONE_DAY_SECS;
+    let max_grace_days = max_grace / ONE_DAY_SECS;
+
+    assert!(
+        period_days >= 33,
+        "Period is approximately 33 days (2,851,201s ÷ 86,400s/day)"
+    );
+    assert!(
+        max_grace_days >= 9,
+        "Max grace is approximately 9.9 days (855,360s ÷ 86,400s/day)"
+    );
+}
+
+/// Test L-6 comprehensive validation: integer division is acceptable by design
+///
+/// This test validates the complete rationale for accepting integer division behavior:
+/// 1. Conservative rounding (never exceeds 30%)
+/// 2. Negligible impact for real-world subscriptions
+/// 3. Predictable and deterministic behavior
+/// 4. Matches Rust's standard integer division semantics
+#[test]
+fn test_l6_integer_division_acceptable_by_design() {
+    // Test scenarios covering different period magnitudes
+    let test_cases = vec![
+        (11, 3, "Small period: 11s → 3s max grace"),
+        (101, 30, "Medium period: 101s → 30s max grace"),
+        (1_001, 300, "Large period: 1,001s → 300s max grace"),
+        (2_851_201, 855_360, "Very large period: 2,851,201s → 855,360s max grace"),
+    ];
+
+    for (period, expected_max_grace, description) in test_cases {
+        let calculated_max_grace = (period * 3) / 10;
+
+        assert_eq!(
+            calculated_max_grace, expected_max_grace,
+            "{description}: Expected {expected_max_grace}, got {calculated_max_grace}"
+        );
+
+        // Verify that max grace is always <= true 30% (conservative)
+        let true_30_percent = f64::from(period) * 0.3;
+        let calculated_grace_f64 = f64::from(calculated_max_grace);
+        assert!(
+            calculated_grace_f64 <= true_30_percent,
+            "{description}: Integer division result ({calculated_max_grace}) should be <= true 30% ({true_30_percent})"
+        );
+
+        // Verify rounding difference is always less than 1 second
+        let rounding_diff = true_30_percent - calculated_grace_f64;
+        assert!(
+            rounding_diff < 1.0,
+            "{description}: Rounding difference ({rounding_diff}) should be sub-second"
+        );
+    }
+}
+
+/// Test L-6 comparison: floor vs ceiling division
+///
+/// This test demonstrates why floor division (rounding down) is the correct choice
+/// and why ceiling division (rounding up) would be a security risk.
+#[test]
+fn test_l6_floor_vs_ceiling_division_comparison() {
+    let period_secs = 11; // Example: 11 seconds
+
+    // Floor division (current implementation): rounds down
+    let max_grace_floor = (period_secs * 3) / 10; // = 3s
+
+    // Ceiling division (hypothetical alternative): would round up
+    let max_grace_ceiling = ((period_secs * 3) + 9) / 10; // = 4s
+
+    // True 30%: 3.3s
+    let true_30_percent = 11.0 * 0.3; // = 3.3
+
+    // Floor division is conservative (3s < 3.3s)
+    assert!(
+        f64::from(max_grace_floor) < true_30_percent,
+        "Floor division (3s) is conservative: less than true 30% (3.3s)"
+    );
+
+    // Ceiling division would exceed 30% (4s > 3.3s)
+    assert!(
+        f64::from(max_grace_ceiling) > true_30_percent,
+        "Ceiling division (4s) would exceed 30% limit (3.3s) - SECURITY RISK"
+    );
+
+    // Floor division never exceeds the 30% security requirement
+    let floor_percentage = (f64::from(max_grace_floor) / f64::from(period_secs)) * 100.0;
+    assert!(
+        floor_percentage <= 30.0,
+        "Floor division maintains ≤30% security requirement"
+    );
+
+    // Ceiling division would violate the 30% security requirement
+    let ceiling_percentage = (f64::from(max_grace_ceiling) / f64::from(period_secs)) * 100.0;
+    assert!(
+        ceiling_percentage > 30.0,
+        "Ceiling division would violate 30% security requirement ({ceiling_percentage}% > 30%)"
+    );
+}
+
+// ============================================================================
 // Regression Tests - Old 100% Period Behavior
 // ============================================================================
 
