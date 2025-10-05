@@ -8,7 +8,8 @@ use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoade
 //   --min-platform-fee-bps 50 \
 //   --fee-basis-points-divisor 10000 \
 //   --min-period-seconds 86400 \
-//   --default-allowance-periods 3
+//   --default-allowance-periods 3 \
+//   --allowed-mint "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitConfigArgs {
@@ -18,6 +19,7 @@ pub struct InitConfigArgs {
     pub fee_basis_points_divisor: u16,
     pub min_period_seconds: u64,
     pub default_allowance_periods: u8,
+    pub allowed_mint: Pubkey,
 }
 
 #[derive(Accounts)]
@@ -97,6 +99,7 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.fee_basis_points_divisor = args.fee_basis_points_divisor;
     config.min_period_seconds = args.min_period_seconds;
     config.default_allowance_periods = args.default_allowance_periods;
+    config.allowed_mint = args.allowed_mint;
     config.bump = ctx.bumps.config;
 
     Ok(())

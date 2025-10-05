@@ -35,6 +35,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
+use std::str::FromStr;
 use tally_subs::errors::SubscriptionError;
 use tally_subs::state::Config;
 
@@ -357,6 +358,9 @@ fn test_complete_validation_flow() {
 fn test_config_state_structure() {
     let platform_authority = Pubkey::new_unique();
 
+    // Use mainnet USDC mint for realistic testing
+    let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
+
     let config = Config {
         platform_authority,
         pending_authority: None,
@@ -365,6 +369,7 @@ fn test_config_state_structure() {
         fee_basis_points_divisor: 10000,
         min_period_seconds: 86400,
         default_allowance_periods: 3,
+        allowed_mint: usdc_mint,
         bump: 255,
     };
 
@@ -390,6 +395,9 @@ fn test_config_state_with_pending_authority() {
     let platform_authority = Pubkey::new_unique();
     let pending_authority = Pubkey::new_unique();
 
+    // Use mainnet USDC mint for realistic testing
+    let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
+
     let config = Config {
         platform_authority,
         pending_authority: Some(pending_authority),
@@ -398,6 +406,7 @@ fn test_config_state_with_pending_authority() {
         fee_basis_points_divisor: 10000,
         min_period_seconds: 86400,
         default_allowance_periods: 3,
+        allowed_mint: usdc_mint,
         bump: 255,
     };
 

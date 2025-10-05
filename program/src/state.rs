@@ -97,11 +97,14 @@ pub struct Config {
     pub min_period_seconds: u64, // 8 bytes
     /// Default allowance periods multiplier (e.g., 3)
     pub default_allowance_periods: u8, // 1 byte
+    /// Allowed token mint address (e.g., official USDC mint)
+    /// This prevents merchants from using fake or arbitrary tokens
+    pub allowed_mint: Pubkey, // 32 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 2 + 8 + 1 + 1 = 89 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 2 + 8 + 1 + 32 + 1 = 121 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

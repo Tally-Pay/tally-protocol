@@ -56,6 +56,13 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
         crate::errors::SubscriptionError::InvalidPlan
     );
 
+    // Validate that the provided USDC mint matches the allowed mint in config
+    // This prevents merchants from using fake or arbitrary tokens
+    require!(
+        args.usdc_mint == ctx.accounts.config.allowed_mint,
+        crate::errors::SubscriptionError::WrongMint
+    );
+
     // Validate passed pubkeys match accounts
     require!(
         args.usdc_mint == ctx.accounts.usdc_mint.key(),
