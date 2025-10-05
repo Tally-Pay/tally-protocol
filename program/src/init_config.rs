@@ -274,6 +274,60 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
         crate::errors::SubscriptionError::InvalidConfiguration
     );
 
+    // ========================================================================
+    // PLATFORM TREASURY ATA VALIDATION (L-5 AUDIT FINDING)
+    // ========================================================================
+    //
+    // CRITICAL OPERATIONAL REQUIREMENT:
+    //
+    // The platform treasury ATA MUST NEVER be closed or modified after this
+    // initialization completes. Closing this ATA will cause COMPLETE DENIAL
+    // OF SERVICE for ALL subscription operations across the entire protocol.
+    //
+    // SECURITY IMPLICATIONS OF ATA CLOSURE:
+    //
+    // If the platform treasury ATA is closed after initialization:
+    // - ALL new subscription starts will fail with InvalidPlatformTreasuryAccount
+    // - ALL subscription renewals will fail with InvalidPlatformTreasuryAccount
+    // - Platform fee collection will be completely halted
+    // - Merchant operations will be blocked (fees cannot be split)
+    // - Complete protocol DOS until ATA is recreated
+    //
+    // VALIDATION STRATEGY:
+    //
+    // 1. INITIALIZATION (this function):
+    //    Validates ATA exists, has correct derivation, owner, and mint.
+    //    This is a one-time check during protocol deployment.
+    //
+    // 2. RUNTIME (every subscription operation):
+    //    Each subscription operation re-validates the platform treasury ATA
+    //    to detect if it has been closed or modified (see validate_platform_treasury
+    //    in utils.rs). However, if the ATA is closed, operations WILL FAIL.
+    //
+    // RECOVERY PROCEDURES:
+    //
+    // If the platform treasury ATA is accidentally closed:
+    // 1. Immediately recreate the ATA using the platform authority
+    // 2. Verify ATA address matches the canonical derivation (deterministic)
+    // 3. Resume operations - ATA recreation should restore functionality
+    //
+    // See docs/OPERATIONAL_PROCEDURES.md for:
+    // - Detailed prevention measures and access controls
+    // - Monitoring and alerting requirements
+    // - Step-by-step recovery procedures
+    // - Automated recovery scripts
+    // - Security best practices for platform authority management
+    //
+    // MONITORING REQUIREMENTS:
+    //
+    // Production deployments MUST implement:
+    // - Real-time monitoring of platform treasury ATA existence (every 5 minutes)
+    // - Immediate alerts if ATA is closed or modified
+    // - Automated recovery procedures (with manual verification)
+    // - Regular backup verification and disaster recovery drills
+    //
+    // ========================================================================
+
     // Validate platform treasury ATA exists and is correctly derived
     // This prevents operational issues where subscriptions fail if the platform
     // authority hasn't created their USDC token account before deployment

@@ -80,6 +80,10 @@ mod tests {
         let args = UnpauseArgs {};
 
         // Verify clone trait is implemented
-        let _ = args.clone();
+        #[allow(clippy::redundant_clone)]
+        let cloned = args.clone();
+
+        // Verify cloned instance can be serialized
+        let _ = cloned.try_to_vec().unwrap();
     }
 }
