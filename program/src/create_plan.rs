@@ -72,10 +72,32 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
         SubscriptionError::InvalidPlan
     );
 
-    // Validate grace_secs <= period_secs (reduced from 2x for security)
-    // This prevents excessively long grace periods that increase merchant payment risk
+    // Validate grace_secs <= 30% of period_secs (L-2 security fix)
+    //
+    // Limiting grace periods to 30% of the subscription period prevents merchants from
+    // creating plans where subscribers can effectively delay payment for the entire
+    // subscription duration. This reduces merchant payment risk and aligns with standard
+    // subscription practices where grace periods should be a reasonable fraction of the
+    // billing cycle, not equal to or exceeding it.
+    //
+    // Example scenarios:
+    // - Monthly subscription (30 days): Maximum 9-day grace period
+    // - Weekly subscription (7 days): Maximum 2-day grace period
+    // - Annual subscription (365 days): Maximum 109-day grace period
+    //
+    // Note: This validation uses integer division (period_secs * 3 / 10) which rounds
+    // down, ensuring conservative grace period limits.
+    //
+    // Security: Using checked arithmetic to prevent overflow. If overflow occurs,
+    // the validation fails as expected (grace period would be invalid).
+    let max_grace_period = args
+        .period_secs
+        .checked_mul(3)
+        .and_then(|v| v.checked_div(10))
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
     require!(
-        args.grace_secs <= args.period_secs,
+        args.grace_secs <= max_grace_period,
         SubscriptionError::InvalidPlan
     );
 
