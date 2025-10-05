@@ -16,6 +16,10 @@ no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 trace = []
+# Network-specific features for upgrade authority validation
+mainnet-beta = []
+devnet = []
+testnet = []
 
 [dependencies]
 anchor-lang = { workspace = true }

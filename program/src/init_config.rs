@@ -4,6 +4,54 @@ use anchor_lang::solana_program::program_pack::Pack;
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{spl_token::state::Account as TokenAccount, Token};
 
+// ============================================================================
+// UPGRADE AUTHORITY MANAGEMENT AND DEPLOYMENT SECURITY (L-1)
+// ============================================================================
+//
+// CRITICAL SECURITY ASSUMPTIONS:
+//
+// 1. UPGRADE AUTHORITY MANAGEMENT:
+//    The program validates that the signer of init_config is the current upgrade
+//    authority at deployment time. This creates a time-of-check/time-of-use (TOCTOU)
+//    dependency on upgrade authority state.
+//
+//    SECURITY IMPLICATIONS:
+//    - If upgrade authority is REVOKED before init_config: Program becomes permanently
+//      unconfigurable. The program will be deployed but unusable.
+//    - If upgrade authority is TRANSFERRED to unauthorized party before init_config:
+//      Attacker can set arbitrary configuration including platform_authority, fee ranges,
+//      and withdrawal limits.
+//
+// 2. EXPECTED DEPLOYMENT PROCESS:
+//    a) Deploy program with `solana program deploy` using authorized keypair
+//    b) IMMEDIATELY call init_config while upgrade authority is still valid
+//    c) Verify config initialization succeeded with expected parameters
+//    d) (OPTIONAL) Revoke or transfer upgrade authority to multisig
+//
+//    CRITICAL TIMING: Steps (a) and (b) must be atomic or executed in rapid succession
+//    to minimize attack window.
+//
+// 3. PRODUCTION DEPLOYMENT RECOMMENDATIONS:
+//    - Use deployment scripts that atomically deploy + initialize
+//    - For mainnet, compile with `--features mainnet-beta` to enable hardcoded
+//      upgrade authority validation (provides additional defense-in-depth)
+//    - Monitor program deployment and config initialization in same transaction block
+//    - Use multisig (e.g., Squads) for upgrade authority management
+//    - Implement monitoring alerts for unexpected config initialization attempts
+//
+// 4. UPGRADE AUTHORITY VALIDATION:
+//    For production deployments, this handler supports optional compile-time validation
+//    against hardcoded expected upgrade authority pubkeys:
+//
+//    #[cfg(feature = "mainnet-beta")]
+//    const EXPECTED_UPGRADE_AUTHORITY: Pubkey = pubkey!("YOUR_MAINNET_AUTHORITY");
+//
+//    This provides defense-in-depth against upgrade authority compromise before init.
+//
+// 5. AUDIT TRAIL:
+//    All init_config executions log the upgrade authority pubkey used during
+//    initialization via msg!() for on-chain audit trails and security monitoring.
+//
 // Example CLI command to initialize config:
 // cargo run --package tally-cli -- init-config \
 //   --platform-authority "YOUR_PLATFORM_AUTHORITY_PUBKEY" \
@@ -14,6 +62,67 @@ use anchor_spl::token::{spl_token::state::Account as TokenAccount, Token};
 //   --allowed-mint "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" \
 //   --max-withdrawal-amount 1000000000 \
 //   --max-grace-period-seconds 604800
+// ============================================================================
+
+// ============================================================================
+// HARDCODED UPGRADE AUTHORITY VALIDATION (OPTIONAL)
+// ============================================================================
+//
+// For production deployments, define expected upgrade authority pubkeys per network.
+// This provides defense-in-depth validation during config initialization.
+//
+// DEPLOYMENT INSTRUCTIONS:
+// 1. Replace placeholder pubkeys below with your actual upgrade authority addresses
+// 2. Compile with appropriate feature flag:
+//    - Mainnet: cargo build-sbf --features mainnet-beta
+//    - Devnet:  cargo build-sbf --features devnet
+//    - Testnet: cargo build-sbf --features testnet
+// 3. Without feature flags, no hardcoded validation occurs (permissive mode)
+//
+// SECURITY NOTE:
+// Hardcoded validation adds an additional security layer but requires recompilation
+// and redeployment if upgrade authority changes. Use multisig upgrade authorities
+// to minimize the need for authority rotation.
+
+// Mainnet upgrade authority (REPLACE WITH YOUR MAINNET AUTHORITY)
+// Example: const EXPECTED_UPGRADE_AUTHORITY: Pubkey = pubkey!("YourMainnetAuthorityPubkeyHere");
+#[cfg(all(
+    feature = "mainnet-beta",
+    not(feature = "devnet"),
+    not(feature = "testnet")
+))]
+#[allow(dead_code)] // Used conditionally based on feature flags
+const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
+
+// Devnet upgrade authority (REPLACE WITH YOUR DEVNET AUTHORITY)
+#[cfg(all(
+    feature = "devnet",
+    not(feature = "mainnet-beta"),
+    not(feature = "testnet")
+))]
+#[allow(dead_code)] // Used conditionally based on feature flags
+const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
+
+// Testnet upgrade authority (REPLACE WITH YOUR TESTNET AUTHORITY)
+#[cfg(all(
+    feature = "testnet",
+    not(feature = "mainnet-beta"),
+    not(feature = "devnet")
+))]
+#[allow(dead_code)] // Used conditionally based on feature flags
+const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
+
+// Default: No hardcoded validation when no network feature is enabled (or multiple are enabled)
+#[cfg(not(all(
+    any(feature = "mainnet-beta", feature = "devnet", feature = "testnet"),
+    not(all(feature = "mainnet-beta", feature = "devnet")),
+    not(all(feature = "mainnet-beta", feature = "testnet")),
+    not(all(feature = "devnet", feature = "testnet"))
+)))]
+#[allow(dead_code)] // Used conditionally based on feature flags
+const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
+
+// ============================================================================
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitConfigArgs {
@@ -62,39 +171,96 @@ fn get_program_data_address(program_id: &Pubkey) -> Pubkey {
     program_data_address
 }
 
-pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
-    // Validate that program_data account matches expected address
+/// Validates upgrade authority and logs audit trail information
+///
+/// This function implements the L-1 security audit fix by:
+/// 1. Validating `program_data` account matches expected PDA
+/// 2. Deserializing program data to extract upgrade authority
+/// 3. Ensuring upgrade authority has not been revoked
+/// 4. Logging comprehensive audit trail for security monitoring
+/// 5. Validating signer matches current upgrade authority
+/// 6. (Optional) Validating against hardcoded expected authority for production
+///
+/// # Security
+///
+/// This validation creates a TOCTOU dependency on upgrade authority state.
+/// Programs MUST call `init_config` immediately after deployment while upgrade
+/// authority is still valid and controlled by authorized parties.
+///
+/// # Returns
+///
+/// Returns the validated upgrade authority pubkey on success.
+fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
+    // Step 1: Validate program_data account matches expected PDA
     let expected_program_data = get_program_data_address(ctx.program_id);
     require!(
         ctx.accounts.program_data.key() == expected_program_data,
         crate::errors::SubscriptionError::InvalidProgramData
     );
 
-    // Deserialize program data to get upgrade authority
+    // Step 2: Deserialize program data to extract upgrade authority
     let program_data_account = ctx.accounts.program_data.to_account_info();
     let program_data_bytes = program_data_account.try_borrow_data()?;
 
-    // Deserialize the UpgradeableLoaderState
     let program_data_state: UpgradeableLoaderState = bincode::deserialize(&program_data_bytes)
         .map_err(|_| crate::errors::SubscriptionError::InvalidProgramData)?;
 
-    // Extract upgrade authority from program data
+    // Step 3: Extract and validate upgrade authority exists
     let UpgradeableLoaderState::ProgramData {
-        upgrade_authority_address: upgrade_authority,
-        ..
+        upgrade_authority_address: upgrade_authority_option,
+        slot: deployment_slot,
     } = program_data_state
     else {
         return Err(crate::errors::SubscriptionError::InvalidProgramData.into());
     };
 
-    // Validate that the signer is the upgrade authority
+    // Step 4: Ensure upgrade authority has not been revoked (critical security check)
     let upgrade_authority =
-        upgrade_authority.ok_or(crate::errors::SubscriptionError::Unauthorized)?;
+        upgrade_authority_option.ok_or(crate::errors::SubscriptionError::Unauthorized)?;
 
+    // Step 5: AUDIT TRAIL - Log upgrade authority for security monitoring
+    msg!("=== CONFIG INITIALIZATION AUDIT TRAIL ===");
+    msg!("Program ID: {}", ctx.program_id);
+    msg!("Upgrade Authority: {}", upgrade_authority);
+    msg!("Deployment Slot: {}", deployment_slot);
+    msg!("Signer: {}", ctx.accounts.authority.key());
+
+    // Step 6: Validate signer is the current upgrade authority
     require!(
         ctx.accounts.authority.key() == upgrade_authority,
         crate::errors::SubscriptionError::Unauthorized
     );
+
+    // Step 7: OPTIONAL - Hardcoded upgrade authority validation (defense-in-depth)
+    #[cfg(any(feature = "mainnet-beta", feature = "devnet", feature = "testnet"))]
+    if let Some(expected_authority) = EXPECTED_UPGRADE_AUTHORITY {
+        require!(
+            upgrade_authority == expected_authority,
+            crate::errors::SubscriptionError::Unauthorized
+        );
+        msg!("✓ Hardcoded upgrade authority validation passed");
+    } else {
+        msg!("⚠ WARNING: No hardcoded upgrade authority configured for this network");
+        msg!("⚠ Consider setting EXPECTED_UPGRADE_AUTHORITY for production security");
+    }
+
+    #[cfg(not(any(feature = "mainnet-beta", feature = "devnet", feature = "testnet")))]
+    msg!("ℹ Development mode: No hardcoded upgrade authority validation");
+
+    msg!("✓ Upgrade authority validation completed successfully");
+    msg!("=========================================");
+
+    Ok(upgrade_authority)
+}
+
+pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
+    // ========================================================================
+    // UPGRADE AUTHORITY VALIDATION AND AUDIT LOGGING (L-1)
+    // ========================================================================
+    // Validate upgrade authority and log comprehensive audit trail
+    let _upgrade_authority = validate_upgrade_authority(&ctx)?;
+    msg!("Platform Authority (from args): {}", args.platform_authority);
+    // ========================================================================
 
     // Validate that min_platform_fee_bps <= max_platform_fee_bps
     require!(
