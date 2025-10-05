@@ -74,12 +74,17 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::NotDue.into());
     }
 
-    let grace_period_i64 = i64::try_from(plan.grace_secs).unwrap_or(i64::MAX); // If grace period > i64::MAX, treat as unlimited grace
-    if current_time
-        > subscription
-            .next_renewal_ts
-            .saturating_add(grace_period_i64)
-    {
+    // Convert grace period to i64 with overflow check
+    let grace_period_i64 = i64::try_from(plan.grace_secs)
+        .map_err(|_| SubscriptionError::ArithmeticError)?;
+
+    // Calculate grace deadline with overflow check
+    let grace_deadline = subscription
+        .next_renewal_ts
+        .checked_add(grace_period_i64)
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
+    if current_time > grace_deadline {
         return Err(SubscriptionError::PastGrace.into());
     }
 
