@@ -132,4 +132,14 @@ pub enum SubscriptionError {
     /// When withdrawal amount exceeds configured maximum
     #[msg("Withdrawal amount exceeds maximum allowed per transaction. Please reduce the amount or contact platform admin to adjust limits.")]
     WithdrawLimitExceeded,
+
+    /// Error Code: 6024
+    /// When authority transfer target is invalid (same as current authority)
+    #[msg("Invalid authority transfer target. The new authority must be different from the current authority.")]
+    InvalidTransferTarget,
+
+    /// Error Code: 6025
+    /// When a monetary amount is invalid (zero, negative, or exceeds limits)
+    #[msg("Invalid amount provided. Amount must be greater than zero and within acceptable limits.")]
+    InvalidAmount,
 }

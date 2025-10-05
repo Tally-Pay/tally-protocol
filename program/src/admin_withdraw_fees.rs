@@ -88,7 +88,7 @@ pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> 
 
     // Validate amount is greater than 0
     if args.amount == 0 {
-        return Err(SubscriptionError::InvalidPlan.into());
+        return Err(SubscriptionError::InvalidAmount.into());
     }
 
     // Validate amount does not exceed configured maximum withdrawal limit

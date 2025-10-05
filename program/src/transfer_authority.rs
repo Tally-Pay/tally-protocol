@@ -52,7 +52,7 @@ pub fn handler(ctx: Context<TransferAuthority>, args: TransferAuthorityArgs) -> 
     // Ensure new authority is different from current
     require!(
         args.new_authority != config.platform_authority,
-        SubscriptionError::InvalidPlan // Reusing error for invalid operation
+        SubscriptionError::InvalidTransferTarget
     );
 
     // Set pending authority
