@@ -13,9 +13,9 @@
 //!
 //! Security Context (M-2):
 //! The emergency pause mechanism allows the platform authority to halt all user-facing
-//! operations (start_subscription, renew_subscription, create_plan) in case of security
-//! incidents, critical bugs, or other emergencies. Admin operations (admin_withdraw_fees,
-//! transfer_authority, accept_authority) are exempt from pause checks to allow emergency
+//! operations (start_subscription, renew_subscription, `create_plan`) in case of security
+//! incidents, critical bugs, or other emergencies. Admin operations (`admin_withdraw_fees`,
+//! `transfer_authority`, `accept_authority`) are exempt from pause checks to allow emergency
 //! fund recovery.
 //!
 //! The pause check is enforced at the account constraint level using:
@@ -204,19 +204,21 @@ fn test_config_bump_preserved_during_pause() {
     let original_bump = bump;
 
     // Simulate pause operation (only modifies paused field)
+    #[allow(clippy::no_effect_underscore_binding)]
     let _paused = true;
 
     // Verify bump is unchanged
     assert_eq!(bump, original_bump, "Bump should be preserved during pause");
 }
 
-/// Test that Config platform_authority is preserved during pause/unpause
+/// Test that Config `platform_authority` is preserved during pause/unpause
 #[test]
 fn test_config_authority_preserved_during_pause() {
     let platform_authority = Pubkey::new_unique();
     let original_authority = platform_authority;
 
     // Simulate pause operation (only modifies paused field)
+    #[allow(clippy::no_effect_underscore_binding)]
     let _paused = true;
 
     // Verify platform_authority is unchanged
@@ -238,7 +240,7 @@ fn test_pause_state_bool_values() {
 
     // Test negation (used in constraint check)
     assert!(!paused_false); // !false = true (this is true, so assertion passes)
-    assert_eq!(!paused_true, false); // !true = false (verify negation equals false)
+    assert!(paused_true); // Verify paused_true is indeed true
 }
 
 /// Test that pause check constraint logic is correct
@@ -257,8 +259,8 @@ fn test_pause_constraint_logic() {
     // When paused = true, constraint fails
     let paused_true = true;
     assert!(
-        !(!(paused_true)),
-        "Constraint should fail when paused is true"
+        paused_true,
+        "Constraint should fail when paused is true (paused_true == true)"
     );
 }
 

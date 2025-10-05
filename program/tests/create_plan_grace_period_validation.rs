@@ -151,7 +151,7 @@ fn test_grace_period_at_15_percent_passes() {
     );
 }
 
-/// Test that grace_secs at 10% of period_secs passes validation
+/// Test that `grace_secs` at 10% of `period_secs` passes validation
 ///
 /// Validates a conservative grace period scenario.
 ///
@@ -174,7 +174,7 @@ fn test_grace_period_at_10_percent_passes() {
 // Boundary Validation Tests - Config Maximum Enforcement
 // ============================================================================
 
-/// Test that grace_secs exactly equal to max_grace_period_seconds passes validation
+/// Test that `grace_secs` exactly equal to `max_grace_period_seconds` passes validation
 ///
 /// Validates the absolute maximum grace period from config.
 /// Typical config value: 604800 seconds (7 days)
@@ -194,7 +194,7 @@ fn test_grace_period_at_config_max_passes() {
     );
 }
 
-/// Test that grace_secs exceeding max_grace_period_seconds by 1 second fails validation
+/// Test that `grace_secs` exceeding `max_grace_period_seconds` by 1 second fails validation
 ///
 /// Validates that the absolute config maximum is strictly enforced.
 ///
@@ -213,7 +213,7 @@ fn test_grace_period_exceeds_config_max_by_one_fails() {
     );
 }
 
-/// Test that grace_secs well below config max passes validation
+/// Test that `grace_secs` well below config max passes validation
 ///
 /// Validates that values below the config maximum work correctly.
 ///
@@ -238,7 +238,7 @@ fn test_grace_period_below_config_max_passes() {
 
 /// Test that BOTH validations must pass - 30% period limit is binding
 ///
-/// Scenario: grace_secs is under config max but exceeds 30% period limit
+/// Scenario: `grace_secs` is under config max but exceeds 30% period limit
 /// Expected: Fails due to period-based validation
 ///
 /// Example: 20-day subscription with 7-day grace period (35%, exceeds 30% but under 7-day max)
@@ -274,7 +274,7 @@ fn test_dual_validation_period_limit_binding() {
 
 /// Test that BOTH validations must pass - config max is binding
 ///
-/// Scenario: grace_secs passes 30% period limit but exceeds config max
+/// Scenario: `grace_secs` passes 30% period limit but exceeds config max
 /// Expected: Fails due to config-based validation
 ///
 /// Example: 1-year subscription with 30-day grace period (8%, under 30% but over 7-day max)
@@ -310,7 +310,7 @@ fn test_dual_validation_config_max_binding() {
 
 /// Test that both validations pass for valid grace period
 ///
-/// Scenario: grace_secs passes both 30% period limit AND config max
+/// Scenario: `grace_secs` passes both 30% period limit AND config max
 /// Expected: Passes validation
 ///
 /// Example: 1-month subscription with 5-day grace period (16.7%, under both limits)
@@ -697,7 +697,7 @@ fn test_config_max_prevents_extreme_cases_with_30_percent() {
 // Error Handling Tests
 // ============================================================================
 
-/// Test that InvalidPlan error is returned for 30% period violation
+/// Test that `InvalidPlan` error is returned for 30% period violation
 ///
 /// Validates that the correct error code is used when grace exceeds 30% of period.
 #[test]
@@ -721,7 +721,7 @@ fn test_invalid_plan_error_for_30_percent_violation() {
     }
 }
 
-/// Test that InvalidPlan error is returned for config max violation
+/// Test that `InvalidPlan` error is returned for config max violation
 ///
 /// Validates that the correct error code is used when grace exceeds config max.
 #[test]
