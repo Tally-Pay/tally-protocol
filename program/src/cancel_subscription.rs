@@ -32,6 +32,14 @@ pub struct CancelSubscription<'info> {
     #[account(mut)]
     pub subscriber_usdc_ata: UncheckedAccount<'info>,
 
+    /// Program PDA that acts as delegate - used to validate delegate identity before revocation
+    /// CHECK: PDA derived from program, validated in handler
+    #[account(
+        seeds = [b"delegate", merchant.key().as_ref()],
+        bump
+    )]
+    pub program_delegate: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
 }
 
@@ -54,18 +62,30 @@ pub fn handler(ctx: Context<CancelSubscription>, _args: CancelSubscriptionArgs) 
         return Err(SubscriptionError::WrongMint.into());
     }
 
-    // Revoke delegate approval to prevent further renewals
-    // Only revoke if there is an active delegation
-    if subscriber_ata_data.delegate.is_some() {
-        let revoke_accounts = Revoke {
-            source: ctx.accounts.subscriber_usdc_ata.to_account_info(),
-            authority: ctx.accounts.subscriber.to_account_info(),
-        };
+    // Validate program delegate PDA derivation to ensure correct delegate account
+    let (expected_delegate_pda, _expected_bump) =
+        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+    require!(
+        ctx.accounts.program_delegate.key() == expected_delegate_pda,
+        SubscriptionError::BadSeeds
+    );
 
-        token::revoke(CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            revoke_accounts,
-        ))?;
+    // Revoke delegate approval to prevent further renewals
+    // Only revoke if the current delegate matches our program's delegate PDA
+    // This prevents revoking unrelated delegations to other programs
+    if let Some(current_delegate) = Option::<Pubkey>::from(subscriber_ata_data.delegate) {
+        if current_delegate == expected_delegate_pda {
+            let revoke_accounts = Revoke {
+                source: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+                authority: ctx.accounts.subscriber.to_account_info(),
+            };
+
+            token::revoke(CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                revoke_accounts,
+            ))?;
+        }
+        // If delegate is not ours, skip revocation (already revoked or delegated elsewhere)
     }
 
     // Make it idempotent - it's safe to "cancel" an already canceled subscription
