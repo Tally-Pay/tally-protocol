@@ -258,12 +258,28 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Update subscription account based on whether this is new or reactivation
     if is_reactivation {
-        // REACTIVATION: Preserve historical data (created_ts, renewals, bump)
-        // Reset operational fields for new billing cycle
+        // REACTIVATION PATH: Preserve historical fields while resetting operational state
+        //
+        // When a previously canceled subscription is reactivated, we intentionally preserve
+        // certain historical fields to maintain a complete record of the subscription's
+        // lifetime across all sessions:
+        //
+        // PRESERVED FIELDS (not modified):
+        //   - created_ts: Original subscription creation timestamp
+        //   - renewals: Cumulative renewal count across all sessions (see state.rs documentation)
+        //   - bump: PDA derivation seed (immutable)
+        //
+        // The renewals counter is deliberately preserved to track total renewals across
+        // the entire subscription relationship, including previous sessions. This means
+        // a subscription canceled after 10 renewals will show renewals=10 upon reactivation,
+        // and will continue from 11 on the next renewal.
+        //
+        // RESET FIELDS (updated for new billing cycle):
+        //   - active: Set to true to enable renewals
+        //   - next_renewal_ts: Scheduled time for next billing cycle
+        //   - last_amount: Current plan price (may differ from previous session)
+        //   - last_renewed_ts: Current time to prevent immediate re-renewal
 
-        // No changes to: created_ts, renewals, bump (preserved from existing account)
-
-        // Reset for new billing cycle
         subscription.active = true;
         subscription.next_renewal_ts = next_renewal_ts;
         subscription.last_amount = plan.price_usdc;

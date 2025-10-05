@@ -51,7 +51,48 @@ pub struct Subscription {
     pub next_renewal_ts: i64, // 8 bytes
     /// Whether subscription is active
     pub active: bool, // 1 byte
-    /// Number of renewals processed
+    /// Number of renewals processed for this subscription.
+    ///
+    /// This counter increments with each successful renewal payment and is preserved
+    /// across subscription cancellation and reactivation cycles. When a subscription
+    /// is canceled and later reactivated, this field retains its historical value
+    /// rather than resetting to zero.
+    ///
+    /// # Reactivation Behavior
+    ///
+    /// - **New Subscription**: Initialized to `0`
+    /// - **Each Renewal**: Incremented by `1`
+    /// - **Cancellation**: Preserved (not reset)
+    /// - **Reactivation**: Preserved (continues from previous value)
+    ///
+    /// # Use Cases
+    ///
+    /// This preservation behavior is intentional to maintain a complete historical
+    /// record of all renewals across the lifetime of the subscription relationship,
+    /// regardless of interruptions. Off-chain systems using this field for analytics,
+    /// business logic, or rewards programs must account for the possibility that this
+    /// value may represent renewals from previous subscription sessions.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Initial subscription
+    /// subscription.renewals = 0;
+    ///
+    /// // After 10 renewals
+    /// subscription.renewals = 10;
+    ///
+    /// // User cancels subscription
+    /// subscription.active = false;
+    /// subscription.renewals = 10; // Preserved
+    ///
+    /// // User reactivates subscription
+    /// subscription.active = true;
+    /// subscription.renewals = 10; // Still preserved, not reset to 0
+    ///
+    /// // After 5 more renewals in the new session
+    /// subscription.renewals = 15; // Cumulative across all sessions
+    /// ```
     pub renewals: u32, // 4 bytes
     /// Unix timestamp when subscription was created
     pub created_ts: i64, // 8 bytes
