@@ -123,10 +123,22 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     let clock = Clock::get()?;
     let current_time = clock.unix_timestamp;
 
+    // Validate allowance calculation won't overflow
+    // Ensure price_usdc * allowance_periods <= u64::MAX
+    let allowance_periods_u64 = u64::from(allowance_periods);
+    let max_safe_price = u64::MAX
+        .checked_div(allowance_periods_u64)
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
+    require!(
+        plan.price_usdc <= max_safe_price,
+        SubscriptionError::InvalidPlan
+    );
+
     // Validate delegate allowance
     let required_allowance = plan
         .price_usdc
-        .checked_mul(u64::from(allowance_periods))
+        .checked_mul(allowance_periods_u64)
         .ok_or(SubscriptionError::ArithmeticError)?;
 
     if subscriber_ata_data.delegated_amount < required_allowance {
