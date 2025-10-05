@@ -17,7 +17,7 @@ pub struct StartSubscription<'info> {
     pub config: Account<'info, Config>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = subscriber,
         space = Subscription::SPACE,
         seeds = [b"subscription", plan.key().as_ref(), subscriber.key().as_ref()],
@@ -72,6 +72,27 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     let subscription = &mut ctx.accounts.subscription;
     let plan = &ctx.accounts.plan;
     let merchant = &ctx.accounts.merchant;
+
+    // Detect if this is reactivation (account already exists) vs new subscription
+    // created_ts will be non-zero for existing accounts since it's set during initialization
+    let is_reactivation = subscription.created_ts != 0;
+
+    if is_reactivation {
+        // REACTIVATION PATH: Validate and reactivate existing subscription
+
+        // Security check: Prevent reactivation if already active
+        require!(!subscription.active, SubscriptionError::AlreadyActive);
+
+        // Security check: Ensure plan and subscriber match (prevent account hijacking)
+        require!(
+            subscription.plan == plan.key(),
+            SubscriptionError::Unauthorized
+        );
+        require!(
+            subscription.subscriber == ctx.accounts.subscriber.key(),
+            SubscriptionError::Unauthorized
+        );
+    }
 
     // Deserialize and validate token accounts with specific error handling
     let subscriber_ata_data: TokenAccount =
@@ -235,16 +256,30 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         .checked_add(period_i64)
         .ok_or(SubscriptionError::ArithmeticError)?;
 
-    // Initialize subscription account
-    subscription.plan = plan.key();
-    subscription.subscriber = ctx.accounts.subscriber.key();
-    subscription.next_renewal_ts = next_renewal_ts;
-    subscription.active = true;
-    subscription.renewals = 0;
-    subscription.created_ts = current_time;
-    subscription.last_amount = plan.price_usdc;
-    subscription.last_renewed_ts = current_time;
-    subscription.bump = ctx.bumps.subscription;
+    // Update subscription account based on whether this is new or reactivation
+    if is_reactivation {
+        // REACTIVATION: Preserve historical data (created_ts, renewals, bump)
+        // Reset operational fields for new billing cycle
+
+        // No changes to: created_ts, renewals, bump (preserved from existing account)
+
+        // Reset for new billing cycle
+        subscription.active = true;
+        subscription.next_renewal_ts = next_renewal_ts;
+        subscription.last_amount = plan.price_usdc;
+        subscription.last_renewed_ts = current_time;
+    } else {
+        // NEW SUBSCRIPTION: Initialize all fields
+        subscription.plan = plan.key();
+        subscription.subscriber = ctx.accounts.subscriber.key();
+        subscription.next_renewal_ts = next_renewal_ts;
+        subscription.active = true;
+        subscription.renewals = 0;
+        subscription.created_ts = current_time;
+        subscription.last_amount = plan.price_usdc;
+        subscription.last_renewed_ts = current_time;
+        subscription.bump = ctx.bumps.subscription;
+    }
 
     // Emit Subscribed event
     emit!(Subscribed {

@@ -10,7 +10,7 @@ edition = "2021"
 
 [workspace.dependencies]
 # Anchor framework dependencies
-anchor-lang = "0.31.1"
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
 anchor-client = "0.31.1"
 anchor-spl = "0.31.1"
 
