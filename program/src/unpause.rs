@@ -80,6 +80,8 @@ mod tests {
         let args = UnpauseArgs {};
 
         // Verify clone trait is implemented
-        let _ = args.clone();
+        let _cloned = args.clone();
+        // Use the cloned value to avoid redundant_clone lint
+        assert!(format!("{:?}", _cloned).contains("UnpauseArgs"));
     }
 }

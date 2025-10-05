@@ -86,8 +86,29 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     // - Weekly subscription (7 days): Maximum 2-day grace period
     // - Annual subscription (365 days): Maximum 109-day grace period
     //
-    // Note: This validation uses integer division (period_secs * 3 / 10) which rounds
-    // down, ensuring conservative grace period limits.
+    // Integer Division Behavior (L-6 Audit Finding - Acceptable by Design):
+    // This validation intentionally uses integer division (period_secs * 3 / 10) which
+    // rounds down, creating conservative grace period limits. For periods not divisible
+    // by 10, the maximum grace is slightly less than 30%.
+    //
+    // Examples of integer division rounding:
+    // - period = 11s → max_grace = 3s (not 3.3s, rounds down by 0.3s)
+    // - period = 101s → max_grace = 30s (not 30.3s, rounds down by 0.3s)
+    // - period = 2,851,201s → max_grace = 855,360s (30% - 0.3s, negligible variance)
+    //
+    // Why floor division (rounding down) is the correct choice:
+    // 1. Conservative Security: Rounding down provides an additional safety margin,
+    //    ensuring grace periods never exceed the intended 30% limit.
+    // 2. Predictable Behavior: Floor division is deterministic and matches Rust's
+    //    standard integer division semantics.
+    // 3. Negligible Impact: For real-world subscription periods (hours, days, weeks,
+    //    months), the sub-second rounding difference is negligible.
+    //
+    // Why ceiling division (rounding up) is NOT recommended:
+    // 1. Security Risk: Would allow grace periods to exceed 30% for certain values,
+    //    violating the security requirement.
+    // 2. Unpredictable Edge Cases: Could create inconsistent behavior for merchants
+    //    setting similar subscription periods.
     //
     // Security: Using checked arithmetic to prevent overflow. If overflow occurs,
     // the validation fails as expected (grace period would be invalid).
