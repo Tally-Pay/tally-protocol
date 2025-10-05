@@ -5,6 +5,67 @@ use crate::{
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
+/// Arguments for starting a new subscription or reactivating a canceled subscription.
+///
+/// # Rate Limiting Considerations
+///
+/// This instruction has **no on-chain rate limiting** by design. Spam prevention relies on
+/// economic costs and off-chain monitoring:
+///
+/// ## Economic Deterrence
+/// - **Transaction Fee**: 0.000005 SOL (~$0.0007) per subscription start
+/// - **Rent Deposit**: 0.00078 SOL (~$0.11) per new subscription (110 bytes account size)
+/// - **USDC Payment**: Requires actual USDC transfer for initial payment
+/// - **Delegate Approval**: Requires pre-approval of USDC token delegate
+///
+/// **Subscription Churn Attack Cost**: Repeatedly starting and canceling the same subscription:
+/// - Per cycle: 0.00001 SOL (start + cancel) + USDC for initial payment
+/// - 1,000 cycles: ~$2-5 (depending on USDC amount and gas)
+///
+/// The USDC payment requirement and delegate setup add friction that makes high-frequency
+/// churn attacks more complex than simple account creation spam.
+///
+/// ## Off-Chain Monitoring
+///
+/// Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):
+/// - **Churn Alert**: >80% of subscriptions canceled within 1 hour of starting
+/// - **Volume Alert**: >20 subscription operations (start/cancel) per account per hour
+/// - **Pattern Alert**: Rapid start-cancel cycles on same plan/subscriber pairs
+///
+/// ## Attack Scenarios
+///
+/// ### Subscription Churn Attack
+/// **Attack**: User repeatedly starts and cancels same subscription to generate event noise.
+/// **Cost**: Low (~$0.002 per cycle), but requires USDC balance and delegate approval.
+/// **Detection**: Monitor subscription lifetime duration; flag subscriptions lasting <5 minutes.
+/// **Mitigation**: RPC rate limiting to 20 subscription operations per hour per account.
+///
+/// ### Reactivation Spam
+/// **Attack**: User exploits `init_if_needed` to repeatedly reactivate canceled subscriptions.
+/// **Cost**: 0.000005 SOL per reactivation (no rent deposit after first creation).
+/// **Detection**: Track reactivation frequency; alert on >5 reactivations per hour.
+/// **Mitigation**: Application-layer cooldown period between cancellation and reactivation.
+///
+/// ## Why No On-Chain Rate Limiting?
+///
+/// On-chain rate limiting was deliberately not implemented because:
+/// 1. **Account Complexity**: Adding rate limit fields to `Subscription` accounts increases
+///    complexity and storage costs for all users.
+/// 2. **State Bloat**: Tracking per-subscriber operation timestamps bloats on-chain state.
+/// 3. **Flexibility**: Off-chain rate limits can be adjusted dynamically based on observed
+///    attack patterns without requiring program upgrades.
+/// 4. **Economic Model**: USDC payment requirement provides natural spam deterrence.
+///
+/// For comprehensive rate limiting strategy, see `/docs/RATE_LIMITING_STRATEGY.md`.
+///
+/// ## Mitigation Recommendations
+///
+/// 1. **RPC Layer**: Limit subscription operations to 20/hour per account
+/// 2. **Indexer**: Monitor subscription lifetime and churn patterns
+/// 3. **Application Layer**: Implement cooldown periods between cancel and reactivation
+/// 4. **Dashboard**: Alert on abnormal subscription churn rates
+///
+/// See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct StartSubscriptionArgs {
     pub allowance_periods: u8, // Multiplier for allowance (default 3)
