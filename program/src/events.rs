@@ -62,3 +62,60 @@ pub struct PlanStatusChanged {
     /// Who changed the status: "merchant" or "platform"
     pub changed_by: String,
 }
+
+/// Event emitted when global configuration is initialized
+#[event]
+pub struct ConfigInitialized {
+    /// Platform authority pubkey for admin operations
+    pub platform_authority: Pubkey,
+    /// Maximum platform fee in basis points
+    pub max_platform_fee_bps: u16,
+    /// Minimum platform fee in basis points
+    pub min_platform_fee_bps: u16,
+    /// Minimum subscription period in seconds
+    pub min_period_seconds: u64,
+    /// Default allowance periods multiplier
+    pub default_allowance_periods: u8,
+    /// Allowed token mint address (e.g., official USDC mint)
+    pub allowed_mint: Pubkey,
+    /// Unix timestamp when config was initialized
+    pub timestamp: i64,
+}
+
+/// Event emitted when a merchant account is initialized
+#[event]
+pub struct MerchantInitialized {
+    /// The merchant PDA account
+    pub merchant: Pubkey,
+    /// Merchant authority (signer for merchant operations)
+    pub authority: Pubkey,
+    /// Pinned USDC mint address for all transactions
+    pub usdc_mint: Pubkey,
+    /// Merchant's USDC treasury ATA
+    pub treasury_ata: Pubkey,
+    /// Platform fee in basis points
+    pub platform_fee_bps: u16,
+    /// Unix timestamp when merchant was initialized
+    pub timestamp: i64,
+}
+
+/// Event emitted when a subscription plan is created
+#[event]
+pub struct PlanCreated {
+    /// The plan PDA account
+    pub plan: Pubkey,
+    /// Reference to the merchant PDA
+    pub merchant: Pubkey,
+    /// Deterministic plan identifier
+    pub plan_id: String,
+    /// Price in USDC microlamports (6 decimals)
+    pub price_usdc: u64,
+    /// Subscription period in seconds
+    pub period_secs: u64,
+    /// Grace period for renewals in seconds
+    pub grace_secs: u64,
+    /// Plan display name
+    pub name: String,
+    /// Unix timestamp when plan was created
+    pub timestamp: i64,
+}

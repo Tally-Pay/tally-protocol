@@ -99,6 +99,20 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.allowed_mint = args.allowed_mint;
     config.bump = ctx.bumps.config;
 
+    // Get current timestamp for event
+    let clock = Clock::get()?;
+
+    // Emit ConfigInitialized event
+    emit!(crate::events::ConfigInitialized {
+        platform_authority: args.platform_authority,
+        max_platform_fee_bps: args.max_platform_fee_bps,
+        min_platform_fee_bps: args.min_platform_fee_bps,
+        min_period_seconds: args.min_period_seconds,
+        default_allowance_periods: args.default_allowance_periods,
+        allowed_mint: args.allowed_mint,
+        timestamp: clock.unix_timestamp,
+    });
+
     Ok(())
 }
 

@@ -114,14 +114,20 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     plan.name = name_bytes;
     plan.active = true; // Set active = true by default
 
-    msg!(
-        "Created plan: id={}, price={}, period={}, grace={}, active={}",
-        args.plan_id,
-        args.price_usdc,
-        args.period_secs,
-        args.grace_secs,
-        plan.active
-    );
+    // Get current timestamp for event
+    let clock = Clock::get()?;
+
+    // Emit PlanCreated event
+    emit!(crate::events::PlanCreated {
+        plan: plan.key(),
+        merchant: ctx.accounts.merchant.key(),
+        plan_id: args.plan_id,
+        price_usdc: args.price_usdc,
+        period_secs: args.period_secs,
+        grace_secs: args.grace_secs,
+        name: args.name,
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

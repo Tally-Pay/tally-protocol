@@ -126,5 +126,18 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     merchant.platform_fee_bps = args.platform_fee_bps;
     merchant.bump = ctx.bumps.merchant;
 
+    // Get current timestamp for event
+    let clock = Clock::get()?;
+
+    // Emit MerchantInitialized event
+    emit!(crate::events::MerchantInitialized {
+        merchant: merchant.key(),
+        authority: ctx.accounts.authority.key(),
+        usdc_mint: args.usdc_mint,
+        treasury_ata: args.treasury_ata,
+        platform_fee_bps: args.platform_fee_bps,
+        timestamp: clock.unix_timestamp,
+    });
+
     Ok(())
 }
