@@ -147,6 +147,14 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::Unauthorized.into());
     }
 
+    // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
+    let (expected_delegate_pda, _expected_bump) =
+        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+    require!(
+        ctx.accounts.program_delegate.key() == expected_delegate_pda,
+        SubscriptionError::BadSeeds
+    );
+
     // Check sufficient funds
     if subscriber_ata_data.amount < plan.price_usdc {
         return Err(SubscriptionError::InsufficientFunds.into());

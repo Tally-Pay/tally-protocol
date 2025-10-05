@@ -152,6 +152,14 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         return Err(SubscriptionError::Unauthorized.into());
     }
 
+    // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
+    let (expected_delegate_pda, _expected_bump) =
+        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+    require!(
+        ctx.accounts.program_delegate.key() == expected_delegate_pda,
+        SubscriptionError::BadSeeds
+    );
+
     // Calculate platform fee using checked arithmetic
     let platform_fee = u64::try_from(
         u128::from(plan.price_usdc)
