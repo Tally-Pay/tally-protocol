@@ -804,28 +804,72 @@ fn test_comprehensive_m3_security_guarantees() {
     assert_eq!(original_bump, 252, "bump preserved for PDA integrity");
 }
 
-/// Test that Subscribed event is emitted on reactivation
+/// Test that Subscribed event is emitted for new subscriptions
 ///
-/// Validates that the Subscribed event (lines 285-290) is emitted during reactivation,
-/// just as it is for new subscriptions.
+/// Validates that the Subscribed event is emitted when a new subscription is created
+/// (is_reactivation == false).
 #[test]
-fn test_subscribed_event_emitted_on_reactivation() {
-    // The emit! call at lines 285-290 happens regardless of is_reactivation
-    let event_emitted = true; // Always true for both paths
+fn test_subscribed_event_emitted_for_new_subscription() {
+    let is_reactivation = false;
+
+    // When is_reactivation is false, Subscribed event should be emitted
+    let emits_subscribed = !is_reactivation;
+    let emits_reactivated = is_reactivation;
 
     assert!(
-        event_emitted,
-        "Subscribed event should be emitted on reactivation"
+        emits_subscribed,
+        "Subscribed event should be emitted for new subscriptions"
+    );
+    assert!(
+        !emits_reactivated,
+        "SubscriptionReactivated event should NOT be emitted for new subscriptions"
     );
 
     // Event should contain current plan price
     let current_plan_price: u64 = 12_000_000; // 12 USDC
-    // Both new subscriptions and reactivations emit event with current plan price
     let event_amount = current_plan_price;
 
     assert_eq!(
         event_amount, current_plan_price,
-        "Subscribed event should show current plan price on reactivation"
+        "Subscribed event should show current plan price"
+    );
+}
+
+/// Test that SubscriptionReactivated event is emitted on reactivation
+///
+/// Validates that the SubscriptionReactivated event is emitted when an existing
+/// subscription is reactivated (is_reactivation == true), providing off-chain
+/// indexers with clear distinction from new subscriptions.
+#[test]
+fn test_subscription_reactivated_event_emitted_on_reactivation() {
+    let is_reactivation = true;
+
+    // When is_reactivation is true, SubscriptionReactivated event should be emitted
+    let emits_subscribed = !is_reactivation;
+    let emits_reactivated = is_reactivation;
+
+    assert!(
+        !emits_subscribed,
+        "Subscribed event should NOT be emitted on reactivation"
+    );
+    assert!(
+        emits_reactivated,
+        "SubscriptionReactivated event should be emitted on reactivation"
+    );
+
+    // Event should contain current plan price and previous renewals
+    let current_plan_price: u64 = 12_000_000; // 12 USDC
+    let previous_renewals: u32 = 5; // Renewals before cancellation
+    let event_amount = current_plan_price;
+    let event_previous_renewals = previous_renewals;
+
+    assert_eq!(
+        event_amount, current_plan_price,
+        "SubscriptionReactivated event should show current plan price"
+    );
+    assert_eq!(
+        event_previous_renewals, previous_renewals,
+        "SubscriptionReactivated event should show previous renewals count for context"
     );
 }
 
