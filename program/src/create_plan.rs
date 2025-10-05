@@ -3,6 +3,48 @@ use crate::errors::SubscriptionError;
 use crate::state::{Merchant, Plan};
 use anchor_lang::prelude::*;
 
+/// Arguments for creating a subscription plan.
+///
+/// # Rate Limiting Considerations
+///
+/// This instruction has **no on-chain rate limiting** by design. Spam prevention is handled
+/// through economic incentives and off-chain monitoring:
+///
+/// ## Economic Deterrence
+/// - **Transaction Fee**: 0.000005 SOL (~$0.0007) per plan creation
+/// - **Rent Deposit**: 0.00089 SOL (~$0.12) per plan (129 bytes account size)
+/// - **Total Cost**: ~$0.12 per plan, making mass spam attacks expensive
+///
+/// Example: Creating 10,000 fake plans costs ~$1,253 (rent + fees), which provides
+/// natural spam deterrence without requiring on-chain rate limiting logic.
+///
+/// ## Off-Chain Monitoring
+///
+/// Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):
+/// - **Critical Alert**: >100 plans created per merchant per hour
+/// - **Warning Alert**: >10 plans created per merchant per hour
+/// - **RPC Rate Limit**: Throttle to 10 plan creations per merchant per hour
+///
+/// ## Why No On-Chain Rate Limiting?
+///
+/// On-chain rate limiting was deliberately not implemented because:
+/// 1. **Account Migration Complexity**: Adding rate limit fields (timestamps, counters) to
+///    `Merchant` accounts requires migrating all existing accounts, risking data loss.
+/// 2. **Storage Costs**: Rate limit state increases account size and rent costs for all merchants.
+/// 3. **Solana Best Practices**: Rate limiting is more effectively handled at the RPC and
+///    indexer layers where it's flexible, configurable, and doesn't bloat on-chain state.
+/// 4. **Economic Model**: Transaction fees + rent deposits already provide spam deterrence.
+///
+/// For comprehensive rate limiting strategy, see `/docs/RATE_LIMITING_STRATEGY.md`.
+///
+/// ## Mitigation Recommendations
+///
+/// 1. **RPC Layer**: Configure rate limits (e.g., Nginx, `HAProxy`, or RPC provider limits)
+/// 2. **Indexer**: Deploy spam detection indexer to monitor merchant activity patterns
+/// 3. **Dashboard**: Real-time alerting for anomalous plan creation rates
+/// 4. **Auto-Throttle**: Implement automatic account throttling for detected spam patterns
+///
+/// See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CreatePlanArgs {
     pub plan_id: String,         // Original string plan ID

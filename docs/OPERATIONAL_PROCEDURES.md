@@ -1,477 +1,933 @@
-# Operational Procedures - Tally Protocol
+# Operational Procedures for Spam Prevention and Incident Response
 
-## Platform Treasury ATA Management
+## Overview
 
-### Critical Requirement: Treasury ATA Permanence
-
-**CRITICAL:** The platform treasury Associated Token Account (ATA) MUST NEVER be closed or modified after initialization. Failure to maintain this account will cause a complete denial-of-service (DOS) for ALL subscription operations across the entire protocol.
-
-**Severity:** CRITICAL - Complete Protocol Failure
-**Impact:** All subscription starts, renewals, and fee distributions will fail
-**Recovery Time:** Minutes to hours depending on operational readiness
-**Affected Operations:** `start_subscription`, `renew_subscription`, any operation transferring platform fees
+This document provides operational procedures, RPC configuration, monitoring setup, and incident response workflows for managing spam attacks on Tally Protocol. It complements the strategic guidance in [RATE_LIMITING_STRATEGY.md](./RATE_LIMITING_STRATEGY.md) and implementation details in [SPAM_DETECTION.md](./SPAM_DETECTION.md).
 
 ---
 
-## Understanding the Treasury ATA Dependency
+## Table of Contents
 
-### Initialization Validation (One-Time Check)
-
-During protocol initialization via `init_config`, the platform treasury ATA is validated to ensure:
-- It exists as a valid SPL token account
-- It is the canonical ATA for the platform authority + USDC mint
-- It is owned by the platform authority
-- It is configured for the correct USDC mint
-
-This validation occurs ONCE during initialization and establishes the permanent treasury ATA address.
-
-### Runtime Validation (Every Subscription Operation)
-
-Every subscription operation (`start_subscription`, `renew_subscription`) performs runtime validation of the platform treasury ATA to ensure it remains valid. However, if the ATA has been closed, these validations will fail, causing:
-
-**Immediate Impact:**
-- All new subscription starts fail with `InvalidPlatformTreasuryAccount`
-- All subscription renewals fail with `InvalidPlatformTreasuryAccount`
-- Platform fee collection completely halted
-- Merchant operations blocked (fees cannot be split)
-- Complete protocol DOS until recovery
-
-**User Experience:**
-- Subscribers cannot start new subscriptions
-- Existing subscriptions cannot renew automatically
-- Error messages indicating treasury account issues
-- Loss of trust and potential subscriber churn
+1. [RPC Configuration](#rpc-configuration)
+2. [Monitoring Dashboard Setup](#monitoring-dashboard-setup)
+3. [Incident Response Procedures](#incident-response-procedures)
+4. [Escalation Paths](#escalation-paths)
+5. [Post-Incident Review](#post-incident-review)
 
 ---
 
-## Prevention Measures
+## RPC Configuration
 
-### Pre-Deployment Checklist
+### Nginx Rate Limiting Configuration
 
-**Before deploying the Tally Protocol:**
+**Production-Ready Nginx Configuration for Solana RPC:**
 
-1. **Create Platform Treasury ATA**
-   ```bash
-   # Using SPL Token CLI
-   spl-token create-account <USDC_MINT_ADDRESS> --owner <PLATFORM_AUTHORITY>
+```nginx
+# /etc/nginx/nginx.conf
 
-   # Verify ATA creation
-   spl-token account-info <PLATFORM_TREASURY_ATA>
-   ```
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
 
-2. **Verify ATA Derivation**
-   ```bash
-   # Ensure the ATA address matches canonical derivation
-   spl-token gc --owner <PLATFORM_AUTHORITY> | grep <USDC_MINT_ADDRESS>
-   ```
-
-3. **Document ATA Address**
-   - Record the platform treasury ATA address
-   - Store in secure configuration management
-   - Include in runbook and operational documentation
-
-4. **Set Account Permissions**
-   - Ensure platform authority keypair is secured (cold storage/multisig)
-   - Implement strict access controls on platform authority
-   - Never delegate close authority to automated systems
-
-### Post-Deployment Safeguards
-
-**Operational Controls:**
-
-1. **Monitoring and Alerting**
-   - Monitor platform treasury ATA balance and status every 5 minutes
-   - Alert immediately if ATA shows any unexpected changes
-   - Track all transactions involving the treasury ATA
-   - Set up dead man's switch alerts if monitoring fails
-
-2. **Access Control Policies**
-   - Platform authority keypair must be multisig (e.g., Squads Protocol)
-   - Require 3-of-5 approval for ANY operation using platform authority
-   - Maintain separation of duties between key holders
-   - Regular key holder audits and attestations
-
-3. **Change Management**
-   - NO automated processes should have platform authority access
-   - Document and review all planned operations involving platform authority
-   - Implement mandatory peer review for platform authority operations
-   - Maintain detailed audit logs of all platform authority usage
-
-4. **Regular Verification**
-   - Daily verification that treasury ATA exists and is valid
-   - Weekly manual inspection of treasury ATA configuration
-   - Monthly comprehensive security review of treasury operations
-   - Quarterly disaster recovery drills
-
----
-
-## Monitoring and Alerting
-
-### Critical Metrics
-
-**Real-Time Monitoring (check every 5 minutes):**
-
-```bash
-# Check if treasury ATA exists and is valid
-spl-token account-info <PLATFORM_TREASURY_ATA> || alert "CRITICAL: Platform treasury ATA not found"
-
-# Verify account owner and mint
-# Expected: owner = <PLATFORM_AUTHORITY>, mint = <USDC_MINT>
-spl-token account-info <PLATFORM_TREASURY_ATA> --output json | jq '.owner, .mint'
-```
-
-**Alert Thresholds:**
-
-| Metric | Threshold | Severity | Response Time |
-|--------|-----------|----------|---------------|
-| ATA Not Found | Immediate | CRITICAL | < 5 minutes |
-| Unexpected Owner Change | Immediate | CRITICAL | < 5 minutes |
-| Unexpected Mint Change | Immediate | CRITICAL | < 5 minutes |
-| Close Authority Set | Immediate | CRITICAL | < 15 minutes |
-| Monitoring Failure | > 10 minutes | HIGH | < 15 minutes |
-
-### Monitoring Script Example
-
-```bash
-#!/bin/bash
-# platform_treasury_monitor.sh
-# Run this script every 5 minutes via cron
-
-PLATFORM_TREASURY_ATA="<YOUR_PLATFORM_TREASURY_ATA>"
-EXPECTED_OWNER="<PLATFORM_AUTHORITY>"
-EXPECTED_MINT="<USDC_MINT>"
-ALERT_WEBHOOK="<YOUR_ALERTING_WEBHOOK>"
-
-# Check if ATA exists
-if ! spl-token account-info "$PLATFORM_TREASURY_ATA" &>/dev/null; then
-    curl -X POST "$ALERT_WEBHOOK" \
-         -H 'Content-Type: application/json' \
-         -d "{\"severity\":\"CRITICAL\",\"message\":\"Platform treasury ATA does not exist: $PLATFORM_TREASURY_ATA\"}"
-    exit 1
-fi
-
-# Verify owner and mint
-ACCOUNT_INFO=$(spl-token account-info "$PLATFORM_TREASURY_ATA" --output json)
-CURRENT_OWNER=$(echo "$ACCOUNT_INFO" | jq -r '.owner')
-CURRENT_MINT=$(echo "$ACCOUNT_INFO" | jq -r '.mint')
-
-if [ "$CURRENT_OWNER" != "$EXPECTED_OWNER" ]; then
-    curl -X POST "$ALERT_WEBHOOK" \
-         -H 'Content-Type: application/json' \
-         -d "{\"severity\":\"CRITICAL\",\"message\":\"Platform treasury ATA owner mismatch. Expected: $EXPECTED_OWNER, Got: $CURRENT_OWNER\"}"
-    exit 1
-fi
-
-if [ "$CURRENT_MINT" != "$EXPECTED_MINT" ]; then
-    curl -X POST "$ALERT_WEBHOOK" \
-         -H 'Content-Type: application/json' \
-         -d "{\"severity\":\"CRITICAL\",\"message\":\"Platform treasury ATA mint mismatch. Expected: $EXPECTED_MINT, Got: $CURRENT_MINT\"}"
-    exit 1
-fi
-
-# Success - log status
-echo "$(date): Platform treasury ATA validation passed"
-```
-
-**Cron Configuration:**
-```cron
-# Monitor platform treasury ATA every 5 minutes
-*/5 * * * * /opt/tally-protocol/platform_treasury_monitor.sh >> /var/log/tally/treasury-monitor.log 2>&1
-```
-
----
-
-## Recovery Procedures
-
-### Scenario: Platform Treasury ATA Closed or Invalid
-
-**Detection:**
-- Monitoring alerts indicate ATA not found or invalid
-- Subscription operations failing with `InvalidPlatformTreasuryAccount`
-- User reports of failed subscription starts/renewals
-
-**Immediate Response (< 5 minutes):**
-
-1. **Acknowledge Incident**
-   - Acknowledge monitoring alerts
-   - Notify incident response team
-   - Start incident timeline documentation
-
-2. **Verify Problem Scope**
-   ```bash
-   # Confirm ATA status
-   spl-token account-info <PLATFORM_TREASURY_ATA>
-
-   # Check recent transactions for close operation
-   solana transaction-history <PLATFORM_AUTHORITY> | grep -i "close"
-   ```
-
-3. **Activate Emergency Procedures**
-   - Pause non-critical operations if possible
-   - Notify stakeholders of incident
-   - Prepare for ATA recreation
-
-**Recovery Steps (< 30 minutes):**
-
-1. **Recreate Platform Treasury ATA**
-   ```bash
-   # Recreate the ATA using platform authority
-   spl-token create-account <USDC_MINT> --owner <PLATFORM_AUTHORITY>
-
-   # Verify new ATA matches expected address
-   # NOTE: ATA derivation is deterministic - address should be identical
-   spl-token accounts <PLATFORM_AUTHORITY> | grep <USDC_MINT>
-   ```
-
-2. **Verify ATA Configuration**
-   ```bash
-   # Confirm all properties match requirements
-   spl-token account-info <PLATFORM_TREASURY_ATA> --output json | jq '{owner, mint, amount}'
-   ```
-
-3. **Test Recovery**
-   ```bash
-   # Attempt a test subscription operation
-   # Use testnet or small mainnet transaction if possible
-   # Verify platform fee transfer succeeds
-   ```
-
-4. **Resume Operations**
-   - Verify monitoring shows healthy status
-   - Confirm subscription operations working
-   - Notify stakeholders of recovery completion
-
-**Post-Incident Actions (< 24 hours):**
-
-1. **Root Cause Analysis**
-   - Determine how ATA was closed
-   - Identify gaps in access controls
-   - Review transaction history for unauthorized access
-   - Check for compromised keys or processes
-
-2. **Implement Preventive Measures**
-   - Strengthen access controls based on findings
-   - Update monitoring to detect similar issues faster
-   - Improve change management processes
-   - Conduct security review of platform authority usage
-
-3. **Documentation and Communication**
-   - Document incident timeline and resolution
-   - Share lessons learned with team
-   - Update runbooks and procedures
-   - Conduct post-mortem meeting
-
----
-
-## Automated Recovery Script
-
-**WARNING:** Only use automated recovery in pre-approved scenarios. Manual verification is recommended.
-
-```bash
-#!/bin/bash
-# platform_treasury_recovery.sh
-# Emergency recovery script for platform treasury ATA
-
-PLATFORM_AUTHORITY_KEYPAIR="/secure/path/to/platform_authority.json"
-USDC_MINT="<USDC_MINT_ADDRESS>"
-EXPECTED_ATA="<EXPECTED_PLATFORM_TREASURY_ATA>"
-ALERT_WEBHOOK="<YOUR_ALERTING_WEBHOOK>"
-
-# Function to send alerts
-send_alert() {
-    local severity=$1
-    local message=$2
-    curl -X POST "$ALERT_WEBHOOK" \
-         -H 'Content-Type: application/json' \
-         -d "{\"severity\":\"$severity\",\"message\":\"$message\"}"
+events {
+    worker_connections 4096;
 }
 
-# Check if ATA exists
-if spl-token account-info "$EXPECTED_ATA" &>/dev/null; then
-    echo "Platform treasury ATA exists. No recovery needed."
-    exit 0
-fi
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
 
-# ATA does not exist - begin recovery
-send_alert "CRITICAL" "Platform treasury ATA missing. Starting automated recovery."
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    'account=$http_x_account_pubkey';
 
-# Recreate ATA
-echo "Recreating platform treasury ATA..."
-RECREATE_OUTPUT=$(spl-token create-account "$USDC_MINT" \
-                  --owner "$PLATFORM_AUTHORITY_KEYPAIR" \
-                  --fee-payer "$PLATFORM_AUTHORITY_KEYPAIR" 2>&1)
+    access_log /var/log/nginx/access.log main;
 
-if [ $? -ne 0 ]; then
-    send_alert "CRITICAL" "Failed to recreate platform treasury ATA: $RECREATE_OUTPUT"
-    exit 1
-fi
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    gzip on;
 
-# Verify ATA address matches expected
-ACTUAL_ATA=$(spl-token accounts "$PLATFORM_AUTHORITY_KEYPAIR" --output json | \
-             jq -r ".accounts[] | select(.mint==\"$USDC_MINT\") | .address")
+    # Rate limit zones
+    limit_req_zone $binary_remote_addr zone=rpc_ip:10m rate=100r/m;
+    limit_req_zone $http_x_account_pubkey zone=rpc_account:10m rate=50r/m;
+    limit_req_zone $binary_remote_addr zone=plan_creation:10m rate=10r/h;
+    limit_req_zone $binary_remote_addr zone=subscription_ops:10m rate=20r/h;
 
-if [ "$ACTUAL_ATA" != "$EXPECTED_ATA" ]; then
-    send_alert "CRITICAL" "Recreated ATA address mismatch. Expected: $EXPECTED_ATA, Got: $ACTUAL_ATA"
-    exit 1
-fi
+    # Connection limits
+    limit_conn_zone $binary_remote_addr zone=addr:10m;
 
-# Verify ATA configuration
-ACCOUNT_INFO=$(spl-token account-info "$EXPECTED_ATA" --output json)
-OWNER=$(echo "$ACCOUNT_INFO" | jq -r '.owner')
-MINT=$(echo "$ACCOUNT_INFO" | jq -r '.mint')
+    upstream solana_rpc {
+        server 127.0.0.1:8899 max_fails=3 fail_timeout=30s;
+        # Add more backend servers for load balancing
+        # server 127.0.0.1:8900 backup;
+        keepalive 32;
+    }
 
-if [ "$MINT" != "$USDC_MINT" ]; then
-    send_alert "CRITICAL" "Recreated ATA has wrong mint. Expected: $USDC_MINT, Got: $MINT"
-    exit 1
-fi
+    server {
+        listen 80;
+        server_name rpc.tallypay.click;
 
-# Success
-send_alert "WARNING" "Platform treasury ATA successfully recreated. Manual verification recommended."
-echo "Recovery completed successfully. ATA address: $EXPECTED_ATA"
-exit 0
+        # Redirect to HTTPS
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name rpc.tallypay.click;
+
+        ssl_certificate /etc/letsencrypt/live/rpc.tallypay.click/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/rpc.tallypay.click/privkey.pem;
+
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers HIGH:!aNULL:!MD5;
+        ssl_prefer_server_ciphers on;
+
+        # Connection limits
+        limit_conn addr 10;
+
+        # Global rate limiting
+        limit_req zone=rpc_ip burst=20 nodelay;
+        limit_req zone=rpc_account burst=10 nodelay;
+
+        location / {
+            # Extract account from request body for rate limiting
+            # This requires custom Lua script or request parsing
+
+            proxy_pass http://solana_rpc;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Timeouts
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+
+            # Buffering
+            proxy_buffering off;
+        }
+
+        # Stricter limits for plan creation (parse method from JSON-RPC)
+        location ~ /create_plan {
+            limit_req zone=plan_creation burst=2 nodelay;
+            proxy_pass http://solana_rpc;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        # Stricter limits for subscription operations
+        location ~ /(start_subscription|cancel_subscription) {
+            limit_req zone=subscription_ops burst=5 nodelay;
+            proxy_pass http://solana_rpc;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}
+```
+
+**Key Configuration Elements:**
+
+1. **IP-Based Rate Limiting**: 100 requests/minute per IP
+2. **Account-Based Limiting**: 50 transactions/minute per account (requires custom header)
+3. **Operation-Specific Limits**: 10 plan creations/hour, 20 subscription ops/hour
+4. **Connection Limits**: Max 10 concurrent connections per IP
+5. **SSL/TLS**: HTTPS with modern cipher suites
+
+**Deployment Steps:**
+
+```bash
+# 1. Install Nginx
+sudo apt update
+sudo apt install nginx
+
+# 2. Copy configuration
+sudo cp nginx.conf /etc/nginx/nginx.conf
+
+# 3. Test configuration
+sudo nginx -t
+
+# 4. Reload Nginx
+sudo systemctl reload nginx
+
+# 5. Monitor logs
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+```
+
+### HAProxy Rate Limiting Configuration
+
+**Alternative: HAProxy for Advanced Load Balancing:**
+
+```haproxy
+# /etc/haproxy/haproxy.cfg
+
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    maxconn 4096
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode http
+    option httplog
+    option dontlognull
+    timeout connect 5000ms
+    timeout client 60000ms
+    timeout server 60000ms
+
+frontend rpc_frontend
+    bind *:443 ssl crt /etc/ssl/certs/tallypay.pem
+    mode http
+
+    # Rate limiting using stick tables
+    stick-table type ip size 100k expire 1m store http_req_rate(1m)
+    acl too_many_requests sc_http_req_rate(0) gt 100
+    http-request track-sc0 src
+    http-request deny if too_many_requests
+
+    # Route to backend
+    default_backend solana_rpc_backend
+
+backend solana_rpc_backend
+    mode http
+    balance roundrobin
+    option httpchk GET /health
+    server rpc1 127.0.0.1:8899 check
+    server rpc2 127.0.0.1:8900 check backup
+```
+
+### Cloudflare Configuration
+
+**For DDoS Protection and Rate Limiting:**
+
+1. **Enable Cloudflare Proxy** for `rpc.tallypay.click`
+2. **Configure Rate Limiting Rules**:
+
+```yaml
+# Cloudflare Dashboard -> Security -> WAF -> Rate Limiting Rules
+
+Rule 1: General RPC Rate Limit
+  - Match: All requests to rpc.tallypay.click
+  - Threshold: 100 requests per minute per IP
+  - Action: Block for 60 seconds
+
+Rule 2: High-Value Operations
+  - Match: Requests containing "create_plan" or "start_subscription"
+  - Threshold: 10 requests per hour per IP
+  - Action: Challenge (CAPTCHA) then block if exceeded
+
+Rule 3: Known Attackers
+  - Match: IP addresses in "Spam IPs" list
+  - Action: Block indefinitely
+```
+
+3. **Enable Bot Fight Mode** (Business plan)
+4. **Configure Firewall Rules** for geo-blocking if needed
+
+---
+
+## Monitoring Dashboard Setup
+
+### Grafana Dashboard Deployment
+
+**Docker Compose Setup:**
+
+```yaml
+# docker-compose.monitoring.yml
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tally-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tally-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: tally-alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+```
+
+**Prometheus Configuration (prometheus.yml):**
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'tally-protocol'
+    environment: 'production'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - 'alerts.yml'
+
+scrape_configs:
+  - job_name: 'tally-indexer'
+    static_configs:
+      - targets: ['indexer:9090']
+
+  - job_name: 'tally-rpc'
+    static_configs:
+      - targets: ['rpc-node:9091']
+
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+```
+
+**Alert Rules (alerts.yml):**
+
+```yaml
+groups:
+  - name: spam_detection
+    interval: 30s
+    rules:
+      - alert: HighPlanCreationRate
+        expr: rate(tally_plans_created_total[1h]) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High plan creation rate detected"
+          description: "Merchant {{ $labels.merchant }} created {{ $value }} plans in the last hour"
+
+      - alert: SubscriptionChurnSpike
+        expr: (tally_subscriptions_canceled_total / tally_subscriptions_started_total) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High subscription churn rate"
+          description: "Churn rate is {{ $value | humanizePercentage }}"
+
+      - alert: CancellationSpam
+        expr: rate(tally_cancellations_total{account=~".*"}[1h]) > 10
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Cancellation spam detected"
+          description: "Account {{ $labels.account }} canceled {{ $value }} subscriptions in 1h"
+```
+
+**Alertmanager Configuration (alertmanager.yml):**
+
+```yaml
+global:
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - match:
+        severity: critical
+      receiver: 'pagerduty'
+      continue: true
+    - match:
+        severity: warning
+      receiver: 'slack'
+    - match:
+        severity: info
+      receiver: 'email'
+
+receivers:
+  - name: 'default'
+    slack_configs:
+      - channel: '#tally-alerts'
+        title: 'Tally Protocol Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'pagerduty'
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+        description: '{{ .CommonAnnotations.summary }}'
+
+  - name: 'slack'
+    slack_configs:
+      - channel: '#tally-warnings'
+        title: 'Tally Protocol Warning'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'email'
+    email_configs:
+      - to: 'ops@tallypay.click'
+        from: 'alerts@tallypay.click'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'alerts@tallypay.click'
+        auth_password: 'YOUR_EMAIL_PASSWORD'
+        headers:
+          Subject: 'Tally Protocol Info Alert'
+```
+
+**Grafana Dashboard JSON:**
+
+Save as `grafana/dashboards/spam-detection.json`:
+
+```json
+{
+  "dashboard": {
+    "title": "Tally Protocol - Spam Detection",
+    "uid": "tally-spam",
+    "version": 1,
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Plans Created (1h rate)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(tally_plans_created_total[1h])",
+            "legendFormat": "Plans/hour"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [10], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "type": "query"
+            }
+          ],
+          "name": "High Plan Creation Rate"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Subscription Churn Rate",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "tally_subscriptions_canceled_total / tally_subscriptions_started_total",
+            "legendFormat": "Churn Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.5, "color": "yellow"},
+                {"value": 0.8, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Top Merchants by Activity",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "topk(10, sum by (merchant) (rate(tally_operations_total[1h])))",
+            "format": "table"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "System-Wide Operation Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(tally_operations_total[5m])) by (operation_type)",
+            "legendFormat": "{{ operation_type }}"
+          }
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "time": {"from": "now-6h", "to": "now"}
+  }
+}
+```
+
+**Deployment:**
+
+```bash
+# 1. Create directory structure
+mkdir -p grafana/{provisioning,dashboards}
+mkdir -p prometheus
+
+# 2. Copy configuration files
+# (Copy prometheus.yml, alerts.yml, alertmanager.yml to respective dirs)
+
+# 3. Start monitoring stack
+docker-compose -f docker-compose.monitoring.yml up -d
+
+# 4. Access Grafana
+open http://localhost:3000
+# Username: admin
+# Password: ${GRAFANA_PASSWORD}
+
+# 5. Import dashboard
+# Navigate to Dashboards -> Import -> Upload JSON
 ```
 
 ---
 
-## Testing and Validation
+## Incident Response Procedures
 
-### Pre-Deployment Testing
+### Incident Classification
 
-**Test Checklist:**
+**Severity Levels:**
 
-1. **ATA Creation Verification**
-   - [ ] Create platform treasury ATA on devnet/testnet
-   - [ ] Verify ATA address matches expected derivation
-   - [ ] Confirm ATA owner and mint are correct
-   - [ ] Document ATA address in configuration
+| Level | Description | Response Time | Examples |
+|-------|-------------|---------------|----------|
+| **P0 - Critical** | System-wide impact, service degradation | Immediate (<5 min) | DDoS attack, >1000 spam operations/min |
+| **P1 - High** | Significant spam, multiple merchants affected | <30 minutes | Coordinated Sybil attack, >100 plans/h |
+| **P2 - Medium** | Single merchant spam, contained impact | <2 hours | Single merchant creating excessive plans |
+| **P3 - Low** | Nuisance spam, minimal impact | <24 hours | Cancellation spam from single user |
 
-2. **Initialization Testing**
-   - [ ] Run `init_config` with valid platform treasury ATA
-   - [ ] Verify initialization succeeds and validates ATA
-   - [ ] Confirm audit logs show correct ATA address
-   - [ ] Test initialization fails with invalid ATA
+### Response Workflows
 
-3. **Subscription Operation Testing**
-   - [ ] Create test subscription with valid treasury ATA
-   - [ ] Verify platform fees transfer to treasury ATA
-   - [ ] Confirm renewal operations succeed
-   - [ ] Test operations fail when ATA is invalid
+#### P0 - Critical Incident Response
 
-4. **Monitoring Testing**
-   - [ ] Deploy monitoring script and verify alerts work
-   - [ ] Test alert triggers for missing ATA
-   - [ ] Verify alert triggers for invalid configuration
-   - [ ] Confirm monitoring recovery procedures
+**Trigger Conditions:**
+- System-wide operation rate >1000/minute
+- Multiple merchants flagged simultaneously
+- RPC node resource exhaustion (CPU >90%, memory >85%)
 
-### Disaster Recovery Testing
+**Response Procedure:**
 
-**Quarterly DR Drill:**
+```
+1. ALERT RECEIVED (0-2 minutes)
+   - PagerDuty notification sent to on-call engineer
+   - Incident channel created in Slack (#incident-YYYYMMDD-NNN)
+   - Incident commander assigned
 
-1. **Simulated ATA Closure** (Testnet Only)
-   - Close platform treasury ATA in testnet environment
-   - Verify monitoring detects closure immediately
-   - Confirm alerts fire correctly
-   - Execute recovery procedures
-   - Measure time to recovery
+2. INITIAL ASSESSMENT (2-5 minutes)
+   - Review Grafana dashboard for attack patterns
+   - Check Prometheus alerts for severity and scope
+   - Identify attack vector (plan spam, subscription churn, etc.)
+   - Determine affected accounts (merchants, subscribers, IPs)
 
-2. **Recovery Verification**
-   - Recreate ATA following recovery procedures
-   - Verify ATA address matches expected
-   - Test subscription operations post-recovery
-   - Document lessons learned and timing
+3. IMMEDIATE MITIGATION (5-10 minutes)
+   Action: Enable aggressive rate limiting
+   Command:
+     # Update Nginx rate limits (reduce thresholds by 90%)
+     sudo vim /etc/nginx/nginx.conf
+     # Change: rate=100r/m -> rate=10r/m
+     sudo nginx -s reload
 
-3. **Process Improvement**
-   - Review recovery time against SLA targets
-   - Identify bottlenecks in recovery process
-   - Update procedures based on findings
-   - Train additional team members on recovery
+   Action: Block attacking IPs
+   Command:
+     # Add IPs to Cloudflare block list
+     curl -X POST "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/firewall/access_rules/rules" \
+       -H "Authorization: Bearer ${CF_API_TOKEN}" \
+       -d '{"mode":"block","configuration":{"target":"ip","value":"ATTACKER_IP"}}'
+
+   Action: Throttle specific accounts
+   Query:
+     -- Get top 10 spamming accounts
+     SELECT account, COUNT(*) as operations
+     FROM indexed_operations
+     WHERE timestamp > NOW() - INTERVAL '10 minutes'
+     GROUP BY account
+     ORDER BY operations DESC
+     LIMIT 10;
+
+   Command:
+     # Add accounts to throttle list via admin API
+     curl -X POST http://admin-api/throttle \
+       -d '{"account":"SPAM_ACCOUNT","duration_hours":24}'
+
+4. INVESTIGATION (10-30 minutes)
+   - Analyze attack pattern (coordinated? Sybil? single attacker?)
+   - Review transaction signatures and funding sources
+   - Document attack timeline and evidence
+   - Estimate financial cost to attacker
+
+5. RECOVERY (30-60 minutes)
+   - Monitor operation rates for stabilization
+   - Gradually relax rate limits if attack subsides
+   - Verify legitimate users are not blocked
+   - Update firewall rules and throttle lists
+
+6. COMMUNICATION (Throughout)
+   - Update incident channel every 15 minutes
+   - Notify stakeholders of impact and ETA
+   - Post-mortem scheduled within 24 hours
+```
+
+**Escalation Criteria:**
+- Attack continues >30 minutes despite mitigation
+- RPC node becomes unresponsive
+- Legitimate users significantly impacted (>10 complaints)
+- Financial loss exceeds $1,000 (rent deposits from spam accounts)
+
+#### P1 - High Severity Response
+
+**Trigger Conditions:**
+- Single merchant creating >100 plans/hour
+- Coordinated Sybil attack detected (>10 accounts, shared funding)
+- Subscription churn rate >80% across >50 subscriptions
+
+**Response Procedure:**
+
+```
+1. ALERT (0-5 minutes)
+   - Slack notification to #tally-alerts channel
+   - On-call engineer acknowledges
+
+2. ASSESSMENT (5-15 minutes)
+   - Review Grafana dashboard for affected accounts
+   - Query indexer for operation details
+   - Identify attack pattern and scope
+
+3. MITIGATION (15-30 minutes)
+   - Apply targeted rate limits for affected accounts
+   - Block attacking IPs if identified
+   - Alert merchant if plan spam detected
+
+4. DOCUMENTATION (30+ minutes)
+   - Log incident details in incident tracker
+   - Update runbooks if new attack pattern discovered
+```
+
+#### P2 - Medium Severity Response
+
+**Trigger Conditions:**
+- Single merchant spam (10-100 plans/hour)
+- Moderate subscription churn (50-80% over 10+ subscriptions)
+
+**Response Procedure:**
+
+```
+1. REVIEW (0-30 minutes)
+   - Investigate alert details
+   - Confirm spam pattern vs. legitimate usage
+
+2. THROTTLE (30-60 minutes)
+   - Apply soft rate limits (reduce by 50%)
+   - Contact merchant/subscriber if pattern unclear
+
+3. MONITOR (1-2 hours)
+   - Track if behavior continues
+   - Escalate to P1 if pattern persists or worsens
+```
+
+#### P3 - Low Severity Response
+
+**Trigger Conditions:**
+- Cancellation spam (>10 cancellations/hour from single user)
+- Minor anomalies flagged by automated systems
+
+**Response Procedure:**
+
+```
+1. LOG (0-24 hours)
+   - Document in monitoring logs
+   - Review during next operational review
+
+2. PASSIVE MONITORING
+   - Track for pattern escalation
+   - No immediate action required
+```
+
+### Incident Response Checklist
+
+**Before Incident:**
+- [ ] On-call rotation schedule published
+- [ ] PagerDuty integration configured
+- [ ] Slack incident channels template ready
+- [ ] Admin API access credentials secured
+- [ ] Cloudflare API tokens documented
+- [ ] RPC node access (SSH, admin console)
+- [ ] Indexer database credentials available
+- [ ] Runbooks reviewed and updated
+
+**During Incident:**
+- [ ] Incident commander assigned
+- [ ] Incident channel created and stakeholders invited
+- [ ] Initial assessment completed (attack vector, scope)
+- [ ] Immediate mitigation actions executed
+- [ ] Status updates posted every 15 minutes (P0) or 30 minutes (P1)
+- [ ] Evidence collected (logs, screenshots, metrics)
+- [ ] Escalation decision made if applicable
+- [ ] Recovery actions executed
+- [ ] Service stability confirmed
+
+**After Incident:**
+- [ ] Post-mortem scheduled (within 24h for P0/P1)
+- [ ] Incident timeline documented
+- [ ] Root cause identified
+- [ ] Action items created with owners
+- [ ] Runbooks updated with lessons learned
+- [ ] Monitoring thresholds adjusted if needed
+- [ ] Stakeholders notified of resolution
 
 ---
 
-## Security Considerations
+## Escalation Paths
 
-### Access Control Best Practices
+### On-Call Rotation
 
-**Platform Authority Management:**
+**Roles:**
 
-1. **Multisig Requirements**
-   - Use Squads Protocol or similar multisig solution
-   - Minimum 3-of-5 signature threshold
-   - Geographically distributed key holders
-   - Regular key holder rotation and audits
+1. **L1 - Operations Engineer** (First Responder)
+   - Monitors alerts and responds to P2-P3 incidents
+   - Executes standard mitigation procedures
+   - Escalates to L2 if unable to resolve within SLA
 
-2. **Key Storage**
-   - Platform authority keys in cold storage (hardware wallets)
-   - No platform authority keys on internet-connected systems
-   - Encrypted backups in multiple secure locations
-   - Regular backup verification and testing
+2. **L2 - Senior Engineer** (Incident Commander)
+   - Responds to P0-P1 incidents
+   - Coordinates cross-functional response
+   - Makes escalation decisions
+   - Leads post-mortem reviews
 
-3. **Operational Security**
-   - All platform authority operations require dual authorization
-   - Mandatory waiting periods for high-risk operations
-   - Comprehensive audit logging of all key usage
-   - Regular security training for key holders
+3. **L3 - Engineering Lead / CTO**
+   - Escalation point for prolonged P0 incidents
+   - Approves emergency procedure deviations
+   - External communication for major incidents
 
-### Attack Vectors and Mitigations
+**Escalation Decision Matrix:**
 
-**Potential Attack Vectors:**
-
-1. **Malicious ATA Closure**
-   - **Threat:** Attacker gains platform authority access and closes ATA
-   - **Mitigation:** Multisig requirements, cold storage, monitoring
-   - **Detection:** Real-time monitoring alerts on ATA changes
-   - **Response:** Immediate key rotation, ATA recreation, incident response
-
-2. **Social Engineering**
-   - **Threat:** Attacker tricks key holder into authorizing ATA closure
-   - **Threat:** Security awareness training, mandatory peer review
-   - **Detection:** Anomaly detection in authorization patterns
-   - **Response:** Incident investigation, additional training, process improvements
-
-3. **Compromised Infrastructure**
-   - **Threat:** Attacker compromises monitoring or operational systems
-   - **Mitigation:** Defense in depth, network segmentation, regular audits
-   - **Detection:** SIEM alerts, infrastructure monitoring, regular penetration testing
-   - **Response:** Isolate compromised systems, forensic analysis, remediation
-
----
-
-## Appendix
-
-### Glossary
-
-**ATA (Associated Token Account):** Deterministic token account address derived from owner and mint
-**Platform Authority:** Primary administrative keypair controlling protocol configuration
-**Platform Treasury:** Token account receiving platform fees from subscriptions
-**DOS (Denial of Service):** Attack or failure causing service unavailability
-**SPL Token:** Solana Program Library token standard
-
-### Related Documentation
-
-- [Solana SPL Token Documentation](https://spl.solana.com/token)
-- [Associated Token Account Program](https://spl.solana.com/associated-token-account)
-- [Squads Protocol Multisig](https://squads.so/)
-- [Security Audit Report](../SECURITY_AUDIT_REPORT.md)
+| Condition | Action | Time Limit |
+|-----------|--------|------------|
+| P3 incident, standard mitigation fails | Escalate to L2 | 24 hours |
+| P2 incident, standard mitigation fails | Escalate to L2 | 2 hours |
+| P1 incident, standard mitigation fails | Escalate to L2 | 30 minutes |
+| P0 incident (automatic) | Alert L2 immediately | Immediate |
+| P0 incident unresolved after mitigation | Escalate to L3 | 1 hour |
+| Any incident causing service outage | Escalate to L3 | Immediate |
 
 ### Contact Information
 
-**Emergency Contacts:**
+**Template for ops team:**
 
-| Role | Contact | Availability |
-|------|---------|--------------|
-| Platform Operations Lead | [Contact Info] | 24/7 |
-| Security Team | [Contact Info] | 24/7 |
-| Infrastructure Team | [Contact Info] | 24/7 |
-| Executive Escalation | [Contact Info] | Business Hours |
+```yaml
+# contacts.yml
+on_call:
+  l1_primary:
+    name: "Jane Doe"
+    phone: "+1-555-0101"
+    slack: "@jane"
+    email: "jane@tallypay.click"
 
-### Revision History
+  l1_backup:
+    name: "John Smith"
+    phone: "+1-555-0102"
+    slack: "@john"
+    email: "john@tallypay.click"
 
-| Date | Version | Author | Changes |
-|------|---------|--------|---------|
-| 2025-10-05 | 1.0 | Security Audit Team | Initial operational procedures for L-5 audit finding |
+  l2_primary:
+    name: "Alice Engineer"
+    phone: "+1-555-0201"
+    slack: "@alice"
+    email: "alice@tallypay.click"
+    pagerduty: "alice@tallypay.pagerduty.com"
+
+  l3_escalation:
+    name: "Bob CTO"
+    phone: "+1-555-0301"
+    slack: "@bob"
+    email: "bob@tallypay.click"
+
+external:
+  rpc_provider:
+    name: "Helius Support"
+    email: "support@helius.dev"
+    sla: "4 hours"
+
+  cloudflare:
+    name: "Cloudflare Enterprise Support"
+    phone: "+1-888-993-5273"
+    portal: "https://dash.cloudflare.com/support"
+```
 
 ---
 
-**Document Classification:** INTERNAL - Operations Critical
-**Review Frequency:** Quarterly or after any security incident
-**Next Review Date:** 2025-01-05
+## Post-Incident Review
+
+### Post-Mortem Template
+
+**Incident Report: [INCIDENT-YYYYMMDD-NNN]**
+
+**Date:** YYYY-MM-DD
+**Duration:** HH:MM start - HH:MM end (Duration: XX hours)
+**Severity:** P0 / P1 / P2 / P3
+**Incident Commander:** Name
+
+---
+
+**1. Executive Summary**
+
+One-paragraph summary of what happened, impact, and resolution.
+
+**2. Timeline**
+
+| Time (UTC) | Event | Action Taken |
+|------------|-------|--------------|
+| 14:32 | Alert triggered: High plan creation rate | Acknowledged by on-call |
+| 14:35 | Investigation started | Reviewed Grafana dashboard |
+| 14:40 | Attack confirmed: 500 plans/min | Applied rate limits |
+| 14:45 | Attacker IP identified | Added to Cloudflare block list |
+| 15:00 | Operations stabilized | Monitoring continued |
+| 15:30 | All-clear declared | Rate limits relaxed |
+
+**3. Root Cause**
+
+Detailed explanation of why the incident occurred.
+
+**4. Impact Assessment**
+
+- **Users Affected:** X merchants, Y subscribers
+- **Operations Blocked:** Z legitimate transactions delayed
+- **Financial Impact:** $X in spam account rent deposits
+- **Downtime:** X minutes of degraded performance
+
+**5. What Went Well**
+
+- Detection systems worked as expected
+- Response time within SLA
+- Mitigation effective
+
+**6. What Didn't Go Well**
+
+- Initial rate limits too permissive
+- Manual IP blocking process slow
+- Communication delay to stakeholders
+
+**7. Action Items**
+
+| Item | Owner | Priority | Due Date | Status |
+|------|-------|----------|----------|--------|
+| Reduce default rate limits by 50% | Jane | High | 2025-10-10 | Open |
+| Automate IP blocking from alerts | John | Medium | 2025-10-15 | Open |
+| Update communication templates | Alice | Low | 2025-10-20 | Open |
+
+**8. Lessons Learned**
+
+- Rate limits should be more aggressive by default
+- Automated response systems reduce MTTR significantly
+- Pre-staging communication templates saves time
+
+---
+
+### Continuous Improvement Process
+
+**Quarterly Security Review:**
+
+1. **Metrics Review** (Week 1)
+   - Incident frequency and severity trends
+   - MTTR (Mean Time To Resolve) analysis
+   - False positive/negative rates for alerts
+
+2. **Threat Model Update** (Week 2)
+   - Review new attack vectors observed
+   - Update attack cost analysis
+   - Adjust monitoring thresholds
+
+3. **Runbook Refresh** (Week 3)
+   - Incorporate post-mortem action items
+   - Update contact information
+   - Test escalation procedures
+
+4. **Tabletop Exercise** (Week 4)
+   - Simulate P0 incident response
+   - Train new team members
+   - Validate runbooks and tooling
+
+---
+
+## Summary
+
+This document provides production-ready operational procedures for:
+
+1. **RPC Configuration**: Nginx, HAProxy, and Cloudflare setups
+2. **Monitoring Setup**: Prometheus, Grafana, and Alertmanager deployment
+3. **Incident Response**: P0-P3 workflows with clear SLAs
+4. **Escalation Paths**: On-call rotation and contact information
+5. **Post-Incident Process**: Post-mortem template and continuous improvement
+
+**Key Takeaways:**
+
+- Rate limiting at RPC layer is the first line of defense
+- Automated monitoring and alerting enable fast response
+- Clear escalation paths minimize incident duration
+- Post-mortems drive continuous improvement
+- Regular testing ensures readiness
+
+**Related Documentation:**
+- [RATE_LIMITING_STRATEGY.md](./RATE_LIMITING_STRATEGY.md) - Overall strategy
+- [SPAM_DETECTION.md](./SPAM_DETECTION.md) - Implementation details
+
+---
+
+**Document Version:** 1.0
+**Last Updated:** 2025-10-05
+**Security Audit Reference:** M-6 - No Rate Limiting on Operations
