@@ -45,13 +45,21 @@ pub struct CreatePlan<'info> {
 }
 
 /// Converts a string to a fixed-size [u8; 32] array
-/// Truncates if longer than 32 bytes, pads with zeros if shorter
-fn string_to_bytes32(input: &str) -> [u8; 32] {
-    let mut result = [0u8; 32];
+/// Returns an error if the string's byte representation exceeds 32 bytes
+/// Pads with zeros if the string is shorter than 32 bytes
+fn string_to_bytes32(input: &str) -> Result<[u8; 32]> {
     let bytes = input.as_bytes();
-    let copy_len = std::cmp::min(bytes.len(), 32);
-    result[..copy_len].copy_from_slice(&bytes[..copy_len]);
-    result
+
+    // Validate that byte length does not exceed 32
+    // This prevents silent truncation which could cause collisions
+    require!(
+        bytes.len() <= 32,
+        SubscriptionError::InvalidPlan
+    );
+
+    let mut result = [0u8; 32];
+    result[..bytes.len()].copy_from_slice(bytes);
+    Ok(result)
 }
 
 pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
@@ -74,24 +82,28 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
         SubscriptionError::InvalidPlan
     );
 
-    // Validate plan_id is not empty and within reasonable length
+    // Validate plan_id is not empty
     require!(
-        !args.plan_id.is_empty() && args.plan_id.len() <= 32,
+        !args.plan_id.is_empty(),
         SubscriptionError::InvalidPlan
     );
 
-    // Validate name is not empty and within reasonable length
+    // Validate name is not empty
     require!(
-        !args.name.is_empty() && args.name.len() <= 32,
+        !args.name.is_empty(),
         SubscriptionError::InvalidPlan
     );
 
     // Validate that plan_id_bytes matches the string conversion to ensure consistency
-    let expected_plan_id_bytes = string_to_bytes32(&args.plan_id);
+    // This also validates that plan_id byte length <= 32
+    let expected_plan_id_bytes = string_to_bytes32(&args.plan_id)?;
     require!(
         args.plan_id_bytes == expected_plan_id_bytes,
         SubscriptionError::InvalidPlan
     );
+
+    // Convert and validate name byte length <= 32
+    let name_bytes = string_to_bytes32(&args.name)?;
 
     let plan = &mut ctx.accounts.plan;
     plan.merchant = ctx.accounts.merchant.key();
@@ -99,7 +111,7 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     plan.price_usdc = args.price_usdc;
     plan.period_secs = args.period_secs;
     plan.grace_secs = args.grace_secs;
-    plan.name = string_to_bytes32(&args.name);
+    plan.name = name_bytes;
     plan.active = true; // Set active = true by default
 
     msg!(
