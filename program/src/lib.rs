@@ -34,10 +34,12 @@ pub mod errors;
 pub mod events;
 mod init_config;
 mod init_merchant;
+mod pause;
 mod renew_subscription;
 mod start_subscription;
 pub mod state;
 mod transfer_authority;
+mod unpause;
 mod update_plan;
 
 use accept_authority::*;
@@ -46,9 +48,11 @@ use cancel_subscription::*;
 use create_plan::*;
 use init_config::*;
 use init_merchant::*;
+use pause::*;
 use renew_subscription::*;
 use start_subscription::*;
 use transfer_authority::*;
+use unpause::*;
 use update_plan::*;
 
 declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
@@ -201,5 +205,30 @@ pub mod subs {
     /// - Plan does not exist or is invalid
     pub fn update_plan(ctx: Context<UpdatePlan>, args: UpdatePlanArgs) -> Result<()> {
         update_plan::handler(ctx, args)
+    }
+
+    /// Pause the program
+    ///
+    /// This enables the emergency pause mechanism, disabling all user-facing operations
+    /// (`start_subscription`, `renew_subscription`, `create_plan`) while allowing admin
+    /// operations to continue for emergency fund recovery.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the platform authority
+    pub fn pause(ctx: Context<Pause>, args: PauseArgs) -> Result<()> {
+        pause::handler(ctx, args)
+    }
+
+    /// Unpause the program
+    ///
+    /// This disables the emergency pause mechanism, re-enabling all user-facing operations
+    /// (`start_subscription`, `renew_subscription`, `create_plan`).
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the platform authority
+    pub fn unpause(ctx: Context<Unpause>, args: UnpauseArgs) -> Result<()> {
+        unpause::handler(ctx, args)
     }
 }

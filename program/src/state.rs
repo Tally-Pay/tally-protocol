@@ -145,11 +145,14 @@ pub struct Config {
     /// Maximum grace period in seconds (e.g., 604800 = 7 days)
     /// Prevents excessively long grace periods that increase merchant payment risk
     pub max_grace_period_seconds: u64, // 8 bytes
+    /// Emergency pause state - when true, all user-facing operations are disabled
+    /// This allows the platform authority to halt operations in case of security incidents
+    pub paused: bool, // 1 byte
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 8 + 1 = 135 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 8 + 1 + 1 = 136 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
