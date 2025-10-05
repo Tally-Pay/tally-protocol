@@ -218,6 +218,7 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     subscription.renewals = 0;
     subscription.created_ts = current_time;
     subscription.last_amount = plan.price_usdc;
+    subscription.last_renewed_ts = current_time;
     subscription.bump = ctx.bumps.subscription;
 
     // Emit Subscribed event

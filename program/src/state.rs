@@ -57,6 +57,8 @@ pub struct Subscription {
     pub created_ts: i64, // 8 bytes
     /// Last charged amount for audit purposes
     pub last_amount: u64, // 8 bytes
+    /// Unix timestamp when subscription was last renewed (prevents double-renewal attacks)
+    pub last_renewed_ts: i64, // 8 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
@@ -72,7 +74,7 @@ impl Plan {
 }
 
 impl Subscription {
-    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 1 = 102 bytes
+    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 8 + 1 = 110 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 

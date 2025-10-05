@@ -83,6 +83,19 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::PastGrace.into());
     }
 
+    // Prevent double-renewal attack: ensure sufficient time has passed since last renewal
+    // This prevents multiple renewals within the same period
+    let period_i64 =
+        i64::try_from(plan.period_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
+    let min_next_renewal_time = subscription
+        .last_renewed_ts
+        .checked_add(period_i64)
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
+    if current_time <= min_next_renewal_time {
+        return Err(SubscriptionError::NotDue.into());
+    }
+
     // Deserialize and validate token accounts with specific error handling
     let subscriber_ata_data: TokenAccount =
         TokenAccount::try_deserialize(&mut ctx.accounts.subscriber_usdc_ata.data.borrow().as_ref())
@@ -203,8 +216,6 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     }
 
     // Update subscription fields
-    let period_i64 =
-        i64::try_from(plan.period_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
     subscription.next_renewal_ts = subscription
         .next_renewal_ts
         .checked_add(period_i64)
@@ -216,6 +227,7 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         .ok_or(SubscriptionError::ArithmeticError)?;
 
     subscription.last_amount = plan.price_usdc;
+    subscription.last_renewed_ts = current_time;
 
     // Emit Renewed event
     emit!(Renewed {
