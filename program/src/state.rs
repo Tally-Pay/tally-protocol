@@ -89,6 +89,8 @@ pub struct Config {
     pub pending_authority: Option<Pubkey>, // 33 bytes (1 byte discriminator + 32 bytes pubkey)
     /// Maximum platform fee in basis points (e.g., 1000 = 10%)
     pub max_platform_fee_bps: u16, // 2 bytes
+    /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
+    pub min_platform_fee_bps: u16, // 2 bytes
     /// Basis points divisor (e.g., 10000 for percentage calculations)
     pub fee_basis_points_divisor: u16, // 2 bytes
     /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
@@ -100,6 +102,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 1 = 87 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 2 + 8 + 1 + 1 = 89 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

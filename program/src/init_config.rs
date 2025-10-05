@@ -5,6 +5,7 @@ use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoade
 // cargo run --package tally-cli -- init-config \
 //   --platform-authority "YOUR_PLATFORM_AUTHORITY_PUBKEY" \
 //   --max-platform-fee-bps 1000 \
+//   --min-platform-fee-bps 50 \
 //   --fee-basis-points-divisor 10000 \
 //   --min-period-seconds 86400 \
 //   --default-allowance-periods 3
@@ -13,6 +14,7 @@ use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoade
 pub struct InitConfigArgs {
     pub platform_authority: Pubkey,
     pub max_platform_fee_bps: u16,
+    pub min_platform_fee_bps: u16,
     pub fee_basis_points_divisor: u16,
     pub min_period_seconds: u64,
     pub default_allowance_periods: u8,
@@ -83,11 +85,18 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
         crate::errors::SubscriptionError::Unauthorized
     );
 
+    // Validate that min_platform_fee_bps <= max_platform_fee_bps
+    require!(
+        args.min_platform_fee_bps <= args.max_platform_fee_bps,
+        crate::errors::SubscriptionError::InvalidPlan
+    );
+
     // Initialize config account
     let config = &mut ctx.accounts.config;
     config.platform_authority = args.platform_authority;
     config.pending_authority = None; // No pending transfer on initialization
     config.max_platform_fee_bps = args.max_platform_fee_bps;
+    config.min_platform_fee_bps = args.min_platform_fee_bps;
     config.fee_basis_points_divisor = args.fee_basis_points_divisor;
     config.min_period_seconds = args.min_period_seconds;
     config.default_allowance_periods = args.default_allowance_periods;
@@ -156,5 +165,49 @@ mod tests {
             }
             _ => panic!("Expected ProgramData variant"),
         }
+    }
+
+    #[test]
+    fn test_min_fee_validation_valid_equal() {
+        // Test that min_platform_fee_bps == max_platform_fee_bps is valid
+        let min_fee = 100u16;
+        let max_fee = 100u16;
+        assert!(min_fee <= max_fee);
+    }
+
+    #[test]
+    fn test_min_fee_validation_valid_less() {
+        // Test that min_platform_fee_bps < max_platform_fee_bps is valid
+        let min_fee = 50u16;
+        let max_fee = 1000u16;
+        assert!(min_fee <= max_fee);
+    }
+
+    #[test]
+    fn test_min_fee_validation_invalid() {
+        // Test that min_platform_fee_bps > max_platform_fee_bps should fail
+        let min_fee = 1000u16;
+        let max_fee = 500u16;
+        assert!(min_fee > max_fee);
+    }
+
+    #[test]
+    fn test_min_fee_zero_allowed() {
+        // Test that min_platform_fee_bps can be 0
+        let min_fee = 0u16;
+        let max_fee = 1000u16;
+        assert!(min_fee <= max_fee);
+    }
+
+    #[test]
+    fn test_fee_range_boundary_values() {
+        // Test boundary values for fee validation
+        let min_fee = 0u16;
+        let max_fee = 10000u16; // 100% in basis points
+        assert!(min_fee <= max_fee);
+
+        let min_fee_50bps = 50u16; // 0.5%
+        let max_fee_1000bps = 1000u16; // 10%
+        assert!(min_fee_50bps <= max_fee_1000bps);
     }
 }

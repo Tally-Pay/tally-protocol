@@ -48,6 +48,10 @@ pub struct InitMerchant<'info> {
 pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()> {
     // Validate platform fee is within acceptable range using config
     require!(
+        args.platform_fee_bps >= ctx.accounts.config.min_platform_fee_bps,
+        crate::errors::SubscriptionError::InvalidPlan
+    );
+    require!(
         args.platform_fee_bps <= ctx.accounts.config.max_platform_fee_bps,
         crate::errors::SubscriptionError::InvalidPlan
     );
