@@ -1,5 +1,6 @@
 use crate::errors::SubscriptionError;
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
@@ -39,6 +40,17 @@ pub struct AdminWithdrawFees<'info> {
 pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> Result<()> {
     // Validate platform authority
     if ctx.accounts.platform_authority.key() != ctx.accounts.config.platform_authority {
+        return Err(SubscriptionError::Unauthorized.into());
+    }
+
+    // Validate that platform_treasury_ata is the correct ATA derived from platform authority and USDC mint
+    // This prevents the admin from withdrawing from arbitrary token accounts (e.g., merchant treasuries)
+    let expected_platform_ata = get_associated_token_address(
+        &ctx.accounts.config.platform_authority,
+        ctx.accounts.usdc_mint.key,
+    );
+
+    if ctx.accounts.platform_treasury_ata.key() != expected_platform_ata {
         return Err(SubscriptionError::Unauthorized.into());
     }
 
