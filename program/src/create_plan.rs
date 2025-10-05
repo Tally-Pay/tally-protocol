@@ -1,3 +1,4 @@
+use crate::constants::MAX_PLAN_PRICE_USDC;
 use crate::errors::SubscriptionError;
 use crate::state::{Merchant, Plan};
 use anchor_lang::prelude::*;
@@ -66,6 +67,25 @@ fn string_to_bytes32(input: &str) -> Result<[u8; 32]> {
 pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     // Validate price_usdc > 0
     require!(args.price_usdc > 0, SubscriptionError::InvalidPlan);
+
+    // Validate price_usdc <= MAX_PLAN_PRICE_USDC (M-5 security fix)
+    //
+    // Enforces a maximum price limit to prevent social engineering attacks where merchants
+    // create plans with extreme prices (e.g., u64::MAX) that could mislead subscribers.
+    //
+    // Security Impact:
+    // - Prevents creation of plans with prices near u64::MAX (~18.4 quintillion USDC)
+    // - Mitigates social engineering risks from unrealistic price displays
+    // - Reduces potential overflow scenarios in downstream calculations
+    // - Establishes reasonable ceiling (1 million USDC) for subscription services
+    //
+    // This validation ensures that all plan prices remain within a realistic range
+    // suitable for legitimate subscription business models while blocking extreme
+    // values that have no valid use case and could enable malicious behavior.
+    require!(
+        args.price_usdc <= MAX_PLAN_PRICE_USDC,
+        SubscriptionError::InvalidPlan
+    );
 
     // Validate period_secs >= minimum period from config
     require!(
