@@ -54,6 +54,15 @@ pub struct Canceled {
     pub subscriber: Pubkey,
 }
 
+/// Event emitted when a subscription account is closed and rent is reclaimed
+#[event]
+pub struct SubscriptionClosed {
+    /// The subscription plan that was closed
+    pub plan: Pubkey,
+    /// The subscriber's public key who closed the subscription and received the rent
+    pub subscriber: Pubkey,
+}
+
 /// Event emitted when a subscription payment fails
 #[event]
 pub struct PaymentFailed {
