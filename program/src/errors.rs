@@ -142,4 +142,9 @@ pub enum SubscriptionError {
     /// When a monetary amount is invalid (zero, negative, or exceeds limits)
     #[msg("Invalid amount provided. Amount must be greater than zero and within acceptable limits.")]
     InvalidAmount,
+
+    /// Error Code: 6026
+    /// When attempting to create a plan that already exists for this merchant
+    #[msg("A plan with this ID already exists for this merchant. Each plan ID must be unique per merchant.")]
+    PlanAlreadyExists,
 }

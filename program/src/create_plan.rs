@@ -105,6 +105,15 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     // Convert and validate name byte length <= 32
     let name_bytes = string_to_bytes32(&args.name)?;
 
+    // Defense-in-depth: Explicitly verify the plan account has not been initialized
+    // While the `init` constraint already prevents duplicate creation, this check
+    // provides an additional safety layer against potential PDA collisions or framework issues
+    let plan_account_info = ctx.accounts.plan.to_account_info();
+    require!(
+        plan_account_info.data_is_empty(),
+        SubscriptionError::PlanAlreadyExists
+    );
+
     let plan = &mut ctx.accounts.plan;
     plan.merchant = ctx.accounts.merchant.key();
     plan.plan_id = args.plan_id_bytes; // Use the validated plan_id_bytes directly
