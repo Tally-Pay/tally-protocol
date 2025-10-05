@@ -20,3 +20,4 @@ trace = []
 [dependencies]
 anchor-lang = { workspace = true }
 anchor-spl = { workspace = true }
+bincode = "1.3"

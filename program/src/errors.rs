@@ -110,4 +110,19 @@ pub enum SubscriptionError {
     /// When the global configuration account is missing or invalid
     #[msg("Global configuration account not found or invalid. Ensure the program has been properly initialized.")]
     ConfigNotFound,
+
+    /// Error Code: 6020
+    /// When the program data account is invalid or cannot be deserialized
+    #[msg("Invalid program data account. Ensure the account is the correct program data account for this program.")]
+    InvalidProgramData,
+
+    /// Error Code: 6021
+    /// When attempting to accept authority transfer but no transfer is pending
+    #[msg("No pending authority transfer. A transfer must be initiated before it can be accepted.")]
+    NoPendingTransfer,
+
+    /// Error Code: 6022
+    /// When attempting to initiate authority transfer but one is already pending
+    #[msg("Authority transfer already pending. Complete or cancel the current transfer before initiating a new one.")]
+    TransferAlreadyPending,
 }

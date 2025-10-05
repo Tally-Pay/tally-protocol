@@ -83,6 +83,8 @@ impl Subscription {
 pub struct Config {
     /// Platform authority pubkey for admin operations
     pub platform_authority: Pubkey, // 32 bytes
+    /// Pending authority for two-step authority transfer
+    pub pending_authority: Option<Pubkey>, // 33 bytes (1 byte discriminator + 32 bytes pubkey)
     /// Maximum platform fee in basis points (e.g., 1000 = 10%)
     pub max_platform_fee_bps: u16, // 2 bytes
     /// Basis points divisor (e.g., 10000 for percentage calculations)
@@ -96,6 +98,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 2 + 2 + 8 + 1 + 1 = 54 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 1 = 87 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

@@ -19,6 +19,7 @@ solana-sdk = "3.0"
 solana-program = "3.0"
 solana-client = "3.0"
 solana-account-decoder = "3.0"
+solana-program-test = "3.0"
 
 # SPL token dependencies
 spl-token = "8.0"

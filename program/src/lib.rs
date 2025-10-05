@@ -25,6 +25,7 @@
 
 use anchor_lang::prelude::*;
 
+mod accept_authority;
 mod admin_withdraw_fees;
 mod cancel_subscription;
 mod create_plan;
@@ -35,7 +36,9 @@ mod init_merchant;
 mod renew_subscription;
 mod start_subscription;
 pub mod state;
+mod transfer_authority;
 
+use accept_authority::*;
 use admin_withdraw_fees::*;
 use cancel_subscription::*;
 use create_plan::*;
@@ -43,6 +46,7 @@ use init_config::*;
 use init_merchant::*;
 use renew_subscription::*;
 use start_subscription::*;
+use transfer_authority::*;
 
 declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
 
@@ -147,5 +151,38 @@ pub mod subs {
         args: AdminWithdrawFeesArgs,
     ) -> Result<()> {
         admin_withdraw_fees::handler(ctx, args)
+    }
+
+    /// Initiate platform authority transfer
+    ///
+    /// This begins a two-step authority transfer process. The current platform
+    /// authority proposes a new authority, which must then accept the transfer.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the current platform authority
+    /// - A pending transfer already exists
+    /// - New authority is the same as current authority
+    pub fn transfer_authority(
+        ctx: Context<TransferAuthority>,
+        args: TransferAuthorityArgs,
+    ) -> Result<()> {
+        transfer_authority::handler(ctx, args)
+    }
+
+    /// Accept platform authority transfer
+    ///
+    /// This completes a two-step authority transfer process. The new authority
+    /// must sign to accept the transfer initiated by the current authority.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - No pending transfer exists
+    /// - Caller is not the pending authority
+    pub fn accept_authority(
+        ctx: Context<AcceptAuthority>,
+        args: AcceptAuthorityArgs,
+    ) -> Result<()> {
+        accept_authority::handler(ctx, args)
     }
 }
