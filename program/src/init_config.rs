@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoaderState};
+use anchor_lang::solana_program::program_pack::Pack;
+use anchor_spl::associated_token::get_associated_token_address;
+use anchor_spl::token::{spl_token::state::Account as TokenAccount, Token};
 
 // Example CLI command to initialize config:
 // cargo run --package tally-cli -- init-config \
@@ -25,6 +28,7 @@ pub struct InitConfigArgs {
 }
 
 #[derive(Accounts)]
+#[instruction(args: InitConfigArgs)]
 pub struct InitConfig<'info> {
     #[account(
         init,
@@ -42,6 +46,12 @@ pub struct InitConfig<'info> {
     /// CHECK: Validated in handler by deserializing and checking upgrade authority
     pub program_data: UncheckedAccount<'info>,
 
+    /// Platform treasury ATA for receiving platform fees
+    /// This ensures the platform authority has already created their USDC token account
+    /// CHECK: Validated in handler as the canonical ATA for `platform_authority` + `allowed_mint`
+    pub platform_treasury_ata: UncheckedAccount<'info>,
+
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
@@ -96,6 +106,41 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     require!(
         args.max_grace_period_seconds > 0,
         crate::errors::SubscriptionError::InvalidPlan
+    );
+
+    // Validate platform treasury ATA exists and is correctly derived
+    // This prevents operational issues where subscriptions fail if the platform
+    // authority hasn't created their USDC token account before deployment
+    let expected_platform_ata = get_associated_token_address(
+        &args.platform_authority,
+        &args.allowed_mint,
+    );
+
+    require!(
+        ctx.accounts.platform_treasury_ata.key() == expected_platform_ata,
+        crate::errors::SubscriptionError::BadSeeds
+    );
+
+    // Validate platform treasury ATA is a valid token account
+    let platform_ata_data = ctx.accounts.platform_treasury_ata.try_borrow_data()?;
+    require!(
+        platform_ata_data.len() == TokenAccount::LEN,
+        crate::errors::SubscriptionError::InvalidPlatformTreasuryAccount
+    );
+    require!(
+        ctx.accounts.platform_treasury_ata.owner == &ctx.accounts.token_program.key(),
+        crate::errors::SubscriptionError::InvalidPlatformTreasuryAccount
+    );
+
+    // Deserialize and validate platform treasury token account data
+    let token_account = TokenAccount::unpack(&platform_ata_data)?;
+    require!(
+        token_account.mint == args.allowed_mint,
+        crate::errors::SubscriptionError::WrongMint
+    );
+    require!(
+        token_account.owner == args.platform_authority,
+        crate::errors::SubscriptionError::Unauthorized
     );
 
     // Initialize config account
