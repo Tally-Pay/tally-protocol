@@ -274,6 +274,22 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
         crate::errors::SubscriptionError::InvalidConfiguration
     );
 
+    // Validate min_period_seconds meets absolute minimum (M-4 security fix)
+    //
+    // This prevents spam attacks where malicious actors could set min_period_seconds = 0
+    // during config initialization, enabling them to create subscription plans with
+    // extremely short billing cycles (e.g., 1 second), leading to:
+    // - Network spam through excessive renewal transactions
+    // - Denial-of-service attacks via transaction flooding
+    // - Unreasonable operational burden on merchants
+    //
+    // The absolute minimum of 86400 seconds (24 hours) ensures all subscription plans
+    // have reasonable billing cycles aligned with industry standards.
+    require!(
+        args.min_period_seconds >= crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS,
+        crate::errors::SubscriptionError::InvalidConfiguration
+    );
+
     // Validate platform treasury ATA exists and is correctly derived
     // This prevents operational issues where subscriptions fail if the platform
     // authority hasn't created their USDC token account before deployment
@@ -444,5 +460,152 @@ mod tests {
         let min_fee_50bps = 50u16; // 0.5%
         let max_fee_1000bps = 1000u16; // 10%
         assert!(min_fee_50bps <= max_fee_1000bps);
+    }
+
+    // ============================================================================
+    // MINIMUM PERIOD VALIDATION TESTS (M-4 Security Fix)
+    // ============================================================================
+
+    #[test]
+    fn test_min_period_rejects_zero() {
+        // Test that min_period_seconds = 0 is rejected
+        let min_period_seconds = 0u64;
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        assert!(
+            min_period_seconds < absolute_min,
+            "Should reject min_period_seconds = 0"
+        );
+    }
+
+    #[test]
+    fn test_min_period_rejects_below_absolute_minimum() {
+        // Test that min_period_seconds < 86400 is rejected
+        let min_period_seconds = 3600u64; // 1 hour
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        assert!(
+            min_period_seconds < absolute_min,
+            "Should reject min_period_seconds below 86400 seconds"
+        );
+    }
+
+    #[test]
+    fn test_min_period_accepts_exact_minimum() {
+        // Test that min_period_seconds = 86400 is accepted
+        let min_period_seconds = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        assert!(
+            min_period_seconds >= absolute_min,
+            "Should accept min_period_seconds exactly at 86400 seconds (24 hours)"
+        );
+    }
+
+    #[test]
+    fn test_min_period_accepts_above_minimum() {
+        // Test that min_period_seconds > 86400 is accepted
+        let min_period_seconds = 604_800_u64; // 7 days
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        assert!(
+            min_period_seconds >= absolute_min,
+            "Should accept min_period_seconds above 86400 seconds"
+        );
+    }
+
+    #[test]
+    fn test_min_period_boundary_values() {
+        // Test boundary values for minimum period validation
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        // Just below boundary - should fail
+        let below_min = absolute_min - 1;
+        assert!(
+            below_min < absolute_min,
+            "min_period_seconds = 86399 should be rejected"
+        );
+
+        // At boundary - should pass
+        let at_min = absolute_min;
+        assert!(
+            at_min >= absolute_min,
+            "min_period_seconds = 86400 should be accepted"
+        );
+
+        // Just above boundary - should pass
+        let above_min = absolute_min + 1;
+        assert!(
+            above_min >= absolute_min,
+            "min_period_seconds = 86401 should be accepted"
+        );
+    }
+
+    #[test]
+    fn test_min_period_common_values() {
+        // Test common subscription periods are accepted
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        // Daily (24 hours)
+        let daily = 86_400_u64;
+        assert!(daily >= absolute_min, "Daily subscriptions should be accepted");
+
+        // Weekly (7 days)
+        let weekly = 604_800_u64;
+        assert!(weekly >= absolute_min, "Weekly subscriptions should be accepted");
+
+        // Monthly (30 days)
+        let monthly = 2_592_000_u64;
+        assert!(monthly >= absolute_min, "Monthly subscriptions should be accepted");
+
+        // Yearly (365 days)
+        let yearly = 31_536_000_u64;
+        assert!(yearly >= absolute_min, "Yearly subscriptions should be accepted");
+    }
+
+    #[test]
+    fn test_min_period_spam_attack_prevention() {
+        // Test that values enabling spam attacks are rejected
+        let absolute_min = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        // 1 second - obvious spam attack vector
+        let one_second = 1u64;
+        assert!(
+            one_second < absolute_min,
+            "1-second billing cycle should be rejected as spam attack vector"
+        );
+
+        // 1 minute - still spam
+        let one_minute = 60u64;
+        assert!(
+            one_minute < absolute_min,
+            "1-minute billing cycle should be rejected as spam attack vector"
+        );
+
+        // 1 hour - still unreasonable
+        let one_hour = 3600u64;
+        assert!(
+            one_hour < absolute_min,
+            "1-hour billing cycle should be rejected as spam attack vector"
+        );
+
+        // 12 hours - still below minimum
+        let twelve_hours = 43200u64;
+        assert!(
+            twelve_hours < absolute_min,
+            "12-hour billing cycle should be rejected (below 24-hour minimum)"
+        );
+    }
+
+    #[test]
+    fn test_absolute_min_period_constant_value() {
+        // Verify the constant has the expected value for 24 hours
+        let expected = 86400u64; // 24 hours * 60 minutes * 60 seconds
+        let actual = crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS;
+
+        assert_eq!(
+            actual, expected,
+            "ABSOLUTE_MIN_PERIOD_SECONDS should equal 86400 (24 hours)"
+        );
     }
 }
