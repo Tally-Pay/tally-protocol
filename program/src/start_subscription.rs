@@ -198,13 +198,6 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         return Err(SubscriptionError::InsufficientAllowance.into());
     }
 
-    // Validate delegate is our program PDA
-    if subscriber_ata_data.delegate.is_none()
-        || subscriber_ata_data.delegate.unwrap() != ctx.accounts.program_delegate.key()
-    {
-        return Err(SubscriptionError::Unauthorized.into());
-    }
-
     // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
     let (expected_delegate_pda, _expected_bump) =
         Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
@@ -212,6 +205,33 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
         SubscriptionError::BadSeeds
     );
+
+    // Validate delegate is our program PDA
+    //
+    // IMPORTANT - SPL Token Single-Delegate Limitation (M-3):
+    //
+    // SPL Token accounts support only ONE delegate at a time. Approving this merchant's
+    // delegate will OVERWRITE any existing delegate approval on this token account.
+    //
+    // This means:
+    // 1. If the user has an active subscription with Merchant A using this token account
+    // 2. And approves a subscription with Merchant B (this instruction)
+    // 3. Merchant A's delegate is OVERWRITTEN and their subscription becomes non-functional
+    //
+    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug.
+    // See docs/MULTI_MERCHANT_LIMITATION.md for:
+    // - Detailed explanation of the limitation
+    // - Workarounds (per-merchant token accounts - RECOMMENDED)
+    // - Future migration paths (Token-2022, global delegate)
+    //
+    // Users should either:
+    // - Use separate token accounts for each merchant (recommended)
+    // - Only subscribe to one merchant at a time per token account
+    if subscriber_ata_data.delegate.is_none()
+        || subscriber_ata_data.delegate.unwrap() != expected_delegate_pda
+    {
+        return Err(SubscriptionError::Unauthorized.into());
+    }
 
     // Calculate platform fee using checked arithmetic
     let platform_fee = u64::try_from(

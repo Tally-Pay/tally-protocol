@@ -71,8 +71,23 @@ pub fn handler(ctx: Context<CancelSubscription>, _args: CancelSubscriptionArgs) 
     );
 
     // Revoke delegate approval to prevent further renewals
-    // Only revoke if the current delegate matches our program's delegate PDA
-    // This prevents revoking unrelated delegations to other programs
+    //
+    // IMPORTANT - SPL Token Single-Delegate Limitation (M-3):
+    //
+    // SPL Token accounts support only ONE delegate at a time. This means:
+    // 1. Revoking the delegate here affects ALL subscriptions that use this token account
+    // 2. If the user has subscriptions with multiple merchants, this revocation will
+    //    make ALL of those subscriptions non-functional, not just this one
+    // 3. Other merchants' subscriptions will appear active but cannot renew
+    //
+    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug.
+    // See docs/MULTI_MERCHANT_LIMITATION.md for:
+    // - Detailed explanation of the limitation
+    // - Workarounds (per-merchant token accounts)
+    // - Future migration paths (Token-2022, global delegate)
+    //
+    // We only revoke if the current delegate matches our program's delegate PDA.
+    // This prevents revoking unrelated delegations to other programs.
     if let Some(current_delegate) = Option::<Pubkey>::from(subscriber_ata_data.delegate) {
         if current_delegate == expected_delegate_pda {
             let revoke_accounts = Revoke {

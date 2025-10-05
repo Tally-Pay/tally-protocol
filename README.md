@@ -373,6 +373,32 @@ This project has not been formally audited. Use at your own risk.
 
 ### Known Limitations
 
+#### Multi-Merchant Subscriptions (SPL Token Architectural Limitation)
+
+**Critical**: Users **cannot** have active subscriptions with multiple merchants using the same token account.
+
+**Root Cause**: SPL Token accounts support only **one delegate at a time**. When a user:
+1. Subscribes to Merchant A → Sets delegate to `PDA(merchant=A)`
+2. Subscribes to Merchant B → **Overwrites** delegate to `PDA(merchant=B)`
+3. Cancels subscription with Merchant B → **Revokes** all delegates
+
+**Impact**: Merchant A's subscription becomes non-functional even though it appears active.
+
+**This is a fundamental architectural limitation of SPL Token**, not a bug. It cannot be fixed without migrating to Token-2022 or implementing a global delegate architecture.
+
+**Workarounds**:
+- **Recommended**: Create separate token accounts for each merchant
+- **Alternative**: Only subscribe to one merchant at a time per token account
+
+**Detection**: The protocol emits `DelegateMismatchWarning` events when renewal attempts detect incorrect delegates.
+
+**Full Details**: See [docs/MULTI_MERCHANT_LIMITATION.md](./docs/MULTI_MERCHANT_LIMITATION.md) for:
+- Complete technical explanation
+- Detailed workarounds and migration paths
+- Implementation guidance for integrators
+
+#### Other Limitations
+
 - Relies on off-chain keeper for renewal timing
 - Delegate approval must be maintained by users
 - No automatic grace period recovery mechanism
