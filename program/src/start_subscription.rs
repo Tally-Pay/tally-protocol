@@ -161,7 +161,25 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         SubscriptionError::InvalidPlan
     );
 
-    // Validate delegate allowance
+    // Validate delegate allowance for multi-period subscription start
+    //
+    // ALLOWANCE MANAGEMENT EXPECTATIONS (Audit L-3):
+    //
+    // For subscription initiation, we require allowance for multiple periods
+    // (default 3x, configurable via allowance_periods parameter) to ensure
+    // seamless renewals without immediate allowance exhaustion.
+    //
+    // IMPORTANT: Subsequent renewals check allowance >= plan.price_usdc (single period).
+    // This design allows flexibility in allowance management while preventing immediate
+    // renewal failures. Users should maintain sufficient allowance (recommended: 2x plan price)
+    // to avoid renewal interruptions.
+    //
+    // The asymmetry is intentional:
+    // - Start: Requires multi-period allowance to prevent immediate renewal failures
+    // - Renewal: Requires single-period allowance, emits warning when low (< 2x price)
+    //
+    // Off-chain systems should monitor LowAllowanceWarning events to prompt users
+    // to increase allowance before the next renewal cycle.
     let required_allowance = plan
         .price_usdc
         .checked_mul(allowance_periods_u64)

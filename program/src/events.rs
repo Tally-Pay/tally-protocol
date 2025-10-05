@@ -140,3 +140,34 @@ pub struct PlanCreated {
     /// Unix timestamp when plan was created
     pub timestamp: i64,
 }
+
+/// Event emitted when a subscription renewal succeeds but remaining allowance is low
+///
+/// This warning event alerts off-chain systems and users when the delegate allowance
+/// drops below a recommended threshold (2x the plan price). While the current renewal
+/// succeeded, the low allowance may cause the next renewal to fail if not topped up.
+///
+/// This addresses the allowance management UX concern from audit finding L-3, where
+/// users may successfully start a subscription with multi-period allowance but find
+/// renewals failing if allowance drops below the single-period price.
+///
+/// Off-chain systems should monitor this event to:
+/// - Send notifications to users to increase their allowance
+/// - Display warnings in UI before the next renewal date
+/// - Trigger automated allowance top-up workflows
+/// - Generate analytics on allowance management patterns
+#[event]
+pub struct LowAllowanceWarning {
+    /// The merchant who owns the subscription plan
+    pub merchant: Pubkey,
+    /// The subscription plan with low allowance
+    pub plan: Pubkey,
+    /// The subscriber who needs to increase allowance
+    pub subscriber: Pubkey,
+    /// Current remaining allowance (in USDC micro-units)
+    pub current_allowance: u64,
+    /// Recommended minimum allowance (2x plan price)
+    pub recommended_allowance: u64,
+    /// Plan price for reference (in USDC micro-units)
+    pub plan_price: u64,
+}

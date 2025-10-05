@@ -9,8 +9,11 @@ use anchor_lang::prelude::*;
 pub enum SubscriptionError {
     /// Error Code: 6000 (maps to PRD 1001)
     /// When delegate allowance is insufficient for subscription payments
+    ///
+    /// For subscription start: Requires multi-period allowance (default 3x plan price)
+    /// For renewals: Requires single-period allowance (1x plan price), warns when low (< 2x)
     #[msg(
-        "Insufficient USDC allowance. Please approve a higher allowance for subscription payments."
+        "Insufficient USDC allowance. For new subscriptions, approve multi-period allowance (recommended: 3x plan price). For renewals, maintain at least 2x plan price to avoid interruptions."
     )]
     InsufficientAllowance,
 

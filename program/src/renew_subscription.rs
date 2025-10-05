@@ -145,9 +145,43 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::Unauthorized.into());
     }
 
-    // Check delegate allowance >= price
+    // Check delegate allowance for single-period renewal
+    //
+    // ALLOWANCE MANAGEMENT (Audit L-3):
+    //
+    // Renewals require only single-period allowance (>= plan.price_usdc), unlike
+    // subscription start which requires multi-period allowance (default 3x).
+    //
+    // This asymmetry is intentional to allow flexibility in allowance management.
+    // However, we emit a LowAllowanceWarning event when allowance drops below
+    // the recommended threshold (2x plan price) to alert users and off-chain systems
+    // to top up allowance before the next renewal cycle.
+    //
+    // This prevents the UX friction identified in audit finding L-3 where users
+    // may successfully start subscriptions but encounter unexpected renewal failures
+    // when allowance depletes.
     if subscriber_ata_data.delegated_amount < plan.price_usdc {
         return Err(SubscriptionError::InsufficientAllowance.into());
+    }
+
+    // Calculate recommended allowance threshold (2x plan price)
+    // Using checked arithmetic to prevent overflow
+    let recommended_allowance = plan
+        .price_usdc
+        .checked_mul(2)
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
+    // Emit warning event if allowance is sufficient for this renewal but below recommended threshold
+    // This gives users and off-chain systems advance notice to top up allowance before next renewal
+    if subscriber_ata_data.delegated_amount < recommended_allowance {
+        emit!(crate::events::LowAllowanceWarning {
+            merchant: merchant.key(),
+            plan: plan.key(),
+            subscriber: subscription.subscriber,
+            current_allowance: subscriber_ata_data.delegated_amount,
+            recommended_allowance,
+            plan_price: plan.price_usdc,
+        });
     }
 
     // Validate delegate is our program PDA
