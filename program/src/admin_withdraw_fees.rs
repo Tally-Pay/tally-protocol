@@ -1,4 +1,5 @@
 use crate::errors::SubscriptionError;
+use crate::events::FeesWithdrawn;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
@@ -114,6 +115,15 @@ pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> 
         args.amount,
         usdc_mint_data.decimals,
     )?;
+
+    // Emit event for transparency and auditability (L-8 fix)
+    let clock = Clock::get()?;
+    emit!(FeesWithdrawn {
+        platform_authority: ctx.accounts.platform_authority.key(),
+        destination: ctx.accounts.platform_destination_ata.key(),
+        amount: args.amount,
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

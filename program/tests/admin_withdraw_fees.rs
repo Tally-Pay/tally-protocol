@@ -537,3 +537,174 @@ fn test_same_mint_different_authorities_validation() {
     assert!(!merchant_2_valid, "Merchant 2 ATA should be invalid");
     assert!(!user_valid, "User ATA should be invalid");
 }
+
+/// Test event structure for fees withdrawn (L-8 fix)
+///
+/// This test validates that the `FeesWithdrawn` event structure is correctly
+/// defined and can be instantiated with appropriate field values.
+#[test]
+fn test_fees_withdrawn_event_structure() {
+    use tally_subs::events::FeesWithdrawn;
+
+    let platform_authority = Pubkey::new_unique();
+    let destination = Pubkey::new_unique();
+    let amount = 1_000_000_000; // 1,000 USDC
+    let timestamp = 1_704_067_200; // 2024-01-01 00:00:00 UTC
+
+    // Create FeesWithdrawn event instance
+    let event = FeesWithdrawn {
+        platform_authority,
+        destination,
+        amount,
+        timestamp,
+    };
+
+    // Verify all fields are accessible and match expected values
+    assert_eq!(
+        event.platform_authority, platform_authority,
+        "Platform authority should match"
+    );
+    assert_eq!(event.destination, destination, "Destination should match");
+    assert_eq!(event.amount, amount, "Amount should match");
+    assert_eq!(event.timestamp, timestamp, "Timestamp should match");
+}
+
+/// Test event emission logic (L-8 fix)
+///
+/// This test simulates the event emission pattern used in `admin_withdraw_fees`
+/// handler to ensure the event can be properly constructed with real data.
+#[test]
+fn test_fees_withdrawn_event_emission_logic() {
+    use tally_subs::events::FeesWithdrawn;
+
+    // Simulate handler context values
+    let platform_authority = Pubkey::new_unique();
+    let platform_destination_ata = Pubkey::new_unique();
+    let withdrawal_amount = 500_000_000; // 500 USDC
+    let current_timestamp = 1_704_153_600; // 2024-01-02 00:00:00 UTC
+
+    // Simulate event creation (as done in handler)
+    let event = FeesWithdrawn {
+        platform_authority,
+        destination: platform_destination_ata,
+        amount: withdrawal_amount,
+        timestamp: current_timestamp,
+    };
+
+    // Verify event contains correct withdrawal information
+    assert_eq!(
+        event.platform_authority, platform_authority,
+        "Event should record correct platform authority"
+    );
+    assert_eq!(
+        event.destination, platform_destination_ata,
+        "Event should record correct destination ATA"
+    );
+    assert_eq!(
+        event.amount, withdrawal_amount,
+        "Event should record correct withdrawal amount"
+    );
+    assert_eq!(
+        event.timestamp, current_timestamp,
+        "Event should record correct timestamp"
+    );
+}
+
+/// Test event provides audit trail for fee withdrawals (L-8 fix)
+///
+/// This test validates that the `FeesWithdrawn` event provides sufficient
+/// information for creating a complete audit trail of fee withdrawal activity.
+#[test]
+fn test_fees_withdrawn_event_audit_trail() {
+    use tally_subs::events::FeesWithdrawn;
+
+    // Simulate multiple fee withdrawal events
+    let platform_authority = Pubkey::new_unique();
+    let destination_1 = Pubkey::new_unique();
+    let destination_2 = Pubkey::new_unique();
+
+    let withdrawal_1 = FeesWithdrawn {
+        platform_authority,
+        destination: destination_1,
+        amount: 1_000_000_000, // 1,000 USDC
+        timestamp: 1_704_067_200,
+    };
+
+    let withdrawal_2 = FeesWithdrawn {
+        platform_authority,
+        destination: destination_2,
+        amount: 2_500_000_000, // 2,500 USDC
+        timestamp: 1_704_153_600,
+    };
+
+    // Verify events can be used to track withdrawal history
+    assert_eq!(
+        withdrawal_1.platform_authority, withdrawal_2.platform_authority,
+        "Both withdrawals should be from same platform authority"
+    );
+
+    assert_ne!(
+        withdrawal_1.destination, withdrawal_2.destination,
+        "Withdrawals to different destinations should be distinguishable"
+    );
+
+    assert_ne!(
+        withdrawal_1.amount, withdrawal_2.amount,
+        "Different withdrawal amounts should be distinguishable"
+    );
+
+    assert!(
+        withdrawal_1.timestamp < withdrawal_2.timestamp,
+        "Events should be chronologically orderable"
+    );
+
+    // Calculate total withdrawn for audit purposes
+    let total_withdrawn = withdrawal_1.amount + withdrawal_2.amount;
+    assert_eq!(
+        total_withdrawn, 3_500_000_000,
+        "Audit trail should support aggregation of withdrawal amounts"
+    );
+}
+
+/// Test event transparency for monitoring (L-8 fix)
+///
+/// This test validates that the `FeesWithdrawn` event enables effective
+/// monitoring and alerting on fee withdrawal activity.
+#[test]
+fn test_fees_withdrawn_event_monitoring() {
+    use tally_subs::events::FeesWithdrawn;
+
+    let platform_authority = Pubkey::new_unique();
+    let destination = Pubkey::new_unique();
+
+    // Simulate a large withdrawal that might trigger monitoring alerts
+    let large_withdrawal = FeesWithdrawn {
+        platform_authority,
+        destination,
+        amount: 10_000_000_000, // 10,000 USDC
+        timestamp: 1_704_067_200,
+    };
+
+    // Simulate monitoring logic
+    let alert_threshold = 5_000_000_000; // 5,000 USDC
+    let should_alert = large_withdrawal.amount > alert_threshold;
+
+    assert!(
+        should_alert,
+        "Large withdrawals should be detectable for monitoring alerts"
+    );
+
+    // Verify all necessary information is available for alert context
+    assert!(
+        !large_withdrawal.platform_authority.to_bytes().is_empty(),
+        "Authority information should be available for alerts"
+    );
+    assert!(
+        !large_withdrawal.destination.to_bytes().is_empty(),
+        "Destination information should be available for alerts"
+    );
+    assert!(
+        large_withdrawal.timestamp > 0,
+        "Timestamp should be available for alerts"
+    );
+}

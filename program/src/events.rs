@@ -198,3 +198,23 @@ pub struct LowAllowanceWarning {
     /// Plan price for reference (in USDC micro-units)
     pub plan_price: u64,
 }
+
+/// Event emitted when platform fees are withdrawn
+///
+/// This event provides transparency and auditability for all platform fee withdrawals,
+/// addressing audit finding L-8. Off-chain systems can monitor this event to:
+/// - Track fee withdrawal history and patterns
+/// - Generate financial reports and analytics
+/// - Alert on unusual withdrawal activity
+/// - Maintain audit trails for compliance
+#[event]
+pub struct FeesWithdrawn {
+    /// Platform authority who authorized the withdrawal
+    pub platform_authority: Pubkey,
+    /// Destination ATA where fees were sent
+    pub destination: Pubkey,
+    /// Amount withdrawn in USDC micro-units
+    pub amount: u64,
+    /// Unix timestamp when withdrawal occurred
+    pub timestamp: i64,
+}
