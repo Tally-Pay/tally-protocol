@@ -369,6 +369,7 @@ fn test_config_state_structure() {
         min_period_seconds: 86400,
         default_allowance_periods: 3,
         allowed_mint: usdc_mint,
+        max_withdrawal_amount: 1_000_000_000,
         bump: 255,
     };
 
@@ -405,6 +406,7 @@ fn test_config_state_with_pending_authority() {
         min_period_seconds: 86400,
         default_allowance_periods: 3,
         allowed_mint: usdc_mint,
+        max_withdrawal_amount: 1_000_000_000,
         bump: 255,
     };
 

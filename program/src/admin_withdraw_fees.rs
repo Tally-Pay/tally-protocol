@@ -91,6 +91,13 @@ pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> 
         return Err(SubscriptionError::InvalidPlan.into());
     }
 
+    // Validate amount does not exceed configured maximum withdrawal limit
+    // This prevents accidental or malicious drainage of entire treasury
+    require!(
+        args.amount <= ctx.accounts.config.max_withdrawal_amount,
+        SubscriptionError::WithdrawLimitExceeded
+    );
+
     // Transfer funds from platform treasury to destination
     let transfer_accounts = TransferChecked {
         from: ctx.accounts.platform_treasury_ata.to_account_info(),

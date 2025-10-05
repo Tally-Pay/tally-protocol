@@ -98,11 +98,14 @@ pub struct Config {
     /// Allowed token mint address (e.g., official USDC mint)
     /// This prevents merchants from using fake or arbitrary tokens
     pub allowed_mint: Pubkey, // 32 bytes
+    /// Maximum withdrawal amount per transaction in USDC microlamports
+    /// Prevents accidental or malicious drainage of entire treasury
+    pub max_withdrawal_amount: u64, // 8 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 1 = 119 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 1 = 127 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

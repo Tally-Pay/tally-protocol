@@ -127,4 +127,9 @@ pub enum SubscriptionError {
     /// When attempting to initiate authority transfer but one is already pending
     #[msg("Authority transfer already pending. Complete or cancel the current transfer before initiating a new one.")]
     TransferAlreadyPending,
+
+    /// Error Code: 6023
+    /// When withdrawal amount exceeds configured maximum
+    #[msg("Withdrawal amount exceeds maximum allowed per transaction. Please reduce the amount or contact platform admin to adjust limits.")]
+    WithdrawLimitExceeded,
 }

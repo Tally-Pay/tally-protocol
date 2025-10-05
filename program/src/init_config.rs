@@ -8,7 +8,8 @@ use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoade
 //   --min-platform-fee-bps 50 \
 //   --min-period-seconds 86400 \
 //   --default-allowance-periods 3 \
-//   --allowed-mint "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+//   --allowed-mint "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" \
+//   --max-withdrawal-amount 1000000000
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct InitConfigArgs {
@@ -18,6 +19,7 @@ pub struct InitConfigArgs {
     pub min_period_seconds: u64,
     pub default_allowance_periods: u8,
     pub allowed_mint: Pubkey,
+    pub max_withdrawal_amount: u64,
 }
 
 #[derive(Accounts)]
@@ -97,6 +99,7 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.min_period_seconds = args.min_period_seconds;
     config.default_allowance_periods = args.default_allowance_periods;
     config.allowed_mint = args.allowed_mint;
+    config.max_withdrawal_amount = args.max_withdrawal_amount;
     config.bump = ctx.bumps.config;
 
     // Get current timestamp for event
@@ -110,6 +113,7 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
         min_period_seconds: args.min_period_seconds,
         default_allowance_periods: args.default_allowance_periods,
         allowed_mint: args.allowed_mint,
+        max_withdrawal_amount: args.max_withdrawal_amount,
         timestamp: clock.unix_timestamp,
     });
 

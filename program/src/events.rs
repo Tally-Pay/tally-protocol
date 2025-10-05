@@ -78,6 +78,8 @@ pub struct ConfigInitialized {
     pub default_allowance_periods: u8,
     /// Allowed token mint address (e.g., official USDC mint)
     pub allowed_mint: Pubkey,
+    /// Maximum withdrawal amount per transaction in USDC microlamports
+    pub max_withdrawal_amount: u64,
     /// Unix timestamp when config was initialized
     pub timestamp: i64,
 }
