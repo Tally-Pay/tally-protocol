@@ -99,13 +99,13 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     // Validate that min_platform_fee_bps <= max_platform_fee_bps
     require!(
         args.min_platform_fee_bps <= args.max_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidPlan
+        crate::errors::SubscriptionError::InvalidConfiguration
     );
 
     // Validate max_grace_period_seconds is reasonable (not zero)
     require!(
         args.max_grace_period_seconds > 0,
-        crate::errors::SubscriptionError::InvalidPlan
+        crate::errors::SubscriptionError::InvalidConfiguration
     );
 
     // Validate platform treasury ATA exists and is correctly derived

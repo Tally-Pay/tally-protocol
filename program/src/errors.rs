@@ -147,4 +147,9 @@ pub enum SubscriptionError {
     /// When attempting to create a plan that already exists for this merchant
     #[msg("A plan with this ID already exists for this merchant. Each plan ID must be unique per merchant.")]
     PlanAlreadyExists,
+
+    /// Error Code: 6027
+    /// When global configuration parameters are invalid or inconsistent
+    #[msg("Invalid configuration parameters. Ensure min/max fee bounds are consistent and all values are within acceptable ranges.")]
+    InvalidConfiguration,
 }

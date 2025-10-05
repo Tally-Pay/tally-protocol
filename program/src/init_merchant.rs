@@ -49,11 +49,11 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     // Validate platform fee is within acceptable range using config
     require!(
         args.platform_fee_bps >= ctx.accounts.config.min_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidPlan
+        crate::errors::SubscriptionError::InvalidConfiguration
     );
     require!(
         args.platform_fee_bps <= ctx.accounts.config.max_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidPlan
+        crate::errors::SubscriptionError::InvalidConfiguration
     );
 
     // Validate that the provided USDC mint matches the allowed mint in config
