@@ -28,6 +28,7 @@ use anchor_lang::prelude::*;
 mod accept_authority;
 mod admin_withdraw_fees;
 mod cancel_subscription;
+mod close_subscription;
 pub mod constants;
 mod create_plan;
 pub mod errors;
@@ -43,6 +44,7 @@ mod update_plan;
 use accept_authority::*;
 use admin_withdraw_fees::*;
 use cancel_subscription::*;
+use close_subscription::*;
 use create_plan::*;
 use init_config::*;
 use init_merchant::*;
@@ -139,6 +141,25 @@ pub mod subs {
         args: CancelSubscriptionArgs,
     ) -> Result<()> {
         cancel_subscription::handler(ctx, args)
+    }
+
+    /// Close a canceled subscription account and reclaim rent
+    ///
+    /// This instruction allows subscribers to close their subscription accounts
+    /// after cancellation to reclaim the rent (~0.00099792 SOL). The subscription
+    /// must be inactive (canceled) before it can be closed.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Subscription is still active (must be canceled first)
+    /// - Unauthorized closure attempt (wrong subscriber)
+    /// - Subscription does not exist or is invalid
+    /// - Account closure operations fail
+    pub fn close_subscription(
+        ctx: Context<CloseSubscription>,
+        args: CloseSubscriptionArgs,
+    ) -> Result<()> {
+        close_subscription::handler(ctx, args)
     }
 
     /// Admin function to withdraw accumulated platform fees
