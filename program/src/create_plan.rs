@@ -72,13 +72,17 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
         SubscriptionError::InvalidPlan
     );
 
-    // Validate grace_secs <= 2 * period_secs
+    // Validate grace_secs <= period_secs (reduced from 2x for security)
+    // This prevents excessively long grace periods that increase merchant payment risk
     require!(
-        args.grace_secs
-            <= args
-                .period_secs
-                .checked_mul(2)
-                .ok_or(SubscriptionError::ArithmeticError)?,
+        args.grace_secs <= args.period_secs,
+        SubscriptionError::InvalidPlan
+    );
+
+    // Validate grace_secs <= max_grace_period_seconds from config
+    // This enforces an absolute maximum to prevent extreme cases (e.g., multi-year grace periods)
+    require!(
+        args.grace_secs <= ctx.accounts.config.max_grace_period_seconds,
         SubscriptionError::InvalidPlan
     );
 

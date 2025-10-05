@@ -101,11 +101,14 @@ pub struct Config {
     /// Maximum withdrawal amount per transaction in USDC microlamports
     /// Prevents accidental or malicious drainage of entire treasury
     pub max_withdrawal_amount: u64, // 8 bytes
+    /// Maximum grace period in seconds (e.g., 604800 = 7 days)
+    /// Prevents excessively long grace periods that increase merchant payment risk
+    pub max_grace_period_seconds: u64, // 8 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 1 = 127 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 8 + 1 = 135 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

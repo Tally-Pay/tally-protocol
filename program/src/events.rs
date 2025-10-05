@@ -80,6 +80,8 @@ pub struct ConfigInitialized {
     pub allowed_mint: Pubkey,
     /// Maximum withdrawal amount per transaction in USDC microlamports
     pub max_withdrawal_amount: u64,
+    /// Maximum grace period in seconds
+    pub max_grace_period_seconds: u64,
     /// Unix timestamp when config was initialized
     pub timestamp: i64,
 }
