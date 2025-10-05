@@ -6,7 +6,6 @@ use anchor_lang::solana_program::bpf_loader_upgradeable::{self, UpgradeableLoade
 //   --platform-authority "YOUR_PLATFORM_AUTHORITY_PUBKEY" \
 //   --max-platform-fee-bps 1000 \
 //   --min-platform-fee-bps 50 \
-//   --fee-basis-points-divisor 10000 \
 //   --min-period-seconds 86400 \
 //   --default-allowance-periods 3 \
 //   --allowed-mint "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
@@ -16,7 +15,6 @@ pub struct InitConfigArgs {
     pub platform_authority: Pubkey,
     pub max_platform_fee_bps: u16,
     pub min_platform_fee_bps: u16,
-    pub fee_basis_points_divisor: u16,
     pub min_period_seconds: u64,
     pub default_allowance_periods: u8,
     pub allowed_mint: Pubkey,
@@ -96,7 +94,6 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.pending_authority = None; // No pending transfer on initialization
     config.max_platform_fee_bps = args.max_platform_fee_bps;
     config.min_platform_fee_bps = args.min_platform_fee_bps;
-    config.fee_basis_points_divisor = args.fee_basis_points_divisor;
     config.min_period_seconds = args.min_period_seconds;
     config.default_allowance_periods = args.default_allowance_periods;
     config.allowed_mint = args.allowed_mint;

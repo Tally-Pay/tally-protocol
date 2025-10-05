@@ -1,4 +1,4 @@
-use crate::{errors::SubscriptionError, events::*, state::*};
+use crate::{constants::FEE_BASIS_POINTS_DIVISOR, errors::SubscriptionError, events::*, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
@@ -191,7 +191,7 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         u128::from(plan.price_usdc)
             .checked_mul(u128::from(merchant.platform_fee_bps))
             .ok_or(SubscriptionError::ArithmeticError)?
-            .checked_div(u128::from(ctx.accounts.config.fee_basis_points_divisor))
+            .checked_div(FEE_BASIS_POINTS_DIVISOR)
             .ok_or(SubscriptionError::ArithmeticError)?,
     )
     .map_err(|_| SubscriptionError::ArithmeticError)?;

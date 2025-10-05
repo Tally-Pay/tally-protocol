@@ -91,8 +91,6 @@ pub struct Config {
     pub max_platform_fee_bps: u16, // 2 bytes
     /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
     pub min_platform_fee_bps: u16, // 2 bytes
-    /// Basis points divisor (e.g., 10000 for percentage calculations)
-    pub fee_basis_points_divisor: u16, // 2 bytes
     /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
     pub min_period_seconds: u64, // 8 bytes
     /// Default allowance periods multiplier (e.g., 3)
@@ -105,6 +103,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 2 + 8 + 1 + 32 + 1 = 121 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 1 = 119 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
