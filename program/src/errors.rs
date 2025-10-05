@@ -155,4 +155,14 @@ pub enum SubscriptionError {
     /// When global configuration parameters are invalid or inconsistent
     #[msg("Invalid configuration parameters. Ensure min/max fee bounds are consistent and all values are within acceptable ranges.")]
     InvalidConfiguration,
+
+    /// Error Code: 6028
+    /// When an invalid trial duration is provided (must be 7, 14, or 30 days)
+    #[msg("Invalid trial duration. Trial period must be exactly 7 days (604800 seconds), 14 days (1209600 seconds), or 30 days (2592000 seconds).")]
+    InvalidTrialDuration,
+
+    /// Error Code: 6029
+    /// When attempting to start a trial but subscriber has already used their trial for this plan
+    #[msg("Trial already used. Each subscriber can only use one free trial per plan.")]
+    TrialAlreadyUsed,
 }

@@ -1,5 +1,28 @@
 use anchor_lang::prelude::*;
 
+/// Merchant tier determines platform fee rate
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum MerchantTier {
+    /// Free tier: 2.0% platform fee (200 basis points)
+    Free,
+    /// Pro tier: 1.5% platform fee (150 basis points)
+    Pro,
+    /// Enterprise tier: 1.0% platform fee (100 basis points)
+    Enterprise,
+}
+
+impl MerchantTier {
+    /// Returns the platform fee in basis points for this tier
+    #[must_use]
+    pub const fn fee_bps(self) -> u16 {
+        match self {
+            Self::Free => 200,       // 2.0%
+            Self::Pro => 150,        // 1.5%
+            Self::Enterprise => 100, // 1.0%
+        }
+    }
+}
+
 /// Merchant account stores merchant configuration and settings
 /// PDA seeds: ["merchant", authority]
 #[account]
@@ -13,6 +36,8 @@ pub struct Merchant {
     pub treasury_ata: Pubkey, // 32 bytes
     /// Platform fee in basis points (0-1000, representing 0-10%)
     pub platform_fee_bps: u16, // 2 bytes
+    /// Merchant tier (Free, Pro, Enterprise)
+    pub tier: MerchantTier, // 1 byte (enum discriminant)
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
@@ -100,12 +125,36 @@ pub struct Subscription {
     pub last_amount: u64, // 8 bytes
     /// Unix timestamp when subscription was last renewed (prevents double-renewal attacks)
     pub last_renewed_ts: i64, // 8 bytes
+    /// Unix timestamp when free trial period ends (None if no trial)
+    ///
+    /// When present, indicates the subscription is in or was in a free trial period.
+    /// During the trial, no payment is required. After `trial_ends_at`, the first
+    /// renewal will process the initial payment.
+    ///
+    /// # Trial Behavior
+    ///
+    /// - **New Subscription with Trial**: Set to `current_time` + `trial_duration_secs`
+    /// - **During Trial**: No payment required, `in_trial` = true
+    /// - **Trial End**: First renewal processes payment, `in_trial` set to false
+    /// - **Reactivation**: Always None (trials only apply to first subscription)
+    pub trial_ends_at: Option<i64>, // 9 bytes (1 byte discriminator + 8 bytes i64)
+    /// Whether subscription is currently in free trial period
+    ///
+    /// When true, the subscription is active but no payment has been made yet.
+    /// The first payment will occur at `next_renewal_ts` (when trial ends).
+    ///
+    /// # Trial State Transitions
+    ///
+    /// - **New Subscription**: Set to true if `trial_duration_secs` provided
+    /// - **Trial End (First Renewal)**: Set to false after successful payment
+    /// - **Reactivation**: Always false (no trials on reactivation)
+    pub in_trial: bool, // 1 byte
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Merchant {
-    /// Total space: 8 (discriminator) + 32 + 32 + 32 + 2 + 1 = 107 bytes
+    /// Total space: 8 (discriminator) + 32 + 32 + 32 + 2 + 1 + 1 = 108 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 
@@ -115,7 +164,7 @@ impl Plan {
 }
 
 impl Subscription {
-    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 8 + 1 = 110 bytes
+    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 8 + 9 + 1 + 1 = 120 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 
@@ -148,11 +197,15 @@ pub struct Config {
     /// Emergency pause state - when true, all user-facing operations are disabled
     /// This allows the platform authority to halt operations in case of security incidents
     pub paused: bool, // 1 byte
+    /// Keeper fee in basis points (e.g., 25 = 0.25%)
+    /// This fee is paid to the transaction caller (keeper) to incentivize decentralized renewal network
+    /// Capped at 100 basis points (1%) to prevent excessive keeper fees
+    pub keeper_fee_bps: u16, // 2 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
 impl Config {
-    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 8 + 1 + 1 = 136 bytes
+    /// Total space: 8 (discriminator) + 32 + 33 + 2 + 2 + 8 + 1 + 32 + 8 + 8 + 1 + 2 + 1 = 138 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }

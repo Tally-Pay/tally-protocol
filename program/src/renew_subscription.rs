@@ -49,6 +49,15 @@ pub struct RenewSubscription<'info> {
     #[account(mut)]
     pub platform_treasury_ata: UncheckedAccount<'info>,
 
+    /// Keeper (transaction caller) who executes the renewal
+    #[account(mut)]
+    pub keeper: Signer<'info>,
+
+    /// Keeper's USDC ATA where keeper fee will be sent
+    /// CHECK: Validated as keeper's USDC token account in handler
+    #[account(mut)]
+    pub keeper_usdc_ata: UncheckedAccount<'info>,
+
     /// CHECK: Validated as USDC mint in handler
     pub usdc_mint: UncheckedAccount<'info>,
 
@@ -72,6 +81,15 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     // Get current timestamp
     let clock = Clock::get()?;
     let current_time = clock.unix_timestamp;
+
+    // TRIAL TO PAID CONVERSION
+    //
+    // If this subscription is in trial period, this renewal represents the first payment
+    // after trial expiration. We need to:
+    // 1. Clear the trial flags (in_trial = false, trial_ends_at = None)
+    // 2. Process the payment normally
+    // 3. Emit TrialConverted event after successful payment
+    let was_trial = subscription.in_trial;
 
     // Check timing: now >= next_renewal_ts AND now <= next_renewal_ts + grace_secs
     if current_time < subscription.next_renewal_ts {
@@ -120,6 +138,10 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     )
     .map_err(|_| SubscriptionError::InvalidPlatformTreasuryAccount)?;
 
+    let keeper_ata_data: TokenAccount =
+        TokenAccount::try_deserialize(&mut ctx.accounts.keeper_usdc_ata.data.borrow().as_ref())
+            .map_err(|_| SubscriptionError::InvalidSubscriberTokenAccount)?;
+
     let usdc_mint_data: Mint =
         Mint::try_deserialize(&mut ctx.accounts.usdc_mint.data.borrow().as_ref())
             .map_err(|_| SubscriptionError::InvalidUsdcMint)?;
@@ -139,9 +161,14 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::Unauthorized.into());
     }
 
+    if keeper_ata_data.owner != ctx.accounts.keeper.key() {
+        return Err(SubscriptionError::Unauthorized.into());
+    }
+
     if subscriber_ata_data.mint != merchant.usdc_mint
         || merchant_treasury_data.mint != merchant.usdc_mint
         || platform_treasury_data.mint != merchant.usdc_mint
+        || keeper_ata_data.mint != merchant.usdc_mint
     {
         return Err(SubscriptionError::WrongMint.into());
     }
@@ -236,9 +263,25 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         return Err(SubscriptionError::InsufficientFunds.into());
     }
 
-    // Calculate platform fee using checked arithmetic (same as start_subscription)
-    let platform_fee = u64::try_from(
+    // Calculate keeper fee first (deducted from total amount)
+    let keeper_fee = u64::try_from(
         u128::from(plan.price_usdc)
+            .checked_mul(u128::from(ctx.accounts.config.keeper_fee_bps))
+            .ok_or(SubscriptionError::ArithmeticError)?
+            .checked_div(FEE_BASIS_POINTS_DIVISOR)
+            .ok_or(SubscriptionError::ArithmeticError)?,
+    )
+    .map_err(|_| SubscriptionError::ArithmeticError)?;
+
+    // Calculate remaining amount after keeper fee
+    let remaining_after_keeper = plan
+        .price_usdc
+        .checked_sub(keeper_fee)
+        .ok_or(SubscriptionError::ArithmeticError)?;
+
+    // Calculate platform fee from remaining amount
+    let platform_fee = u64::try_from(
+        u128::from(remaining_after_keeper)
             .checked_mul(u128::from(merchant.platform_fee_bps))
             .ok_or(SubscriptionError::ArithmeticError)?
             .checked_div(FEE_BASIS_POINTS_DIVISOR)
@@ -246,8 +289,8 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     )
     .map_err(|_| SubscriptionError::ArithmeticError)?;
 
-    let merchant_amount = plan
-        .price_usdc
+    // Calculate merchant amount from remaining amount
+    let merchant_amount = remaining_after_keeper
         .checked_sub(platform_fee)
         .ok_or(SubscriptionError::ArithmeticError)?;
 
@@ -299,6 +342,26 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         )?;
     }
 
+    // Transfer keeper fee to keeper's ATA (via delegate)
+    if keeper_fee > 0 {
+        let transfer_to_keeper = TransferChecked {
+            from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+            mint: ctx.accounts.usdc_mint.to_account_info(),
+            to: ctx.accounts.keeper_usdc_ata.to_account_info(),
+            authority: ctx.accounts.program_delegate.to_account_info(),
+        };
+
+        token::transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                transfer_to_keeper,
+                delegate_seeds,
+            ),
+            keeper_fee,
+            usdc_decimals,
+        )?;
+    }
+
     // Update subscription fields
     subscription.next_renewal_ts = subscription
         .next_renewal_ts
@@ -313,12 +376,30 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     subscription.last_amount = plan.price_usdc;
     subscription.last_renewed_ts = current_time;
 
-    // Emit Renewed event
+    // Clear trial status if this was a trial conversion
+    if was_trial {
+        subscription.in_trial = false;
+        subscription.trial_ends_at = None;
+    }
+
+    // Emit appropriate event based on whether this was a trial conversion or regular renewal
+    if was_trial {
+        // Emit TrialConverted event for trial to paid conversion
+        emit!(crate::events::TrialConverted {
+            subscription: subscription.key(),
+            subscriber: subscription.subscriber,
+            plan: plan.key(),
+        });
+    }
+
+    // Always emit Renewed event (regardless of trial status)
     emit!(Renewed {
         merchant: merchant.key(),
         plan: plan.key(),
         subscriber: subscription.subscriber,
         amount: plan.price_usdc,
+        keeper: ctx.accounts.keeper.key(),
+        keeper_fee,
     });
 
     Ok(())

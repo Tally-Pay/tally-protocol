@@ -108,3 +108,27 @@ pub const ABSOLUTE_MIN_PERIOD_SECONDS: u64 = 86400;
 /// - Predictable validation behavior for merchants and subscribers
 /// - Protection against extreme price manipulation attacks
 pub const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000; // 1 million USDC
+
+/// Valid trial duration: 7 days in seconds
+///
+/// Free trial period of 7 days is a standard short trial period commonly used
+/// for subscription services to provide quick product evaluation.
+///
+/// # Value: 604800 seconds (7 days)
+pub const TRIAL_DURATION_7_DAYS: u64 = 604_800;
+
+/// Valid trial duration: 14 days in seconds
+///
+/// Free trial period of 14 days (2 weeks) is a common trial period for subscription
+/// services, providing sufficient time for thorough product evaluation.
+///
+/// # Value: 1209600 seconds (14 days)
+pub const TRIAL_DURATION_14_DAYS: u64 = 1_209_600;
+
+/// Valid trial duration: 30 days in seconds
+///
+/// Free trial period of 30 days (1 month) is a generous trial period commonly used
+/// for premium or enterprise subscription services requiring extended evaluation.
+///
+/// # Value: 2592000 seconds (30 days)
+pub const TRIAL_DURATION_30_DAYS: u64 = 2_592_000;

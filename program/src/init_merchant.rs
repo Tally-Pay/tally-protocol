@@ -124,6 +124,7 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     merchant.usdc_mint = args.usdc_mint;
     merchant.treasury_ata = args.treasury_ata;
     merchant.platform_fee_bps = args.platform_fee_bps;
+    merchant.tier = crate::state::MerchantTier::Free; // Default to Free tier
     merchant.bump = ctx.bumps.merchant;
 
     // Get current timestamp for event

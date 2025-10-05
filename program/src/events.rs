@@ -41,6 +41,10 @@ pub struct Renewed {
     pub subscriber: Pubkey,
     /// The amount paid for the renewal (in USDC micro-units)
     pub amount: u64,
+    /// The keeper (transaction caller) who executed the renewal
+    pub keeper: Pubkey,
+    /// The fee paid to the keeper (in USDC micro-units)
+    pub keeper_fee: u64,
 }
 
 /// Event emitted when a subscription is canceled
@@ -258,4 +262,120 @@ pub struct DelegateMismatchWarning {
     pub expected_delegate: Pubkey,
     /// The actual delegate currently set on the token account (may be None or different merchant)
     pub actual_delegate: Option<Pubkey>,
+}
+
+/// Event emitted when global configuration is updated
+///
+/// This event provides transparency for all configuration changes made by the platform authority.
+/// Off-chain systems can monitor this event to track configuration updates and adjust behavior accordingly.
+#[event]
+pub struct ConfigUpdated {
+    /// Keeper fee in basis points (e.g., 25 = 0.25%)
+    pub keeper_fee_bps: u16,
+    /// Maximum withdrawal amount per transaction in USDC microlamports
+    pub max_withdrawal_amount: u64,
+    /// Maximum grace period in seconds
+    pub max_grace_period_seconds: u64,
+    /// Minimum platform fee in basis points
+    pub min_platform_fee_bps: u16,
+    /// Maximum platform fee in basis points
+    pub max_platform_fee_bps: u16,
+    /// Platform authority who made the update
+    pub updated_by: Pubkey,
+}
+
+/// Event emitted when a merchant's tier is changed
+///
+/// This event provides transparency and auditability for merchant tier changes.
+/// Tier changes immediately affect the platform fee rate applied to new renewals.
+/// Off-chain systems can monitor this event to:
+/// - Track merchant tier progression and revenue impact
+/// - Generate analytics on tier adoption patterns
+/// - Alert merchants of tier changes initiated by platform authority
+/// - Maintain audit trails for billing and compliance
+#[event]
+pub struct MerchantTierChanged {
+    /// The merchant account whose tier changed
+    pub merchant: Pubkey,
+    /// The previous tier before the change
+    pub old_tier: crate::state::MerchantTier,
+    /// The new tier after the change
+    pub new_tier: crate::state::MerchantTier,
+    /// The new platform fee in basis points corresponding to the new tier
+    pub new_fee_bps: u16,
+}
+
+/// Event emitted when a plan's pricing or terms are updated
+///
+/// This event provides transparency for all plan term modifications made by merchant authority.
+/// Term updates affect existing subscriptions starting from their next renewal.
+/// Off-chain systems can monitor this event to:
+/// - Track pricing changes and revenue impacts
+/// - Alert subscribers of upcoming term changes
+/// - Generate analytics on plan evolution patterns
+/// - Maintain audit trails for subscription management
+#[event]
+pub struct PlanTermsUpdated {
+    /// The plan account whose terms were updated
+    pub plan: Pubkey,
+    /// The merchant who owns the plan
+    pub merchant: Pubkey,
+    /// The old price before update (if price was updated)
+    pub old_price: Option<u64>,
+    /// The new price after update (if price was updated)
+    pub new_price: Option<u64>,
+    /// The old period before update (if period was updated)
+    pub old_period: Option<u64>,
+    /// The new period after update (if period was updated)
+    pub new_period: Option<u64>,
+    /// The old grace period before update (if grace was updated)
+    pub old_grace: Option<u64>,
+    /// The new grace period after update (if grace was updated)
+    pub new_grace: Option<u64>,
+    /// Merchant authority who performed the update
+    pub updated_by: Pubkey,
+}
+
+/// Event emitted when a subscription starts with a free trial period
+///
+/// This event indicates a new subscription was created with a trial period,
+/// during which no payment is required. The first payment will occur when
+/// the trial ends.
+///
+/// Off-chain systems can monitor this event to:
+/// - Track trial usage and conversion rates
+/// - Send trial expiration reminders to subscribers
+/// - Generate analytics on trial effectiveness
+/// - Identify potential trial abuse patterns
+#[event]
+pub struct TrialStarted {
+    /// The subscription account that entered trial period
+    pub subscription: Pubkey,
+    /// The subscriber who started the trial
+    pub subscriber: Pubkey,
+    /// The subscription plan for this trial
+    pub plan: Pubkey,
+    /// Unix timestamp when the trial period ends
+    pub trial_ends_at: i64,
+}
+
+/// Event emitted when a trial subscription converts to paid
+///
+/// This event marks the successful conversion of a free trial subscription
+/// to a paid subscription after the trial period ends. This occurs during
+/// the first renewal after trial expiration.
+///
+/// Off-chain systems can monitor this event to:
+/// - Track trial-to-paid conversion rates
+/// - Measure subscription revenue attribution
+/// - Generate trial effectiveness metrics
+/// - Trigger post-conversion workflows (welcome emails, etc.)
+#[event]
+pub struct TrialConverted {
+    /// The subscription account that converted from trial to paid
+    pub subscription: Pubkey,
+    /// The subscriber who converted to paid
+    pub subscriber: Pubkey,
+    /// The subscription plan that was converted
+    pub plan: Pubkey,
 }

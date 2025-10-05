@@ -42,7 +42,10 @@ mod start_subscription;
 pub mod state;
 mod transfer_authority;
 mod unpause;
+mod update_config;
+mod update_merchant_tier;
 mod update_plan;
+mod update_plan_terms;
 pub mod utils;
 
 use accept_authority::*;
@@ -58,7 +61,10 @@ use renew_subscription::*;
 use start_subscription::*;
 use transfer_authority::*;
 use unpause::*;
+use update_config::*;
+use update_merchant_tier::*;
 use update_plan::*;
+use update_plan_terms::*;
 
 declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
 
@@ -271,5 +277,67 @@ pub mod subs {
     /// - Caller is not the platform authority
     pub fn unpause(ctx: Context<Unpause>, args: UnpauseArgs) -> Result<()> {
         unpause::handler(ctx, args)
+    }
+
+    /// Update global configuration parameters
+    ///
+    /// This allows the platform authority to update global configuration parameters
+    /// at runtime without redeploying the program. All changes take effect immediately.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the platform authority
+    /// - `keeper_fee_bps` exceeds 100 (1%)
+    /// - `min_platform_fee_bps` > `max_platform_fee_bps`
+    /// - Any value is zero where positive values are required
+    /// - No fields are provided for update
+    pub fn update_config(
+        ctx: Context<UpdateConfig>,
+        args: UpdateConfigArgs,
+    ) -> Result<()> {
+        update_config::handler(ctx, args)
+    }
+
+    /// Update merchant tier
+    ///
+    /// This allows the merchant authority or platform admin to change a merchant's tier,
+    /// which automatically adjusts the platform fee rate:
+    /// - Free: 2.0% (200 basis points)
+    /// - Pro: 1.5% (150 basis points)
+    /// - Enterprise: 1.0% (100 basis points)
+    ///
+    /// Tier changes take effect immediately on the next renewal.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the merchant authority or platform admin
+    /// - New tier fee is outside config min/max bounds
+    pub fn update_merchant_tier(
+        ctx: Context<UpdateMerchantTier>,
+        args: UpdateMerchantTierArgs,
+    ) -> Result<()> {
+        update_merchant_tier::handler(ctx, args)
+    }
+
+    /// Update subscription plan pricing and terms
+    ///
+    /// Allows the merchant authority to update an existing plan's price, period,
+    /// grace period, and name without creating a new plan. This is useful for
+    /// adjusting pricing, extending or shortening billing cycles, or updating
+    /// plan details based on market conditions.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - Caller is not the merchant authority
+    /// - No fields are provided for update (at least one required)
+    /// - New price is zero or exceeds maximum
+    /// - New period is below minimum period from config
+    /// - New grace period exceeds period or config maximum
+    /// - New name is empty
+    pub fn update_plan_terms(
+        ctx: Context<UpdatePlanTerms>,
+        args: UpdatePlanTermsArgs,
+    ) -> Result<()> {
+        update_plan_terms::handler(ctx, args)
     }
 }

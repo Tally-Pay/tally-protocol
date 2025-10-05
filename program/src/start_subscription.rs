@@ -1,5 +1,11 @@
 use crate::{
-    constants::FEE_BASIS_POINTS_DIVISOR, errors::SubscriptionError, events::*, state::*,
+    constants::{
+        FEE_BASIS_POINTS_DIVISOR, TRIAL_DURATION_14_DAYS, TRIAL_DURATION_30_DAYS,
+        TRIAL_DURATION_7_DAYS,
+    },
+    errors::SubscriptionError,
+    events::*,
+    state::*,
     utils::validate_platform_treasury,
 };
 use anchor_lang::prelude::*;
@@ -68,7 +74,8 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 /// See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct StartSubscriptionArgs {
-    pub allowance_periods: u8, // Multiplier for allowance (default 3)
+    pub allowance_periods: u8,       // Multiplier for allowance (default 3)
+    pub trial_duration_secs: Option<u64>, // Optional trial period: 7, 14, or 30 days (in seconds)
 }
 
 #[derive(Accounts)]
@@ -157,6 +164,23 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
             subscription.subscriber == ctx.accounts.subscriber.key(),
             SubscriptionError::Unauthorized
         );
+
+        // Trial abuse prevention: Trials only allowed for new subscriptions, not reactivations
+        // This prevents users from repeatedly canceling and reactivating to get multiple trials
+        if args.trial_duration_secs.is_some() {
+            return Err(SubscriptionError::TrialAlreadyUsed.into());
+        }
+    } else {
+        // NEW SUBSCRIPTION PATH: Validate trial parameters if provided
+        if let Some(trial_secs) = args.trial_duration_secs {
+            // Validate trial duration is exactly 7, 14, or 30 days
+            if trial_secs != TRIAL_DURATION_7_DAYS
+                && trial_secs != TRIAL_DURATION_14_DAYS
+                && trial_secs != TRIAL_DURATION_30_DAYS
+            {
+                return Err(SubscriptionError::InvalidTrialDuration.into());
+            }
+        }
     }
 
     // Deserialize and validate token accounts with specific error handling
@@ -231,6 +255,9 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         SubscriptionError::InvalidPlan
     );
 
+    // Determine if this is a trial subscription
+    let is_trial = !is_reactivation && args.trial_duration_secs.is_some();
+
     // Validate delegate allowance for multi-period subscription start
     //
     // ALLOWANCE MANAGEMENT EXPECTATIONS (Audit L-3):
@@ -250,6 +277,11 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     //
     // Off-chain systems should monitor LowAllowanceWarning events to prompt users
     // to increase allowance before the next renewal cycle.
+    //
+    // TRIAL SUBSCRIPTIONS:
+    // During trial periods, delegate approval is still required but no immediate payment
+    // is made. The allowance is validated to ensure the first payment (when trial ends)
+    // can be processed successfully.
     let required_allowance = plan
         .price_usdc
         .checked_mul(allowance_periods_u64)
@@ -294,75 +326,95 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         return Err(SubscriptionError::Unauthorized.into());
     }
 
-    // Calculate platform fee using checked arithmetic
-    let platform_fee = u64::try_from(
-        u128::from(plan.price_usdc)
-            .checked_mul(u128::from(merchant.platform_fee_bps))
-            .ok_or(SubscriptionError::ArithmeticError)?
-            .checked_div(FEE_BASIS_POINTS_DIVISOR)
-            .ok_or(SubscriptionError::ArithmeticError)?,
-    )
-    .map_err(|_| SubscriptionError::ArithmeticError)?;
+    // PAYMENT PROCESSING: Skip during trial period
+    //
+    // Trial subscriptions do not require immediate payment. The delegate approval
+    // has already been validated above, ensuring payment can be processed when
+    // the trial ends. The first payment will occur during the renewal at trial_ends_at.
+    if !is_trial {
+        // Calculate platform fee using checked arithmetic
+        let platform_fee = u64::try_from(
+            u128::from(plan.price_usdc)
+                .checked_mul(u128::from(merchant.platform_fee_bps))
+                .ok_or(SubscriptionError::ArithmeticError)?
+                .checked_div(FEE_BASIS_POINTS_DIVISOR)
+                .ok_or(SubscriptionError::ArithmeticError)?,
+        )
+        .map_err(|_| SubscriptionError::ArithmeticError)?;
 
-    let merchant_amount = plan
-        .price_usdc
-        .checked_sub(platform_fee)
-        .ok_or(SubscriptionError::ArithmeticError)?;
+        let merchant_amount = plan
+            .price_usdc
+            .checked_sub(platform_fee)
+            .ok_or(SubscriptionError::ArithmeticError)?;
 
-    // Prepare delegate signer seeds
-    let merchant_key = merchant.key();
-    let delegate_bump = ctx.bumps.program_delegate;
-    let delegate_seeds: &[&[&[u8]]] = &[&[b"delegate", merchant_key.as_ref(), &[delegate_bump]]];
+        // Prepare delegate signer seeds
+        let merchant_key = merchant.key();
+        let delegate_bump = ctx.bumps.program_delegate;
+        let delegate_seeds: &[&[&[u8]]] =
+            &[&[b"delegate", merchant_key.as_ref(), &[delegate_bump]]];
 
-    // Get USDC mint decimals from the mint account
-    let usdc_decimals = usdc_mint_data.decimals;
+        // Get USDC mint decimals from the mint account
+        let usdc_decimals = usdc_mint_data.decimals;
 
-    // Transfer merchant amount to merchant treasury (via delegate)
-    if merchant_amount > 0 {
-        let transfer_to_merchant = TransferChecked {
-            from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
-            mint: ctx.accounts.usdc_mint.to_account_info(),
-            to: ctx.accounts.merchant_treasury_ata.to_account_info(),
-            authority: ctx.accounts.program_delegate.to_account_info(),
-        };
+        // Transfer merchant amount to merchant treasury (via delegate)
+        if merchant_amount > 0 {
+            let transfer_to_merchant = TransferChecked {
+                from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+                mint: ctx.accounts.usdc_mint.to_account_info(),
+                to: ctx.accounts.merchant_treasury_ata.to_account_info(),
+                authority: ctx.accounts.program_delegate.to_account_info(),
+            };
 
-        token::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                transfer_to_merchant,
-                delegate_seeds,
-            ),
-            merchant_amount,
-            usdc_decimals,
-        )?;
-    }
+            token::transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    transfer_to_merchant,
+                    delegate_seeds,
+                ),
+                merchant_amount,
+                usdc_decimals,
+            )?;
+        }
 
-    // Transfer platform fee to platform treasury (via delegate)
-    if platform_fee > 0 {
-        let transfer_to_platform = TransferChecked {
-            from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
-            mint: ctx.accounts.usdc_mint.to_account_info(),
-            to: ctx.accounts.platform_treasury_ata.to_account_info(),
-            authority: ctx.accounts.program_delegate.to_account_info(),
-        };
+        // Transfer platform fee to platform treasury (via delegate)
+        if platform_fee > 0 {
+            let transfer_to_platform = TransferChecked {
+                from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+                mint: ctx.accounts.usdc_mint.to_account_info(),
+                to: ctx.accounts.platform_treasury_ata.to_account_info(),
+                authority: ctx.accounts.program_delegate.to_account_info(),
+            };
 
-        token::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                transfer_to_platform,
-                delegate_seeds,
-            ),
-            platform_fee,
-            usdc_decimals,
-        )?;
+            token::transfer_checked(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    transfer_to_platform,
+                    delegate_seeds,
+                ),
+                platform_fee,
+                usdc_decimals,
+            )?;
+        }
     }
 
     // Calculate next renewal timestamp
-    let period_i64 =
-        i64::try_from(plan.period_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
-    let next_renewal_ts = current_time
-        .checked_add(period_i64)
-        .ok_or(SubscriptionError::ArithmeticError)?;
+    //
+    // For trial subscriptions: next_renewal_ts = trial_ends_at (when trial period ends)
+    // For paid subscriptions: next_renewal_ts = current_time + period_secs
+    let next_renewal_ts = if is_trial {
+        let trial_secs = args.trial_duration_secs.unwrap();
+        let trial_duration_i64 =
+            i64::try_from(trial_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
+        current_time
+            .checked_add(trial_duration_i64)
+            .ok_or(SubscriptionError::ArithmeticError)?
+    } else {
+        let period_i64 =
+            i64::try_from(plan.period_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
+        current_time
+            .checked_add(period_i64)
+            .ok_or(SubscriptionError::ArithmeticError)?
+    };
 
     // Update subscription account based on whether this is new or reactivation
     if is_reactivation {
@@ -451,6 +503,9 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         subscription.next_renewal_ts = next_renewal_ts;
         subscription.last_amount = plan.price_usdc;
         subscription.last_renewed_ts = current_time;
+        // Trials never apply to reactivations
+        subscription.trial_ends_at = None;
+        subscription.in_trial = false;
     } else {
         // NEW SUBSCRIPTION: Initialize all fields
         subscription.plan = plan.key();
@@ -462,6 +517,15 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         subscription.last_amount = plan.price_usdc;
         subscription.last_renewed_ts = current_time;
         subscription.bump = ctx.bumps.subscription;
+
+        // Initialize trial fields
+        if is_trial {
+            subscription.trial_ends_at = Some(next_renewal_ts);
+            subscription.in_trial = true;
+        } else {
+            subscription.trial_ends_at = None;
+            subscription.in_trial = false;
+        }
     }
 
     // Emit appropriate event based on whether this is a new subscription or reactivation
@@ -474,7 +538,16 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
             total_renewals: subscription.renewals,
             original_created_ts: subscription.created_ts,
         });
+    } else if is_trial {
+        // Emit TrialStarted event for new trial subscriptions
+        emit!(crate::events::TrialStarted {
+            subscription: subscription.key(),
+            subscriber: ctx.accounts.subscriber.key(),
+            plan: plan.key(),
+            trial_ends_at: next_renewal_ts,
+        });
     } else {
+        // Emit Subscribed event for regular paid subscriptions
         emit!(Subscribed {
             merchant: merchant.key(),
             plan: plan.key(),

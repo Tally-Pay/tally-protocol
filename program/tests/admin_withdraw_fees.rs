@@ -372,6 +372,7 @@ fn test_config_state_structure() {
         max_withdrawal_amount: 1_000_000_000,
         max_grace_period_seconds: 604_800, // 7 days
         paused: false,
+        keeper_fee_bps: 25,
         bump: 255,
     };
 
@@ -411,6 +412,7 @@ fn test_config_state_with_pending_authority() {
         max_withdrawal_amount: 1_000_000_000,
         max_grace_period_seconds: 604_800, // 7 days
         paused: false,
+        keeper_fee_bps: 25,
         bump: 255,
     };
 

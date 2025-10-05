@@ -134,6 +134,7 @@ pub struct InitConfigArgs {
     pub allowed_mint: Pubkey,
     pub max_withdrawal_amount: u64,
     pub max_grace_period_seconds: u64,
+    pub keeper_fee_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -290,6 +291,13 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
         crate::errors::SubscriptionError::InvalidConfiguration
     );
 
+    // Validate keeper_fee_bps is within acceptable range (max 1% = 100 bps)
+    // This prevents excessive keeper fees that would reduce merchant revenue
+    require!(
+        args.keeper_fee_bps <= 100,
+        crate::errors::SubscriptionError::InvalidConfiguration
+    );
+
     // ========================================================================
     // PLATFORM TREASURY ATA VALIDATION (L-5 AUDIT FINDING)
     // ========================================================================
@@ -391,6 +399,7 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     config.max_withdrawal_amount = args.max_withdrawal_amount;
     config.max_grace_period_seconds = args.max_grace_period_seconds;
     config.paused = false; // Program starts in unpaused state
+    config.keeper_fee_bps = args.keeper_fee_bps;
     config.bump = ctx.bumps.config;
 
     // Get current timestamp for event
