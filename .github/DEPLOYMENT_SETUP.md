@@ -2,11 +2,37 @@
 
 This guide explains how to set up GitHub secrets for automated devnet deployments.
 
-## Required GitHub Secrets
+## Required GitHub Organization Secrets
 
-Configure these secrets in your repository settings (`Settings > Secrets and variables > Actions`):
+These secrets are configured at the **organization level** (`Tally-Pay` organization settings) and are available to all repositories:
 
-### 1. `DEVNET_DEPLOYER_KEYPAIR`
+### 1. `DEVNET_PROGRAM_ID`
+
+**Purpose**: The on-chain program address for devnet.
+
+**Value**: `6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5`
+
+**How to create**:
+
+```bash
+# Set as org secret (requires admin permissions)
+echo '6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5' | gh secret set DEVNET_PROGRAM_ID --org Tally-Pay --visibility all
+```
+
+### 2. `LOCALNET_PROGRAM_ID`
+
+**Purpose**: The on-chain program address for localnet testing.
+
+**Value**: `Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV`
+
+**How to create**:
+
+```bash
+# Set as org secret
+echo 'Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV' | gh secret set LOCALNET_PROGRAM_ID --org Tally-Pay --visibility all
+```
+
+### 3. `DEVNET_DEPLOYER_KEYPAIR`
 
 **Purpose**: Wallet that pays for deployment fees and acts as the program upgrade authority.
 
@@ -24,11 +50,12 @@ solana airdrop 5 $(solana address -k ~/.config/solana/devnet-deployer.json) --ur
 
 # Get the keypair in array format for GitHub secret
 cat ~/.config/solana/devnet-deployer.json
+
+# Set as org secret
+cat ~/.config/solana/devnet-deployer.json | gh secret set DEVNET_DEPLOYER_KEYPAIR --org Tally-Pay --visibility all
 ```
 
-Copy the entire JSON array (e.g., `[123,45,67,...]`) and paste it as the `DEVNET_DEPLOYER_KEYPAIR` secret.
-
-### 2. `DEVNET_PROGRAM_KEYPAIR`
+### 4. `DEVNET_PROGRAM_KEYPAIR`
 
 **Purpose**: The program's keypair (only needed for initial deployment).
 
@@ -37,9 +64,10 @@ Copy the entire JSON array (e.g., `[123,45,67,...]`) and paste it as the `DEVNET
 ```bash
 # After running anchor build, the keypair is generated at:
 cat target/deploy/tally_subs-keypair.json
-```
 
-Copy the entire JSON array and paste it as the `DEVNET_PROGRAM_KEYPAIR` secret.
+# Set as org secret
+cat target/deploy/tally_subs-keypair.json | gh secret set DEVNET_PROGRAM_KEYPAIR --org Tally-Pay --visibility all
+```
 
 **Note**: This is only used for the initial deployment. After that, upgrades use the deployer keypair as the upgrade authority.
 

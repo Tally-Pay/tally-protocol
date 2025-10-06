@@ -86,9 +86,8 @@ jobs:
       - name: Deploy/Upgrade program to Devnet
         env:
           PROGRAM_KEYPAIR: ${{ secrets.DEVNET_PROGRAM_KEYPAIR }}
+          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
-          PROGRAM_ID="6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
-
           # Check if program already exists
           if solana program show "$PROGRAM_ID" &> /dev/null; then
             echo "📦 Program exists. Upgrading..."
@@ -115,9 +114,9 @@ jobs:
           fi
 
       - name: Verify deployment
+        env:
+          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
-          PROGRAM_ID="6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
-
           # Show program info
           solana program show "$PROGRAM_ID"
 
@@ -142,10 +141,12 @@ jobs:
 
       - name: Deployment summary
         if: success()
+        env:
+          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
           echo "🎉 Deployment Summary"
           echo "===================="
           echo "Tag: ${{ github.ref_name }}"
-          echo "Program ID: 6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+          echo "Program ID: $PROGRAM_ID"
           echo "Network: Devnet"
-          echo "Explorer: https://explorer.solana.com/address/6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5?cluster=devnet"
+          echo "Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
