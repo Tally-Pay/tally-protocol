@@ -75,9 +75,10 @@ pub use keypair::load_keypair;
 pub use program_types::*;
 pub use transaction_builder::{
     admin_withdraw_fees, cancel_subscription, close_subscription, create_merchant, create_plan,
-    init_config, renew_subscription, start_subscription, AdminWithdrawFeesBuilder,
-    CancelSubscriptionBuilder, CloseSubscriptionBuilder, CreateMerchantBuilder, CreatePlanBuilder,
-    InitConfigBuilder, RenewSubscriptionBuilder, StartSubscriptionBuilder,
+    init_config, renew_subscription, start_subscription, transfer_authority,
+    AdminWithdrawFeesBuilder, CancelSubscriptionBuilder, CloseSubscriptionBuilder,
+    CreateMerchantBuilder, CreatePlanBuilder, InitConfigBuilder, RenewSubscriptionBuilder,
+    StartSubscriptionBuilder, TransferAuthorityBuilder,
 };
 pub use validation::*;
 

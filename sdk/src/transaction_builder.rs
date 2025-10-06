@@ -107,6 +107,14 @@ pub struct CloseSubscriptionBuilder {
     program_id: Option<Pubkey>,
 }
 
+/// Builder for transfer authority transactions
+#[derive(Clone, Debug, Default)]
+pub struct TransferAuthorityBuilder {
+    platform_authority: Option<Pubkey>,
+    new_authority: Option<Pubkey>,
+    program_id: Option<Pubkey>,
+}
+
 impl StartSubscriptionBuilder {
     /// Create a new start subscription builder
     #[must_use]
@@ -1003,6 +1011,74 @@ impl CloseSubscriptionBuilder {
     }
 }
 
+impl TransferAuthorityBuilder {
+    /// Create a new transfer authority builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the current platform authority (must be signer)
+    #[must_use]
+    pub const fn platform_authority(mut self, platform_authority: Pubkey) -> Self {
+        self.platform_authority = Some(platform_authority);
+        self
+    }
+
+    /// Set the new authority to transfer to
+    #[must_use]
+    pub const fn new_authority(mut self, new_authority: Pubkey) -> Self {
+        self.new_authority = Some(new_authority);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `transfer_authority` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let platform_authority = self
+            .platform_authority
+            .ok_or("Platform authority not set")?;
+        let new_authority = self.new_authority.ok_or("New authority not set")?;
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute config PDA
+        let config_pda = pda::config_address_with_program_id(&program_id);
+
+        let accounts = vec![
+            AccountMeta::new(config_pda, false),           // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
+        ];
+
+        let args = crate::program_types::TransferAuthorityArgs { new_authority };
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:transfer_authority")
+            data.extend_from_slice(&[48, 169, 76, 72, 229, 180, 55, 161]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -1057,6 +1133,12 @@ pub fn renew_subscription() -> RenewSubscriptionBuilder {
 #[must_use]
 pub fn close_subscription() -> CloseSubscriptionBuilder {
     CloseSubscriptionBuilder::new()
+}
+
+/// Create a transfer authority transaction builder
+#[must_use]
+pub fn transfer_authority() -> TransferAuthorityBuilder {
+    TransferAuthorityBuilder::new()
 }
 
 #[cfg(test)]
@@ -1716,5 +1798,138 @@ mod tests {
 
         assert_eq!(instruction.accounts[0].pubkey, expected_subscription_pda);
         assert_eq!(instruction.accounts[1].pubkey, subscriber);
+    }
+
+    #[test]
+    fn test_transfer_authority_builder() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = transfer_authority()
+            .platform_authority(platform_authority)
+            .new_authority(new_authority)
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 2);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(
+            &instruction.data[..8],
+            &[48, 169, 76, 72, 229, 180, 55, 161]
+        );
+
+        // Verify account structure
+        assert!(instruction.accounts[0].is_writable); // config (mutable)
+        assert!(!instruction.accounts[0].is_signer); // config (not signer, it's a PDA)
+        assert!(!instruction.accounts[1].is_writable); // platform_authority (readonly)
+        assert!(instruction.accounts[1].is_signer); // platform_authority (signer)
+
+        // Verify account addresses
+        assert_eq!(
+            instruction.accounts[0].pubkey,
+            pda::config_address_with_program_id(&program_id)
+        );
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_transfer_authority_builder_missing_required_fields() {
+        // Test missing platform_authority
+        let result = transfer_authority()
+            .new_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Platform authority not set"));
+
+        // Test missing new_authority
+        let result = transfer_authority()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("New authority not set"));
+    }
+
+    #[test]
+    fn test_transfer_authority_builder_custom_program_id() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = transfer_authority()
+            .platform_authority(platform_authority)
+            .new_authority(new_authority)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_transfer_authority_builder_pda_computation() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = transfer_authority()
+            .platform_authority(platform_authority)
+            .new_authority(new_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed config PDA is correct
+        let program_id = program_id();
+        let expected_config_pda = pda::config_address_with_program_id(&program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_transfer_authority_args_serialization() {
+        let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test that args can be serialized and included in instruction data
+        let instruction = transfer_authority()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .new_authority(new_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the data contains the discriminator (8 bytes) followed by serialized args
+        assert!(instruction.data.len() > 8);
+
+        // Verify we can deserialize the args from the instruction data
+        let args_data = &instruction.data[8..];
+        let deserialized_args =
+            crate::program_types::TransferAuthorityArgs::try_from_slice(args_data).unwrap();
+        assert_eq!(deserialized_args.new_authority, new_authority);
+    }
+
+    #[test]
+    fn test_transfer_authority_builder_clone_debug() {
+        let builder = transfer_authority()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .new_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+
+        // Test Clone trait
+        let cloned_builder = builder.clone();
+        assert_eq!(
+            cloned_builder.platform_authority,
+            builder.platform_authority
+        );
+        assert_eq!(cloned_builder.new_authority, builder.new_authority);
+
+        // Test Debug trait
+        let debug_str = format!("{builder:?}");
+        assert!(debug_str.contains("TransferAuthorityBuilder"));
     }
 }
