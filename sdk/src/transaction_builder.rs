@@ -6,7 +6,7 @@ use crate::{
     pda, program_id,
     program_types::{
         AdminWithdrawFeesArgs, CancelSubscriptionArgs, CreatePlanArgs, InitConfigArgs,
-        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdatePlanArgs,
+        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdateConfigArgs, UpdatePlanArgs,
     },
 };
 use anchor_client::solana_sdk::instruction::{AccountMeta, Instruction};
@@ -140,6 +140,20 @@ pub struct PauseBuilder {
 #[derive(Clone, Debug, Default)]
 pub struct UnpauseBuilder {
     platform_authority: Option<Pubkey>,
+    program_id: Option<Pubkey>,
+}
+
+/// Builder for update config transactions
+#[derive(Clone, Debug, Default)]
+pub struct UpdateConfigBuilder {
+    platform_authority: Option<Pubkey>,
+    keeper_fee_bps: Option<u16>,
+    max_withdrawal_amount: Option<u64>,
+    max_grace_period_seconds: Option<u64>,
+    min_platform_fee_bps: Option<u16>,
+    max_platform_fee_bps: Option<u16>,
+    min_period_seconds: Option<u64>,
+    default_allowance_periods: Option<u8>,
     program_id: Option<Pubkey>,
 }
 
@@ -1084,7 +1098,7 @@ impl TransferAuthorityBuilder {
         let config_pda = pda::config_address_with_program_id(&program_id);
 
         let accounts = vec![
-            AccountMeta::new(config_pda, false),           // config (PDA, mutable)
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
             AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
         ];
 
@@ -1142,7 +1156,7 @@ impl AcceptAuthorityBuilder {
         let config_pda = pda::config_address_with_program_id(&program_id);
 
         let accounts = vec![
-            AccountMeta::new(config_pda, false),           // config (PDA, mutable)
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
             AccountMeta::new_readonly(new_authority, true), // new_authority (signer)
         ];
 
@@ -1202,8 +1216,8 @@ impl CancelAuthorityTransferBuilder {
         let config_pda = pda::config_address_with_program_id(&program_id);
 
         let accounts = vec![
-            AccountMeta::new(config_pda, false),                     // config (PDA, mutable)
-            AccountMeta::new_readonly(platform_authority, true),     // platform_authority (signer)
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
         ];
 
         let args = crate::program_types::CancelAuthorityTransferArgs::default();
@@ -1262,8 +1276,8 @@ impl PauseBuilder {
         let config_pda = pda::config_address_with_program_id(&program_id);
 
         let accounts = vec![
-            AccountMeta::new(config_pda, false),                     // config (PDA, mutable)
-            AccountMeta::new_readonly(platform_authority, true),     // platform_authority (signer)
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
         ];
 
         let args = crate::program_types::PauseArgs {};
@@ -1322,8 +1336,8 @@ impl UnpauseBuilder {
         let config_pda = pda::config_address_with_program_id(&program_id);
 
         let accounts = vec![
-            AccountMeta::new(config_pda, false),                     // config (PDA, mutable)
-            AccountMeta::new_readonly(platform_authority, true),     // platform_authority (signer)
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
         ];
 
         let args = crate::program_types::UnpauseArgs {};
@@ -1332,6 +1346,184 @@ impl UnpauseBuilder {
             let mut data = Vec::new();
             // Instruction discriminator (computed from "global:unpause")
             data.extend_from_slice(&[169, 144, 4, 38, 10, 141, 188, 255]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
+impl UpdateConfigBuilder {
+    /// Create a new update config builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the platform authority (must be signer)
+    #[must_use]
+    pub const fn platform_authority(mut self, platform_authority: Pubkey) -> Self {
+        self.platform_authority = Some(platform_authority);
+        self
+    }
+
+    /// Set the keeper fee in basis points (0-100)
+    #[must_use]
+    pub const fn keeper_fee_bps(mut self, keeper_fee_bps: u16) -> Self {
+        self.keeper_fee_bps = Some(keeper_fee_bps);
+        self
+    }
+
+    /// Set the maximum withdrawal amount
+    #[must_use]
+    pub const fn max_withdrawal_amount(mut self, max_withdrawal_amount: u64) -> Self {
+        self.max_withdrawal_amount = Some(max_withdrawal_amount);
+        self
+    }
+
+    /// Set the maximum grace period in seconds
+    #[must_use]
+    pub const fn max_grace_period_seconds(mut self, max_grace_period_seconds: u64) -> Self {
+        self.max_grace_period_seconds = Some(max_grace_period_seconds);
+        self
+    }
+
+    /// Set the minimum platform fee in basis points
+    #[must_use]
+    pub const fn min_platform_fee_bps(mut self, min_platform_fee_bps: u16) -> Self {
+        self.min_platform_fee_bps = Some(min_platform_fee_bps);
+        self
+    }
+
+    /// Set the maximum platform fee in basis points
+    #[must_use]
+    pub const fn max_platform_fee_bps(mut self, max_platform_fee_bps: u16) -> Self {
+        self.max_platform_fee_bps = Some(max_platform_fee_bps);
+        self
+    }
+
+    /// Set the minimum period in seconds
+    #[must_use]
+    pub const fn min_period_seconds(mut self, min_period_seconds: u64) -> Self {
+        self.min_period_seconds = Some(min_period_seconds);
+        self
+    }
+
+    /// Set the default allowance periods
+    #[must_use]
+    pub const fn default_allowance_periods(mut self, default_allowance_periods: u8) -> Self {
+        self.default_allowance_periods = Some(default_allowance_periods);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `update_config` instruction
+    /// * `Err(TallyError)` - If building fails
+    ///
+    /// # Validation
+    /// * Platform authority must be set
+    /// * At least one field must be set for update
+    /// * `keeper_fee_bps` <= 100 if provided
+    /// * `min_platform_fee_bps` <= `max_platform_fee_bps` if both provided
+    /// * All numeric values > 0 where required
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let platform_authority = self
+            .platform_authority
+            .ok_or("Platform authority not set")?;
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Validate at least one field is set for update
+        let has_update = self.keeper_fee_bps.is_some()
+            || self.max_withdrawal_amount.is_some()
+            || self.max_grace_period_seconds.is_some()
+            || self.min_platform_fee_bps.is_some()
+            || self.max_platform_fee_bps.is_some()
+            || self.min_period_seconds.is_some()
+            || self.default_allowance_periods.is_some();
+
+        if !has_update {
+            return Err("At least one configuration field must be set for update".into());
+        }
+
+        // Validate keeper_fee_bps <= 100 if provided
+        if let Some(keeper_fee) = self.keeper_fee_bps {
+            if keeper_fee > 100 {
+                return Err("Keeper fee must be <= 100 basis points (1%)".into());
+            }
+        }
+
+        // Validate min_platform_fee_bps <= max_platform_fee_bps if both provided
+        if let Some(min_fee) = self.min_platform_fee_bps {
+            if let Some(max_fee) = self.max_platform_fee_bps {
+                if min_fee > max_fee {
+                    return Err("Minimum platform fee must be <= maximum platform fee".into());
+                }
+            }
+        }
+
+        // Validate numeric values > 0 where required
+        if let Some(max_withdrawal) = self.max_withdrawal_amount {
+            if max_withdrawal == 0 {
+                return Err("Maximum withdrawal amount must be > 0".into());
+            }
+        }
+
+        if let Some(max_grace) = self.max_grace_period_seconds {
+            if max_grace == 0 {
+                return Err("Maximum grace period must be > 0".into());
+            }
+        }
+
+        if let Some(min_period) = self.min_period_seconds {
+            if min_period == 0 {
+                return Err("Minimum period must be > 0".into());
+            }
+        }
+
+        if let Some(allowance_periods) = self.default_allowance_periods {
+            if allowance_periods == 0 {
+                return Err("Default allowance periods must be > 0".into());
+            }
+        }
+
+        // Compute config PDA
+        let config_pda = pda::config_address_with_program_id(&program_id);
+
+        let accounts = vec![
+            AccountMeta::new(config_pda, false), // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true), // platform_authority (signer)
+        ];
+
+        let args = UpdateConfigArgs {
+            keeper_fee_bps: self.keeper_fee_bps,
+            max_withdrawal_amount: self.max_withdrawal_amount,
+            max_grace_period_seconds: self.max_grace_period_seconds,
+            min_platform_fee_bps: self.min_platform_fee_bps,
+            max_platform_fee_bps: self.max_platform_fee_bps,
+            min_period_seconds: self.min_period_seconds,
+            default_allowance_periods: self.default_allowance_periods,
+        };
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:update_config")
+            data.extend_from_slice(&[29, 158, 252, 191, 10, 83, 219, 99]);
             borsh::to_writer(&mut data, &args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -1429,6 +1621,12 @@ pub fn pause() -> PauseBuilder {
 #[must_use]
 pub fn unpause() -> UnpauseBuilder {
     UnpauseBuilder::new()
+}
+
+/// Create an update config transaction builder
+#[must_use]
+pub fn update_config() -> UpdateConfigBuilder {
+    UpdateConfigBuilder::new()
 }
 
 #[cfg(test)]
@@ -2321,8 +2519,8 @@ mod tests {
 
     #[test]
     fn test_accept_authority_builder_clone_debug() {
-        let builder = accept_authority()
-            .new_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+        let builder =
+            accept_authority().new_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
 
         // Test Clone trait
         let cloned_builder = builder.clone();
@@ -2357,7 +2555,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(instruction.program_id, direct_instruction.program_id);
-        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
         assert_eq!(instruction.data, direct_instruction.data);
     }
 
@@ -2498,7 +2699,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(instruction.program_id, direct_instruction.program_id);
-        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
         assert_eq!(instruction.data, direct_instruction.data);
     }
 
@@ -2600,8 +2804,7 @@ mod tests {
 
     #[test]
     fn test_pause_builder_clone_debug() {
-        let builder = pause()
-            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+        let builder = pause().platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
 
         // Test Clone trait
         let cloned_builder = builder.clone();
@@ -2639,7 +2842,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(instruction.program_id, direct_instruction.program_id);
-        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
         assert_eq!(instruction.data, direct_instruction.data);
     }
 
@@ -2741,8 +2947,8 @@ mod tests {
 
     #[test]
     fn test_unpause_builder_clone_debug() {
-        let builder = unpause()
-            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+        let builder =
+            unpause().platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
 
         // Test Clone trait
         let cloned_builder = builder.clone();
@@ -2780,7 +2986,357 @@ mod tests {
             .unwrap();
 
         assert_eq!(instruction.program_id, direct_instruction.program_id);
-        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
         assert_eq!(instruction.data, direct_instruction.data);
+    }
+
+    // UpdateConfigBuilder tests
+
+    #[test]
+    fn test_update_config_builder_basic() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 2);
+
+        // Verify config PDA is first account (mutable)
+        let expected_config_pda = pda::config_address_with_program_id(&program_id());
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert!(instruction.accounts[0].is_writable);
+        assert!(!instruction.accounts[0].is_signer);
+
+        // Verify platform authority is second account (signer, read-only)
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+        assert!(!instruction.accounts[1].is_writable);
+        assert!(instruction.accounts[1].is_signer);
+    }
+
+    #[test]
+    fn test_update_config_builder_all_fields() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(50)
+            .max_withdrawal_amount(1_000_000_000)
+            .max_grace_period_seconds(604_800)
+            .min_platform_fee_bps(50)
+            .max_platform_fee_bps(1000)
+            .min_period_seconds(86_400)
+            .default_allowance_periods(5)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 2);
+    }
+
+    #[test]
+    fn test_update_config_builder_missing_authority() {
+        let result = update_config().keeper_fee_bps(25).build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Platform authority not set"));
+    }
+
+    #[test]
+    fn test_update_config_builder_no_updates() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("At least one configuration field must be set"));
+    }
+
+    #[test]
+    fn test_update_config_builder_keeper_fee_too_high() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(101)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Keeper fee must be <= 100"));
+    }
+
+    #[test]
+    fn test_update_config_builder_min_fee_greater_than_max() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .min_platform_fee_bps(200)
+            .max_platform_fee_bps(100)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Minimum platform fee must be <= maximum platform fee"));
+    }
+
+    #[test]
+    fn test_update_config_builder_zero_max_withdrawal() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .max_withdrawal_amount(0)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Maximum withdrawal amount must be > 0"));
+    }
+
+    #[test]
+    fn test_update_config_builder_zero_max_grace_period() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .max_grace_period_seconds(0)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Maximum grace period must be > 0"));
+    }
+
+    #[test]
+    fn test_update_config_builder_zero_min_period() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .min_period_seconds(0)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Minimum period must be > 0"));
+    }
+
+    #[test]
+    fn test_update_config_builder_zero_allowance_periods() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_config()
+            .platform_authority(platform_authority)
+            .default_allowance_periods(0)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Default allowance periods must be > 0"));
+    }
+
+    #[test]
+    fn test_update_config_builder_custom_program_id() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_update_config_builder_pda_computation() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed config PDA is correct
+        let program_id = program_id();
+        let expected_config_pda = pda::config_address_with_program_id(&program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_update_config_args_serialization() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test that args can be serialized and included in instruction data
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .max_withdrawal_amount(1_000_000)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the data contains the discriminator (8 bytes) followed by serialized args
+        assert!(instruction.data.len() > 8);
+
+        // Verify the discriminator matches
+        assert_eq!(
+            &instruction.data[..8],
+            &[29, 158, 252, 191, 10, 83, 219, 99]
+        );
+    }
+
+    #[test]
+    fn test_update_config_builder_clone_debug() {
+        let builder = update_config()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper_fee_bps(25);
+
+        // Test Clone trait
+        let cloned_builder = builder.clone();
+        assert_eq!(
+            cloned_builder.platform_authority,
+            builder.platform_authority
+        );
+        assert_eq!(cloned_builder.keeper_fee_bps, builder.keeper_fee_bps);
+
+        // Test Debug trait
+        let debug_str = format!("{builder:?}");
+        assert!(debug_str.contains("UpdateConfigBuilder"));
+    }
+
+    #[test]
+    fn test_update_config_builder_default() {
+        let builder = UpdateConfigBuilder::default();
+        assert!(builder.platform_authority.is_none());
+        assert!(builder.keeper_fee_bps.is_none());
+        assert!(builder.max_withdrawal_amount.is_none());
+        assert!(builder.max_grace_period_seconds.is_none());
+        assert!(builder.min_platform_fee_bps.is_none());
+        assert!(builder.max_platform_fee_bps.is_none());
+        assert!(builder.min_period_seconds.is_none());
+        assert!(builder.default_allowance_periods.is_none());
+        assert!(builder.program_id.is_none());
+    }
+
+    #[test]
+    fn test_update_config_convenience_function() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test using convenience function
+        let instruction = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .build_instruction()
+            .unwrap();
+
+        // Verify it works the same as using the builder directly
+        let direct_instruction = UpdateConfigBuilder::new()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(25)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, direct_instruction.program_id);
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
+        assert_eq!(instruction.data, direct_instruction.data);
+    }
+
+    #[test]
+    fn test_update_config_builder_partial_updates() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test updating only keeper fee
+        let instruction1 = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(30)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction1.accounts.len(), 2);
+
+        // Test updating only max withdrawal amount
+        let instruction2 = update_config()
+            .platform_authority(platform_authority)
+            .max_withdrawal_amount(5_000_000)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction2.accounts.len(), 2);
+
+        // Test updating only fee bounds
+        let instruction3 = update_config()
+            .platform_authority(platform_authority)
+            .min_platform_fee_bps(100)
+            .max_platform_fee_bps(500)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction3.accounts.len(), 2);
+    }
+
+    #[test]
+    fn test_update_config_builder_edge_cases() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test max keeper fee (100 bps = 1%)
+        let instruction1 = update_config()
+            .platform_authority(platform_authority)
+            .keeper_fee_bps(100)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction1.accounts.len(), 2);
+
+        // Test min/max fee equal
+        let instruction2 = update_config()
+            .platform_authority(platform_authority)
+            .min_platform_fee_bps(100)
+            .max_platform_fee_bps(100)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction2.accounts.len(), 2);
+
+        // Test minimum valid values
+        let instruction3 = update_config()
+            .platform_authority(platform_authority)
+            .max_withdrawal_amount(1)
+            .max_grace_period_seconds(1)
+            .min_period_seconds(1)
+            .default_allowance_periods(1)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction3.accounts.len(), 2);
     }
 }
