@@ -4,9 +4,7 @@ use anchor_lang::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Merchant tier determines platform fee rate
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum MerchantTier {
     /// Free tier: 2.0% platform fee (200 basis points)

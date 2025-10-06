@@ -6,17 +6,17 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{events::TallyEvent, error::Result, SimpleTallyClient, TallyError};
+use crate::solana_sdk::pubkey::Pubkey;
+use crate::{error::Result, events::TallyEvent, SimpleTallyClient, TallyError};
+use anchor_client::solana_account_decoder::UiAccountEncoding;
+use anchor_client::solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
+use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
+use anchor_client::solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
+use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, signature::Signature};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use anchor_client::solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
-use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-use anchor_client::solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
-use anchor_client::solana_account_decoder::UiAccountEncoding;
-use anchor_client::solana_sdk::{commitment_config::CommitmentConfig, signature::Signature};
-use crate::solana_sdk::pubkey::Pubkey;
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::str::FromStr;
@@ -106,7 +106,10 @@ impl CacheEntry {
         // Use checked conversion to i64 and saturating addition to prevent overflow
         let ttl_i64 = i64::try_from(self.ttl_seconds).unwrap_or(i64::MAX);
         let duration = chrono::Duration::seconds(ttl_i64);
-        let expiry = self.cached_at.checked_add_signed(duration).unwrap_or(self.cached_at);
+        let expiry = self
+            .cached_at
+            .checked_add_signed(duration)
+            .unwrap_or(self.cached_at);
         Utc::now() > expiry
     }
 }
@@ -151,8 +154,10 @@ impl EventQueryClient {
     ///
     /// Returns an error if RPC client creation fails
     pub fn new(config: EventQueryClientConfig) -> Result<Self> {
-        let sdk_client = Arc::new(SimpleTallyClient::new(&config.rpc_url)
-            .context("Failed to create SimpleTallyClient")?);
+        let sdk_client = Arc::new(
+            SimpleTallyClient::new(&config.rpc_url)
+                .context("Failed to create SimpleTallyClient")?,
+        );
 
         let cache_size = NonZeroUsize::new(config.query_config.max_cache_size)
             .context("Cache size must be greater than 0")?;
@@ -314,11 +319,7 @@ impl EventQueryClient {
     }
 
     /// Log successful query completion with metrics
-    fn log_query_success(
-        merchant: &Pubkey,
-        events: &[ParsedEvent],
-        start_time: Instant,
-    ) {
+    fn log_query_success(merchant: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
@@ -365,7 +366,12 @@ impl EventQueryClient {
 
         // Convert dates to slots and build query key
         let (from_slot, to_slot) = self.convert_date_range_to_slots(from, to)?;
-        let query_key = Self::build_date_range_query_key(merchant, from_slot, to_slot, self.config.max_events_per_query);
+        let query_key = Self::build_date_range_query_key(
+            merchant,
+            from_slot,
+            to_slot,
+            self.config.max_events_per_query,
+        );
 
         // Check cache and return early if hit
         if let Some(cached) = self.try_get_cached_date_range_events(&query_key, merchant) {
@@ -373,18 +379,30 @@ impl EventQueryClient {
         }
 
         // Fetch, filter, and sort events
-        let sorted_events = self.fetch_filter_and_sort_events_by_date(merchant, from, to, from_slot, to_slot).await?;
+        let sorted_events = self
+            .fetch_filter_and_sort_events_by_date(merchant, from, to, from_slot, to_slot)
+            .await?;
 
         // Store results in cache
         self.try_cache_events(query_key.clone(), &sorted_events);
 
-        Self::log_date_range_query_success(merchant, &sorted_events, from_slot, to_slot, start_time);
+        Self::log_date_range_query_success(
+            merchant,
+            &sorted_events,
+            from_slot,
+            to_slot,
+            start_time,
+        );
 
         Ok(sorted_events)
     }
 
     /// Convert date range to approximate slot range
-    fn convert_date_range_to_slots(&self, from: DateTime<Utc>, to: DateTime<Utc>) -> Result<(u64, u64)> {
+    fn convert_date_range_to_slots(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<(u64, u64)> {
         let from_slot = self.timestamp_to_approximate_slot(from.timestamp())?;
         let to_slot = self.timestamp_to_approximate_slot(to.timestamp())?;
         Ok((from_slot, to_slot))
@@ -440,7 +458,9 @@ impl EventQueryClient {
         from_slot: u64,
         to_slot: u64,
     ) -> Result<Vec<ParsedEvent>> {
-        let signatures = self.get_merchant_signatures_in_slot_range(merchant, from_slot, to_slot).await?;
+        let signatures = self
+            .get_merchant_signatures_in_slot_range(merchant, from_slot, to_slot)
+            .await?;
         let events = self.parse_events_from_signatures(&signatures).await?;
         let filtered_events = Self::filter_events_by_date_range(events, from, to);
         Ok(Self::sort_events_by_block_time(filtered_events))
@@ -460,7 +480,8 @@ impl EventQueryClient {
 
     /// Check if an event is within the specified date range
     fn is_event_in_date_range(event: &ParsedEvent, from: DateTime<Utc>, to: DateTime<Utc>) -> bool {
-        event.block_time
+        event
+            .block_time
             .and_then(|block_time| DateTime::from_timestamp(block_time, 0))
             .is_some_and(|event_time| event_time >= from && event_time <= to)
     }
@@ -529,7 +550,9 @@ impl EventQueryClient {
         );
 
         // Fetch, parse, and sort events
-        let sorted_events = self.fetch_parse_and_sort_merchant_events(merchant, limit).await?;
+        let sorted_events = self
+            .fetch_parse_and_sort_merchant_events(merchant, limit)
+            .await?;
 
         // Store results in cache
         self.try_cache_events(query_key, &sorted_events);
@@ -583,7 +606,9 @@ impl EventQueryClient {
     ) -> Result<Vec<ParsedEvent>> {
         // Get more signatures to ensure we have enough events (2x buffer with overflow protection)
         let signature_limit = limit.saturating_mul(2);
-        let signatures = self.get_merchant_signatures(merchant, signature_limit).await?;
+        let signatures = self
+            .get_merchant_signatures(merchant, signature_limit)
+            .await?;
 
         // Parse events from transactions
         let events = self.parse_events_from_signatures(&signatures).await?;
@@ -593,11 +618,7 @@ impl EventQueryClient {
     }
 
     /// Log successful merchant events query completion with metrics
-    fn log_merchant_events_success(
-        merchant: &Pubkey,
-        events: &[ParsedEvent],
-        start_time: Instant,
-    ) {
+    fn log_merchant_events_success(merchant: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
@@ -672,7 +693,9 @@ impl EventQueryClient {
                             ..Default::default()
                         }),
                     )
-                    .map_err(|e| TallyError::RpcError(format!("Failed to get subscription signatures: {e}")))?;
+                    .map_err(|e| {
+                        TallyError::RpcError(format!("Failed to get subscription signatures: {e}"))
+                    })?;
 
                 for sig_info in sub_signatures {
                     if let Ok(signature) = Signature::from_str(&sig_info.signature) {
@@ -828,7 +851,8 @@ impl EventQueryClient {
         };
 
         let accounts = self
-            .sdk_client.rpc()
+            .sdk_client
+            .rpc()
             .get_program_accounts_with_config(&self.program_id, config)
             .map_err(|e| TallyError::RpcError(format!("Failed to get merchant plans: {e}")))?;
 
@@ -866,7 +890,8 @@ impl EventQueryClient {
         };
 
         let accounts = self
-            .sdk_client.rpc()
+            .sdk_client
+            .rpc()
             .get_program_accounts_with_config(&self.program_id, config)
             .map_err(|e| TallyError::RpcError(format!("Failed to get plan subscriptions: {e}")))?;
 
@@ -891,7 +916,10 @@ impl EventQueryClient {
         const SLOT_DURATION_MS: i64 = 400;
 
         // Get current slot and time
-        let current_slot = self.sdk_client.get_slot().map_err(|e| TallyError::RpcError(format!("Failed to get current slot: {e}")))?;
+        let current_slot = self
+            .sdk_client
+            .get_slot()
+            .map_err(|e| TallyError::RpcError(format!("Failed to get current slot: {e}")))?;
         let current_time = Utc::now().timestamp();
         let time_diff_seconds = current_time.saturating_sub(timestamp);
         let time_diff_ms = time_diff_seconds.saturating_mul(1000);
@@ -957,7 +985,7 @@ impl EventQueryClient {
     }
 
     /// Get cache statistics
-    #[must_use] 
+    #[must_use]
     pub fn get_cache_stats(&self) -> HashMap<String, u64> {
         let mut stats = HashMap::new();
 

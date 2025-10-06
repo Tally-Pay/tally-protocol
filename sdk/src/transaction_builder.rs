@@ -9,8 +9,8 @@ use crate::{
         InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdatePlanArgs,
     },
 };
-use anchor_lang::prelude::*;
 use anchor_client::solana_sdk::instruction::{AccountMeta, Instruction};
+use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use spl_token::instruction::{approve_checked as approve_checked_token, revoke as revoke_token};
 use spl_token_2022::instruction::{
@@ -96,6 +96,14 @@ pub struct RenewSubscriptionBuilder {
     keeper: Option<Pubkey>,
     keeper_ata: Option<Pubkey>,
     token_program: Option<TokenProgram>,
+    program_id: Option<Pubkey>,
+}
+
+/// Builder for close subscription transactions
+#[derive(Clone, Debug, Default)]
+pub struct CloseSubscriptionBuilder {
+    plan: Option<Pubkey>,
+    subscriber: Option<Pubkey>,
     program_id: Option<Pubkey>,
 }
 
@@ -436,7 +444,7 @@ impl CreateMerchantBuilder {
             AccountMeta::new_readonly(treasury_ata, false), // treasury_ata
             AccountMeta::new_readonly(spl_token::id(), false), // token_program
             AccountMeta::new_readonly(spl_associated_token_account::id(), false), // associated_token_program
-            AccountMeta::new_readonly(system_program::ID, false),               // system_program
+            AccountMeta::new_readonly(system_program::ID, false),                 // system_program
         ];
 
         let args = InitMerchantArgs {
@@ -928,6 +936,73 @@ impl RenewSubscriptionBuilder {
     }
 }
 
+impl CloseSubscriptionBuilder {
+    /// Create a new close subscription builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the plan PDA
+    #[must_use]
+    pub const fn plan(mut self, plan: Pubkey) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
+    /// Set the subscriber pubkey
+    #[must_use]
+    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
+        self.subscriber = Some(subscriber);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `close_subscription` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let plan = self.plan.ok_or("Plan not set")?;
+        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute subscription PDA
+        let subscription_pda =
+            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
+
+        // Create close_subscription instruction
+        let close_sub_accounts = vec![
+            AccountMeta::new(subscription_pda, false), // subscription (PDA, mutable, will be closed)
+            AccountMeta::new(subscriber, true), // subscriber (signer, mutable, receives rent)
+        ];
+
+        let close_sub_args = crate::program_types::CloseSubscriptionArgs {};
+        let close_sub_data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "close_subscription")
+            data.extend_from_slice(&[33, 214, 169, 135, 35, 127, 78, 7]);
+            borsh::to_writer(&mut data, &close_sub_args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts: close_sub_accounts,
+            data: close_sub_data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -978,6 +1053,12 @@ pub fn renew_subscription() -> RenewSubscriptionBuilder {
     RenewSubscriptionBuilder::new()
 }
 
+/// Create a close subscription transaction builder
+#[must_use]
+pub fn close_subscription() -> CloseSubscriptionBuilder {
+    CloseSubscriptionBuilder::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -990,7 +1071,7 @@ mod tests {
             usdc_mint: Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0,  // Free tier
+            tier: 0, // Free tier
             bump: 255,
         }
     }
@@ -1144,7 +1225,7 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a test mint for classic token
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0,  // Free tier
+            tier: 0, // Free tier
             bump: 255,
         };
 
@@ -1153,7 +1234,7 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a different test mint for Token-2022
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0,  // Free tier
+            tier: 0, // Free tier
             bump: 255,
         };
 
@@ -1405,7 +1486,10 @@ mod tests {
         assert_eq!(instruction.accounts.len(), 12);
 
         // Verify instruction discriminator matches program
-        assert_eq!(&instruction.data[..8], &[45, 75, 154, 194, 160, 10, 111, 183]);
+        assert_eq!(
+            &instruction.data[..8],
+            &[45, 75, 154, 194, 160, 10, 111, 183]
+        );
 
         // Verify readonly accounts
         verify_renew_readonly_accounts(&instruction);
@@ -1551,5 +1635,86 @@ mod tests {
             spl_token_2022::id()
         );
         assert_eq!(instruction_token.accounts[11].pubkey, spl_token::id());
+    }
+
+    #[test]
+    fn test_close_subscription_builder() {
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = close_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 2);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(&instruction.data[..8], &[33, 214, 169, 135, 35, 127, 78, 7]);
+
+        // Verify account structure
+        assert!(instruction.accounts[0].is_writable); // subscription (mutable)
+        assert!(!instruction.accounts[0].is_signer); // subscription (not signer, it's a PDA)
+        assert!(instruction.accounts[1].is_writable); // subscriber (mutable, receives rent)
+        assert!(instruction.accounts[1].is_signer); // subscriber (signer)
+    }
+
+    #[test]
+    fn test_close_subscription_builder_missing_required_fields() {
+        // Test missing plan
+        let result = close_subscription()
+            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Plan not set"));
+
+        // Test missing subscriber
+        let result = close_subscription()
+            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Subscriber not set"));
+    }
+
+    #[test]
+    fn test_close_subscription_builder_custom_program_id() {
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = close_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_close_subscription_builder_pda_computation() {
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = close_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed subscription PDA is correct
+        let program_id = program_id();
+        let expected_subscription_pda =
+            pda::subscription_address_with_program_id(&plan_key, &subscriber, &program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_subscription_pda);
+        assert_eq!(instruction.accounts[1].pubkey, subscriber);
     }
 }

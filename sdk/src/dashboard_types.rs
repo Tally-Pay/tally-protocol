@@ -6,8 +6,8 @@
 #![allow(clippy::cast_lossless)] // Safe casting for USDC formatting
 
 use crate::program_types::{Plan, Subscription};
-use serde::{Deserialize, Serialize};
 use anchor_client::solana_sdk::pubkey::Pubkey;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Overview statistics for a merchant dashboard

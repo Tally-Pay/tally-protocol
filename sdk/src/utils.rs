@@ -193,8 +193,8 @@ pub fn calculate_next_renewal(
 #[must_use]
 pub fn is_renewal_due(next_renewal_timestamp: i64, grace_period_seconds: u64) -> bool {
     let current_timestamp = chrono::Utc::now().timestamp();
-    let grace_end = next_renewal_timestamp
-        .saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
+    let grace_end =
+        next_renewal_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
     current_timestamp >= next_renewal_timestamp && current_timestamp <= grace_end
 }
 
@@ -212,8 +212,8 @@ pub fn is_renewal_due(next_renewal_timestamp: i64, grace_period_seconds: u64) ->
 #[must_use]
 pub fn is_subscription_overdue(next_renewal_timestamp: i64, grace_period_seconds: u64) -> bool {
     let current_timestamp = chrono::Utc::now().timestamp();
-    let grace_end = next_renewal_timestamp
-        .saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
+    let grace_end =
+        next_renewal_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
     current_timestamp > grace_end
 }
 
@@ -280,10 +280,16 @@ mod tests {
         let period = 2_592_000_u64; // 30 days in seconds
 
         // First renewal (0 periods elapsed)
-        assert_eq!(calculate_next_renewal(start, period, 0), start + i64::try_from(period).unwrap());
+        assert_eq!(
+            calculate_next_renewal(start, period, 0),
+            start + i64::try_from(period).unwrap()
+        );
 
         // Second renewal (1 period elapsed)
-        assert_eq!(calculate_next_renewal(start, period, 1), start + i64::try_from(2 * period).unwrap());
+        assert_eq!(
+            calculate_next_renewal(start, period, 1),
+            start + i64::try_from(2 * period).unwrap()
+        );
     }
 
     #[test]

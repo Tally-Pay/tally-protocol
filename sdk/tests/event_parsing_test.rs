@@ -8,11 +8,11 @@
 //! - Base64 encoding/decoding edge cases
 //! - Program log parsing and filtering
 
+use anchor_client::solana_sdk::signature::Signature;
+use anchor_client::solana_sdk::transaction::TransactionError;
 use anchor_lang::prelude::*;
 use base64::prelude::*;
 use solana_sdk::signature::{Keypair, Signer};
-use anchor_client::solana_sdk::signature::Signature;
-use anchor_client::solana_sdk::transaction::TransactionError;
 use std::collections::HashMap;
 use tally_sdk::{
     events::{
@@ -740,4 +740,3 @@ async fn test_edge_case_scenarios() {
     let min_result = parse_single_event(&min_encoded);
     assert!(min_result.is_ok(), "Should handle minimal event data");
 }
-

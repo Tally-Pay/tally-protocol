@@ -1,11 +1,11 @@
 //! Event parsing utilities for Tally program events and structured receipts
 
 use crate::{error::Result, TallyError};
+use anchor_client::solana_sdk::{signature::Signature, transaction::TransactionError};
 use anchor_lang::prelude::*;
 use base64::prelude::*;
 use chrono;
 use serde::{Deserialize, Serialize};
-use anchor_client::solana_sdk::{signature::Signature, transaction::TransactionError};
 use std::collections::HashMap;
 
 /// Event emitted when a subscription is successfully started
@@ -141,7 +141,8 @@ impl ParsedEventWithContext {
     /// Convert to streamable event data for WebSocket
     #[must_use]
     pub fn to_streamable(&self) -> StreamableEventData {
-        let (event_type, merchant_pda, plan_address, subscriber, amount, reason) = match &self.event {
+        let (event_type, merchant_pda, plan_address, subscriber, amount, reason) = match &self.event
+        {
             TallyEvent::Subscribed(e) => (
                 "subscribed".to_string(),
                 e.merchant.to_string(),
@@ -187,9 +188,11 @@ impl ParsedEventWithContext {
         metadata.insert("success".to_string(), self.success.to_string());
 
         // Generate subscription address for events that have plan + subscriber
-        let subscription_address = if plan_address.is_some() && metadata.contains_key("subscriber") {
+        let subscription_address = if plan_address.is_some() && metadata.contains_key("subscriber")
+        {
             let subscriber_str = metadata.get("subscriber").map_or("unknown", String::as_str);
-            Some(format!("subscription_{}_{}",
+            Some(format!(
+                "subscription_{}_{}",
                 plan_address.as_deref().unwrap_or("unknown"),
                 subscriber_str
             ))
@@ -279,8 +282,13 @@ impl ParsedEventWithContext {
     /// Get timestamp as formatted string
     #[must_use]
     pub fn format_timestamp(&self) -> String {
-        self.block_time.map_or_else(|| "Pending".to_string(), |timestamp| chrono::DateTime::from_timestamp(timestamp, 0)
-                    .map_or_else(|| "Unknown".to_string(), |dt| dt.to_rfc3339()))
+        self.block_time.map_or_else(
+            || "Pending".to_string(),
+            |timestamp| {
+                chrono::DateTime::from_timestamp(timestamp, 0)
+                    .map_or_else(|| "Unknown".to_string(), |dt| dt.to_rfc3339())
+            },
+        )
     }
 
     /// Check if this event affects revenue
@@ -384,12 +392,7 @@ pub fn parse_events_with_context(
 
     for (log_index, event) in events.into_iter().enumerate() {
         parsed_events.push(ParsedEventWithContext::new(
-            signature,
-            slot,
-            block_time,
-            success,
-            event,
-            log_index,
+            signature, slot, block_time, success, event, log_index,
         ));
     }
 

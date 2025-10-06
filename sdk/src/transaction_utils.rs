@@ -6,7 +6,6 @@
 #![forbid(unsafe_code)]
 
 use crate::error::{Result, TallyError};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use anchor_client::solana_sdk::{
     hash::Hash,
     instruction::Instruction,
@@ -15,6 +14,7 @@ use anchor_client::solana_sdk::{
     signature::Signature,
     transaction::VersionedTransaction,
 };
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 /// Parameters for building a subscribe transaction
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ pub struct SubscribeTransactionParams<'a> {
 /// The same pubkey (no conversion needed)
 #[must_use]
 pub const fn convert_anchor_pubkey(pk: &Pubkey) -> Pubkey {
-    *pk  // No conversion needed since types are now the same
+    *pk // No conversion needed since types are now the same
 }
 
 /// Creates a Memo instruction for transaction traceability
@@ -139,7 +139,10 @@ pub fn map_tally_error_to_string(err: &TallyError) -> String {
             format!("Invalid token program: expected {expected}, found {found}")
         }
         TallyError::AccountNotFound(account) => format!("Account not found: {account}"),
-        TallyError::InsufficientFunds { required, available } => {
+        TallyError::InsufficientFunds {
+            required,
+            available,
+        } => {
             format!("Insufficient funds: required {required}, available {available}")
         }
         TallyError::TokenProgramDetectionFailed { mint } => {
@@ -195,7 +198,8 @@ mod tests {
 
         // Verify we can deserialize it back to a transaction
         let transaction_bytes = decoded.unwrap();
-        let transaction: std::result::Result<VersionedTransaction, _> = bincode::deserialize(&transaction_bytes);
+        let transaction: std::result::Result<VersionedTransaction, _> =
+            bincode::deserialize(&transaction_bytes);
         assert!(transaction.is_ok());
     }
 

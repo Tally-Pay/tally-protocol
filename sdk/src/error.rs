@@ -233,10 +233,12 @@ impl TallyError {
         // Check if the client error contains a program error we can map
         if let anchor_client::ClientError::SolanaClientError(solana_err) = &client_error {
             // Use get_transaction_error() method as suggested by the compiler
-            if let Some(anchor_client::solana_sdk::transaction::TransactionError::InstructionError(
-                _,
-                anchor_client::solana_sdk::instruction::InstructionError::Custom(error_code),
-            )) = solana_err.get_transaction_error()
+            if let Some(
+                anchor_client::solana_sdk::transaction::TransactionError::InstructionError(
+                    _,
+                    anchor_client::solana_sdk::instruction::InstructionError::Custom(error_code),
+                ),
+            ) = solana_err.get_transaction_error()
             {
                 // Map specific program error codes
                 match error_code {

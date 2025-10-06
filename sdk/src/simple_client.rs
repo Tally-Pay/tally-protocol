@@ -5,19 +5,18 @@ use crate::{
     program_id_string,
     program_types::{Merchant, Plan, Subscription},
 };
-use anchor_client::solana_client::rpc_client::RpcClient;
-use anchor_lang::AnchorDeserialize;
 use anchor_client::solana_account_decoder::UiAccountEncoding;
-use anchor_client::solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTransactionConfig};
-use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
-use anchor_client::solana_client::rpc_client::{GetConfirmedSignaturesForAddress2Config};
-use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
-use anchor_client::solana_client::rpc_response::RpcConfirmedTransactionStatusWithSignature;
-use anchor_client::solana_sdk::{
-    signature::Signer,
-    transaction::Transaction,
+use anchor_client::solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
+use anchor_client::solana_client::rpc_client::RpcClient;
+use anchor_client::solana_client::rpc_config::{
+    RpcAccountInfoConfig, RpcProgramAccountsConfig, RpcTransactionConfig,
 };
+use anchor_client::solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use anchor_client::solana_client::rpc_response::RpcConfirmedTransactionStatusWithSignature;
+use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
 use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_client::solana_sdk::{signature::Signer, transaction::Transaction};
+use anchor_lang::AnchorDeserialize;
 use std::str::FromStr;
 
 /// Simple Tally client for basic operations
@@ -408,7 +407,8 @@ impl SimpleTallyClient {
         }
 
         // Check if treasury ATA exists
-        let treasury_exists = crate::ata::get_token_account_info(self.rpc(), treasury_ata)?.is_some();
+        let treasury_exists =
+            crate::ata::get_token_account_info(self.rpc(), treasury_ata)?.is_some();
 
         let mut instructions = Vec::new();
         let created_ata = !treasury_exists;
@@ -425,7 +425,8 @@ impl SimpleTallyClient {
             )?;
         } else {
             // Validate the expected ATA address matches computed ATA
-            let computed_ata = crate::ata::get_associated_token_address_for_mint(&authority.pubkey(), usdc_mint)?;
+            let computed_ata =
+                crate::ata::get_associated_token_address_for_mint(&authority.pubkey(), usdc_mint)?;
             if computed_ata != *treasury_ata {
                 return Err(TallyError::Generic(format!(
                     "Treasury ATA mismatch: expected {treasury_ata}, computed {computed_ata}"
@@ -569,7 +570,11 @@ impl SimpleTallyClient {
     ) -> Result<Vec<RpcConfirmedTransactionStatusWithSignature>> {
         self.rpc_client
             .get_signatures_for_address_with_config(address, config.unwrap_or_default())
-            .map_err(|e| TallyError::Generic(format!("Failed to get signatures for address {address}: {e}")))
+            .map_err(|e| {
+                TallyError::Generic(format!(
+                    "Failed to get signatures for address {address}: {e}"
+                ))
+            })
     }
 
     /// Get transaction details
@@ -600,7 +605,9 @@ impl SimpleTallyClient {
 
         for chunk in signatures.chunks(CHUNK_SIZE) {
             for signature in chunk {
-                let transaction_result = self.rpc_client.get_transaction_with_config(signature, RpcTransactionConfig::default());
+                let transaction_result = self
+                    .rpc_client
+                    .get_transaction_with_config(signature, RpcTransactionConfig::default());
                 match transaction_result {
                     Ok(tx) => results.push(Some(serde_json::to_value(tx).unwrap_or_default())),
                     Err(_) => results.push(None), // Transaction not found or other error
@@ -643,7 +650,6 @@ impl SimpleTallyClient {
             .get_health()
             .map_err(|e| TallyError::Generic(format!("Health check failed: {e}")))
     }
-
 }
 
 #[cfg(test)]

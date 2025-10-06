@@ -2,11 +2,9 @@
 
 use crate::{error::Result, TallyError};
 use anchor_client::solana_client::rpc_client::RpcClient;
-use anchor_client::solana_sdk::{
-    account::Account, program_pack::Pack,
-};
-use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::commitment_config::CommitmentConfig;
+use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_client::solana_sdk::{account::Account, program_pack::Pack};
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::{Account as TokenAccount, Mint};
 

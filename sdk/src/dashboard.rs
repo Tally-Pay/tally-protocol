@@ -17,9 +17,9 @@ use crate::{
     simple_client::SimpleTallyClient,
     validation::validate_platform_fee_bps,
 };
-use chrono::{DateTime, Utc};
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Signer;
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 /// Time period for statistics calculation
@@ -558,7 +558,9 @@ impl DashboardClient {
         let filtered_events: Vec<ParsedEventWithContext> = events
             .into_iter()
             .filter(|event| {
-                event.block_time.is_some_and(|block_time| block_time >= from_timestamp && block_time <= to_timestamp)
+                event.block_time.is_some_and(|block_time| {
+                    block_time >= from_timestamp && block_time <= to_timestamp
+                })
             })
             .collect();
 
@@ -578,7 +580,10 @@ impl DashboardClient {
     pub fn convert_to_streamable_events(
         events: &[ParsedEventWithContext],
     ) -> Vec<crate::events::StreamableEventData> {
-        events.iter().map(ParsedEventWithContext::to_streamable).collect()
+        events
+            .iter()
+            .map(ParsedEventWithContext::to_streamable)
+            .collect()
     }
 
     /// Validate merchant and get basic info
@@ -612,7 +617,10 @@ impl DashboardClient {
     ///
     /// # Errors
     /// Returns an error if merchant doesn't exist or data fetching fails
-    pub fn get_cached_analytics(&self, merchant: &Pubkey) -> Result<(Overview, Vec<PlanAnalytics>)> {
+    pub fn get_cached_analytics(
+        &self,
+        merchant: &Pubkey,
+    ) -> Result<(Overview, Vec<PlanAnalytics>)> {
         let overview = self.get_merchant_overview(merchant)?;
         let plan_analytics = self.get_all_plan_analytics(merchant)?;
         Ok((overview, plan_analytics))
@@ -825,7 +833,9 @@ impl DashboardClient {
     }
 
     /// Convert `ParsedEventWithContext` to `DashboardEvent`
-    fn convert_parsed_event_to_dashboard_event(parsed_event: &ParsedEventWithContext) -> DashboardEvent {
+    fn convert_parsed_event_to_dashboard_event(
+        parsed_event: &ParsedEventWithContext,
+    ) -> DashboardEvent {
         let (event_type, plan_address, subscription_address, subscriber, amount) =
             match &parsed_event.event {
                 TallyEvent::Subscribed(event) => (

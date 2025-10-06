@@ -74,10 +74,10 @@ pub use events::{
 pub use keypair::load_keypair;
 pub use program_types::*;
 pub use transaction_builder::{
-    admin_withdraw_fees, cancel_subscription, create_merchant, create_plan, init_config,
-    renew_subscription, start_subscription, AdminWithdrawFeesBuilder, CancelSubscriptionBuilder,
-    CreateMerchantBuilder, CreatePlanBuilder, InitConfigBuilder, RenewSubscriptionBuilder,
-    StartSubscriptionBuilder,
+    admin_withdraw_fees, cancel_subscription, close_subscription, create_merchant, create_plan,
+    init_config, renew_subscription, start_subscription, AdminWithdrawFeesBuilder,
+    CancelSubscriptionBuilder, CloseSubscriptionBuilder, CreateMerchantBuilder, CreatePlanBuilder,
+    InitConfigBuilder, RenewSubscriptionBuilder, StartSubscriptionBuilder,
 };
 pub use validation::*;
 
@@ -90,8 +90,8 @@ pub use signature::{
 
 // Re-export transaction utilities
 pub use transaction_utils::{
-    build_transaction, convert_anchor_pubkey, create_memo_instruction,
-    get_user_usdc_ata, map_tally_error_to_string, SubscribeTransactionParams,
+    build_transaction, convert_anchor_pubkey, create_memo_instruction, get_user_usdc_ata,
+    map_tally_error_to_string, SubscribeTransactionParams,
 };
 
 // Re-export general utilities
@@ -101,9 +101,9 @@ pub use utils::{
 };
 
 // Re-export commonly used external types
-pub use anchor_client::solana_sdk;
-pub use anchor_client::solana_client;
 pub use anchor_client::solana_account_decoder;
+pub use anchor_client::solana_client;
+pub use anchor_client::solana_sdk;
 pub use anchor_client::ClientError;
 pub use anchor_lang::AnchorDeserialize;
 pub use spl_associated_token_account;
