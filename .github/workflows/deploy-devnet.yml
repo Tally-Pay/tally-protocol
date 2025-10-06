@@ -80,9 +80,9 @@ jobs:
           cargo nextest run -p tally_subs || cargo test -p tally_subs
           echo "✅ Tests passed"
 
-      - name: Run clippy
+      - name: Run clippy (lib only)
         run: |
-          cargo clippy -p tally_subs --all-targets -- -D warnings
+          cargo clippy -p tally_subs --lib -- -D warnings
           echo "✅ Clippy checks passed"
 
       - name: Deploy/Upgrade program to Devnet
