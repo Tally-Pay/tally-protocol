@@ -89,13 +89,12 @@ pub struct InitConfigBuilder {
 }
 
 /// Builder for renew subscription transactions
-#[derive(Clone, Debug)]
-#[allow(dead_code)]
+#[derive(Clone, Debug, Default)]
 pub struct RenewSubscriptionBuilder {
     plan: Option<Pubkey>,
     subscriber: Option<Pubkey>,
-    payer: Option<Pubkey>,
-    expected_renewal_ts: Option<i64>,
+    keeper: Option<Pubkey>,
+    keeper_ata: Option<Pubkey>,
     token_program: Option<TokenProgram>,
     program_id: Option<Pubkey>,
 }
@@ -810,6 +809,125 @@ impl InitConfigBuilder {
     }
 }
 
+impl RenewSubscriptionBuilder {
+    /// Create a new renew subscription builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the plan PDA
+    #[must_use]
+    pub const fn plan(mut self, plan: Pubkey) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
+    /// Set the subscriber pubkey
+    #[must_use]
+    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
+        self.subscriber = Some(subscriber);
+        self
+    }
+
+    /// Set the keeper (transaction caller) who executes the renewal
+    #[must_use]
+    pub const fn keeper(mut self, keeper: Pubkey) -> Self {
+        self.keeper = Some(keeper);
+        self
+    }
+
+    /// Set the keeper's USDC ATA where keeper fee will be sent
+    #[must_use]
+    pub const fn keeper_ata(mut self, keeper_ata: Pubkey) -> Self {
+        self.keeper_ata = Some(keeper_ata);
+        self
+    }
+
+    /// Set the token program to use
+    #[must_use]
+    pub const fn token_program(mut self, token_program: TokenProgram) -> Self {
+        self.token_program = Some(token_program);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Arguments
+    /// * `merchant` - The merchant account data
+    /// * `plan_data` - The plan account data
+    /// * `platform_treasury_ata` - Platform treasury ATA address
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `renew_subscription` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(
+        self,
+        merchant: &Merchant,
+        _plan_data: &Plan,
+        platform_treasury_ata: &Pubkey,
+    ) -> Result<Instruction> {
+        let plan = self.plan.ok_or("Plan not set")?;
+        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
+        let keeper = self.keeper.ok_or("Keeper not set")?;
+        let keeper_ata = self.keeper_ata.ok_or("Keeper ATA not set")?;
+        let token_program = self.token_program.unwrap_or(TokenProgram::Token);
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute required PDAs
+        let config_pda = pda::config_address_with_program_id(&program_id);
+        let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
+        let subscription_pda =
+            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
+        let delegate_pda = pda::delegate_address_with_program_id(&merchant_pda, &program_id);
+        let subscriber_ata = get_associated_token_address_with_program(
+            &subscriber,
+            &merchant.usdc_mint,
+            token_program,
+        )?;
+
+        // Create renew_subscription instruction
+        let renew_sub_accounts = vec![
+            AccountMeta::new_readonly(config_pda, false),   // config
+            AccountMeta::new(subscription_pda, false),      // subscription (PDA, mutable)
+            AccountMeta::new_readonly(plan, false),         // plan
+            AccountMeta::new_readonly(merchant_pda, false), // merchant
+            AccountMeta::new(subscriber_ata, false),        // subscriber_usdc_ata (mutable)
+            AccountMeta::new(merchant.treasury_ata, false), // merchant_treasury_ata (mutable)
+            AccountMeta::new(*platform_treasury_ata, false), // platform_treasury_ata (mutable)
+            AccountMeta::new(keeper, true),                 // keeper (signer, mutable for fees)
+            AccountMeta::new(keeper_ata, false),            // keeper_usdc_ata (mutable)
+            AccountMeta::new_readonly(merchant.usdc_mint, false), // usdc_mint
+            AccountMeta::new_readonly(delegate_pda, false), // program_delegate
+            AccountMeta::new_readonly(token_program.program_id(), false), // token_program
+        ];
+
+        let renew_sub_args = crate::program_types::RenewSubscriptionArgs {};
+        let renew_sub_data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "renew_subscription")
+            data.extend_from_slice(&[45, 75, 154, 194, 160, 10, 111, 183]);
+            borsh::to_writer(&mut data, &renew_sub_args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts: renew_sub_accounts,
+            data: renew_sub_data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -852,6 +970,12 @@ pub fn init_config() -> InitConfigBuilder {
 #[must_use]
 pub fn update_plan() -> UpdatePlanBuilder {
     UpdatePlanBuilder::new()
+}
+
+/// Create a renew subscription transaction builder
+#[must_use]
+pub fn renew_subscription() -> RenewSubscriptionBuilder {
+    RenewSubscriptionBuilder::new()
 }
 
 #[cfg(test)]
@@ -1256,5 +1380,176 @@ mod tests {
         // Test default
         let default_args = UpdatePlanArgs::default();
         assert!(!default_args.has_updates());
+    }
+
+    #[test]
+    fn test_renew_subscription_builder() {
+        let merchant = create_test_merchant();
+        let plan_data = create_test_plan();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let keeper_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = renew_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .keeper(keeper)
+            .keeper_ata(keeper_ata)
+            .build_instruction(&merchant, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 12);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(&instruction.data[..8], &[45, 75, 154, 194, 160, 10, 111, 183]);
+
+        // Verify readonly accounts
+        verify_renew_readonly_accounts(&instruction);
+        // Verify mutable accounts
+        verify_renew_mutable_accounts(&instruction);
+        // Verify signer accounts
+        verify_renew_signer_accounts(&instruction);
+    }
+
+    fn verify_renew_readonly_accounts(instruction: &Instruction) {
+        assert!(!instruction.accounts[0].is_writable); // config
+        assert!(!instruction.accounts[2].is_writable); // plan
+        assert!(!instruction.accounts[3].is_writable); // merchant
+        assert!(!instruction.accounts[9].is_writable); // usdc_mint
+        assert!(!instruction.accounts[10].is_writable); // program_delegate
+        assert!(!instruction.accounts[11].is_writable); // token_program
+    }
+
+    fn verify_renew_mutable_accounts(instruction: &Instruction) {
+        assert!(instruction.accounts[1].is_writable); // subscription
+        assert!(instruction.accounts[4].is_writable); // subscriber_usdc_ata
+        assert!(instruction.accounts[5].is_writable); // merchant_treasury_ata
+        assert!(instruction.accounts[6].is_writable); // platform_treasury_ata
+        assert!(instruction.accounts[7].is_writable); // keeper
+        assert!(instruction.accounts[8].is_writable); // keeper_usdc_ata
+    }
+
+    fn verify_renew_signer_accounts(instruction: &Instruction) {
+        assert!(!instruction.accounts[0].is_signer); // config
+        assert!(!instruction.accounts[1].is_signer); // subscription
+        assert!(!instruction.accounts[2].is_signer); // plan
+        assert!(!instruction.accounts[3].is_signer); // merchant
+        assert!(!instruction.accounts[4].is_signer); // subscriber_usdc_ata
+        assert!(!instruction.accounts[5].is_signer); // merchant_treasury_ata
+        assert!(!instruction.accounts[6].is_signer); // platform_treasury_ata
+        assert!(instruction.accounts[7].is_signer); // keeper (only signer)
+        assert!(!instruction.accounts[8].is_signer); // keeper_usdc_ata
+        assert!(!instruction.accounts[9].is_signer); // usdc_mint
+        assert!(!instruction.accounts[10].is_signer); // program_delegate
+        assert!(!instruction.accounts[11].is_signer); // token_program
+    }
+
+    #[test]
+    fn test_renew_subscription_builder_missing_required_fields() {
+        let merchant = create_test_merchant();
+        let plan_data = create_test_plan();
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test missing plan
+        let result = renew_subscription()
+            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Plan not set"));
+
+        // Test missing subscriber
+        let result = renew_subscription()
+            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Subscriber not set"));
+
+        // Test missing keeper
+        let result = renew_subscription()
+            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Keeper not set"));
+
+        // Test missing keeper_ata
+        let result = renew_subscription()
+            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Keeper ATA not set"));
+    }
+
+    #[test]
+    fn test_renew_subscription_token_program_variants() {
+        // Create separate merchants for different token programs
+        let merchant_token = Merchant {
+            authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            platform_fee_bps: 50,
+            tier: 0,
+            bump: 255,
+        };
+
+        let merchant_token2022 = Merchant {
+            authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            platform_fee_bps: 50,
+            tier: 0,
+            bump: 255,
+        };
+
+        let plan_data = create_test_plan();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let keeper_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test with Token-2022
+        let instruction_token2022 = renew_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .keeper(keeper)
+            .keeper_ata(keeper_ata)
+            .token_program(TokenProgram::Token2022)
+            .build_instruction(&merchant_token2022, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        // Test with classic Token
+        let instruction_token = renew_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .keeper(keeper)
+            .keeper_ata(keeper_ata)
+            .token_program(TokenProgram::Token)
+            .build_instruction(&merchant_token, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        // Both should work but have different token program IDs in the accounts
+        assert_eq!(
+            instruction_token2022.accounts[11].pubkey,
+            spl_token_2022::id()
+        );
+        assert_eq!(instruction_token.accounts[11].pubkey, spl_token::id());
     }
 }

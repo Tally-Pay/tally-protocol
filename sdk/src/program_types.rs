@@ -170,8 +170,7 @@ pub struct StartSubscriptionArgs {
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct RenewSubscriptionArgs {
-    /// Expected renewal timestamp (for verification)
-    pub expected_renewal_ts: i64,
+    // No args needed - renewal driven by keeper
 }
 
 /// Arguments for updating a subscription plan
