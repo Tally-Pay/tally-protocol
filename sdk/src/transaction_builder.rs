@@ -122,6 +122,13 @@ pub struct AcceptAuthorityBuilder {
     program_id: Option<Pubkey>,
 }
 
+/// Builder for cancel authority transfer transactions
+#[derive(Clone, Debug, Default)]
+pub struct CancelAuthorityTransferBuilder {
+    platform_authority: Option<Pubkey>,
+    program_id: Option<Pubkey>,
+}
+
 impl StartSubscriptionBuilder {
     /// Create a new start subscription builder
     #[must_use]
@@ -1144,6 +1151,66 @@ impl AcceptAuthorityBuilder {
     }
 }
 
+impl CancelAuthorityTransferBuilder {
+    /// Create a new cancel authority transfer builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the current platform authority (must be signer)
+    #[must_use]
+    pub const fn platform_authority(mut self, platform_authority: Pubkey) -> Self {
+        self.platform_authority = Some(platform_authority);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `cancel_authority_transfer` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let platform_authority = self
+            .platform_authority
+            .ok_or("Platform authority not set")?;
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute config PDA
+        let config_pda = pda::config_address_with_program_id(&program_id);
+
+        let accounts = vec![
+            AccountMeta::new(config_pda, false),                     // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true),     // platform_authority (signer)
+        ];
+
+        let args = crate::program_types::CancelAuthorityTransferArgs::default();
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:cancel_authority_transfer")
+            data.extend_from_slice(&[94, 131, 125, 184, 183, 24, 125, 229]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -1210,6 +1277,12 @@ pub fn transfer_authority() -> TransferAuthorityBuilder {
 #[must_use]
 pub fn accept_authority() -> AcceptAuthorityBuilder {
     AcceptAuthorityBuilder::new()
+}
+
+/// Create a cancel authority transfer transaction builder
+#[must_use]
+pub fn cancel_authority_transfer() -> CancelAuthorityTransferBuilder {
+    CancelAuthorityTransferBuilder::new()
 }
 
 #[cfg(test)]
@@ -2134,6 +2207,147 @@ mod tests {
         // Verify it works the same as using the builder directly
         let direct_instruction = AcceptAuthorityBuilder::new()
             .new_authority(new_authority)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, direct_instruction.program_id);
+        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(instruction.data, direct_instruction.data);
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = cancel_authority_transfer()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 2);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(
+            &instruction.data[..8],
+            &[94, 131, 125, 184, 183, 24, 125, 229]
+        );
+
+        // Verify account structure
+        assert!(instruction.accounts[0].is_writable); // config (mutable)
+        assert!(!instruction.accounts[0].is_signer); // config (not signer, it's a PDA)
+        assert!(!instruction.accounts[1].is_writable); // platform_authority (readonly)
+        assert!(instruction.accounts[1].is_signer); // platform_authority (signer)
+
+        // Verify account addresses
+        assert_eq!(
+            instruction.accounts[0].pubkey,
+            pda::config_address_with_program_id(&program_id)
+        );
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder_missing_required_fields() {
+        // Test missing platform_authority
+        let result = cancel_authority_transfer().build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Platform authority not set"));
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder_custom_program_id() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = cancel_authority_transfer()
+            .platform_authority(platform_authority)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder_pda_computation() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = cancel_authority_transfer()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed config PDA is correct
+        let program_id = program_id();
+        let expected_config_pda = pda::config_address_with_program_id(&program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_args_serialization() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test that args can be serialized and included in instruction data
+        let instruction = cancel_authority_transfer()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the data contains the discriminator (8 bytes) followed by serialized args
+        // CancelAuthorityTransferArgs is empty, so data should be exactly 8 bytes (discriminator only)
+        assert_eq!(instruction.data.len(), 8);
+
+        // Verify the discriminator matches
+        assert_eq!(
+            &instruction.data[..8],
+            &[94, 131, 125, 184, 183, 24, 125, 229]
+        );
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder_clone_debug() {
+        let builder = cancel_authority_transfer()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+
+        // Test Clone trait
+        let cloned_builder = builder.clone();
+        assert_eq!(
+            cloned_builder.platform_authority,
+            builder.platform_authority
+        );
+
+        // Test Debug trait
+        let debug_str = format!("{builder:?}");
+        assert!(debug_str.contains("CancelAuthorityTransferBuilder"));
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_builder_default() {
+        let builder = CancelAuthorityTransferBuilder::default();
+        assert!(builder.platform_authority.is_none());
+        assert!(builder.program_id.is_none());
+    }
+
+    #[test]
+    fn test_cancel_authority_transfer_convenience_function() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test using convenience function
+        let instruction = cancel_authority_transfer()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify it works the same as using the builder directly
+        let direct_instruction = CancelAuthorityTransferBuilder::new()
+            .platform_authority(platform_authority)
             .build_instruction()
             .unwrap();
 
