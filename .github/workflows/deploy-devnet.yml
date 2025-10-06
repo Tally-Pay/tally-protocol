@@ -89,6 +89,8 @@ jobs:
         env:
           PROGRAM_KEYPAIR: ${{ secrets.DEVNET_PROGRAM_KEYPAIR }}
           PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
+          ANCHOR_WALLET: /home/rodzilla/.config/solana/deployer.json
+          ANCHOR_PROVIDER_URL: https://api.devnet.solana.com
         run: |
           # Check if program already exists
           if solana program show "$PROGRAM_ID" &> /dev/null; then
