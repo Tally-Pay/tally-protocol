@@ -7,6 +7,8 @@ on:
       - develop
     tags-ignore:
       - 'v*.*.*'
+      - 'program-v*.*.*'  # Ignore program deployment tags
+      - 'sdk-v*.*.*'      # Ignore SDK release tags
     paths:
       - 'sdk/**'
       - '.github/workflows/sdk-ci.yml'
