@@ -76,10 +76,11 @@ pub use program_types::*;
 pub use transaction_builder::{
     accept_authority, admin_withdraw_fees, cancel_authority_transfer, cancel_subscription,
     close_subscription, create_merchant, create_plan, init_config, pause, renew_subscription,
-    start_subscription, transfer_authority, AcceptAuthorityBuilder, AdminWithdrawFeesBuilder,
-    CancelAuthorityTransferBuilder, CancelSubscriptionBuilder, CloseSubscriptionBuilder,
-    CreateMerchantBuilder, CreatePlanBuilder, InitConfigBuilder, PauseBuilder,
-    RenewSubscriptionBuilder, StartSubscriptionBuilder, TransferAuthorityBuilder,
+    start_subscription, transfer_authority, unpause, AcceptAuthorityBuilder,
+    AdminWithdrawFeesBuilder, CancelAuthorityTransferBuilder, CancelSubscriptionBuilder,
+    CloseSubscriptionBuilder, CreateMerchantBuilder, CreatePlanBuilder, InitConfigBuilder,
+    PauseBuilder, RenewSubscriptionBuilder, StartSubscriptionBuilder, TransferAuthorityBuilder,
+    UnpauseBuilder,
 };
 pub use validation::*;
 
