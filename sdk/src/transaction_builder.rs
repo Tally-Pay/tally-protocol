@@ -157,6 +157,15 @@ pub struct UpdateConfigBuilder {
     program_id: Option<Pubkey>,
 }
 
+/// Builder for update merchant tier transactions
+#[derive(Clone, Debug, Default)]
+pub struct UpdateMerchantTierBuilder {
+    authority: Option<Pubkey>,
+    merchant: Option<Pubkey>,
+    new_tier: Option<u8>,
+    program_id: Option<Pubkey>,
+}
+
 impl StartSubscriptionBuilder {
     /// Create a new start subscription builder
     #[must_use]
@@ -1537,6 +1546,91 @@ impl UpdateConfigBuilder {
     }
 }
 
+impl UpdateMerchantTierBuilder {
+    /// Create a new update merchant tier builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the authority (must be either merchant authority OR platform authority)
+    #[must_use]
+    pub const fn authority(mut self, authority: Pubkey) -> Self {
+        self.authority = Some(authority);
+        self
+    }
+
+    /// Set the merchant PDA to update
+    #[must_use]
+    pub const fn merchant(mut self, merchant: Pubkey) -> Self {
+        self.merchant = Some(merchant);
+        self
+    }
+
+    /// Set the new tier (0=Free, 1=Pro, 2=Enterprise)
+    #[must_use]
+    pub const fn new_tier(mut self, new_tier: u8) -> Self {
+        self.new_tier = Some(new_tier);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `update_merchant_tier` instruction
+    /// * `Err(TallyError)` - If building fails
+    ///
+    /// # Validation
+    /// * Authority must be set (merchant or platform authority)
+    /// * Merchant must be set
+    /// * New tier must be set and valid (0-2)
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let authority = self.authority.ok_or("Authority not set")?;
+        let merchant = self.merchant.ok_or("Merchant not set")?;
+        let new_tier = self.new_tier.ok_or("New tier not set")?;
+
+        // Validate tier value (0=Free, 1=Pro, 2=Enterprise)
+        if new_tier > 2 {
+            return Err("New tier must be 0 (Free), 1 (Pro), or 2 (Enterprise)".into());
+        }
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute config PDA
+        let config_pda = pda::config_address_with_program_id(&program_id);
+
+        let accounts = vec![
+            AccountMeta::new_readonly(config_pda, false), // config (PDA, readonly)
+            AccountMeta::new(merchant, false),            // merchant (PDA, mutable)
+            AccountMeta::new_readonly(authority, true),   // authority (signer)
+        ];
+
+        let args = crate::program_types::UpdateMerchantTierArgs { new_tier };
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:update_merchant_tier")
+            data.extend_from_slice(&[24, 54, 190, 70, 221, 93, 3, 64]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -1627,6 +1721,12 @@ pub fn unpause() -> UnpauseBuilder {
 #[must_use]
 pub fn update_config() -> UpdateConfigBuilder {
     UpdateConfigBuilder::new()
+}
+
+/// Create an update merchant tier transaction builder
+#[must_use]
+pub fn update_merchant_tier() -> UpdateMerchantTierBuilder {
+    UpdateMerchantTierBuilder::new()
 }
 
 #[cfg(test)]
@@ -3338,5 +3438,263 @@ mod tests {
             .build_instruction()
             .unwrap();
         assert_eq!(instruction3.accounts.len(), 2);
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1) // Pro tier
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 3);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(
+            &instruction.data[..8],
+            &[24, 54, 190, 70, 221, 93, 3, 64]
+        );
+
+        // Verify account structure
+        assert!(!instruction.accounts[0].is_writable); // config (readonly)
+        assert!(!instruction.accounts[0].is_signer); // config (PDA, not signer)
+        assert!(instruction.accounts[1].is_writable); // merchant (mutable)
+        assert!(!instruction.accounts[1].is_signer); // merchant (PDA, not signer)
+        assert!(!instruction.accounts[2].is_writable); // authority (readonly)
+        assert!(instruction.accounts[2].is_signer); // authority (signer)
+
+        // Verify account addresses
+        assert_eq!(
+            instruction.accounts[0].pubkey,
+            pda::config_address_with_program_id(&program_id)
+        );
+        assert_eq!(instruction.accounts[1].pubkey, merchant);
+        assert_eq!(instruction.accounts[2].pubkey, authority);
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_all_tiers() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test Free tier (0)
+        let instruction_free = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(0)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction_free.accounts.len(), 3);
+
+        // Test Pro tier (1)
+        let instruction_pro = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction_pro.accounts.len(), 3);
+
+        // Test Enterprise tier (2)
+        let instruction_enterprise = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(2)
+            .build_instruction()
+            .unwrap();
+        assert_eq!(instruction_enterprise.accounts.len(), 3);
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_missing_required_fields() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test missing authority
+        let result = update_merchant_tier()
+            .merchant(merchant)
+            .new_tier(1)
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Authority not set"));
+
+        // Test missing merchant
+        let result = update_merchant_tier()
+            .authority(authority)
+            .new_tier(1)
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Merchant not set"));
+
+        // Test missing new_tier
+        let result = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("New tier not set"));
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_invalid_tier() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test tier > 2 (invalid)
+        let result = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(3)
+            .build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("New tier must be 0 (Free), 1 (Pro), or 2 (Enterprise)"));
+
+        // Test tier 255 (invalid)
+        let result = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(255)
+            .build_instruction();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_custom_program_id() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_pda_computation() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed config PDA is correct
+        let program_id = program_id();
+        let expected_config_pda = pda::config_address_with_program_id(&program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert_eq!(instruction.accounts[1].pubkey, merchant);
+        assert_eq!(instruction.accounts[2].pubkey, authority);
+    }
+
+    #[test]
+    fn test_update_merchant_tier_args_serialization() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test that args can be serialized and included in instruction data
+        let instruction = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1) // Pro tier
+            .build_instruction()
+            .unwrap();
+
+        // Verify the data contains the discriminator (8 bytes) followed by serialized args
+        // UpdateMerchantTierArgs has 1 u8 field, so data should be 9 bytes
+        assert_eq!(instruction.data.len(), 9);
+
+        // Verify the discriminator matches
+        assert_eq!(
+            &instruction.data[..8],
+            &[24, 54, 190, 70, 221, 93, 3, 64]
+        );
+
+        // Verify the tier value is serialized correctly
+        assert_eq!(instruction.data[8], 1); // Pro tier
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_clone_debug() {
+        let builder = update_merchant_tier()
+            .authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .merchant(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .new_tier(1);
+
+        // Test Clone trait
+        let cloned_builder = builder.clone();
+        assert_eq!(cloned_builder.authority, builder.authority);
+        assert_eq!(cloned_builder.merchant, builder.merchant);
+        assert_eq!(cloned_builder.new_tier, builder.new_tier);
+
+        // Test Debug trait
+        let debug_str = format!("{builder:?}");
+        assert!(debug_str.contains("UpdateMerchantTierBuilder"));
+    }
+
+    #[test]
+    fn test_update_merchant_tier_builder_default() {
+        let builder = UpdateMerchantTierBuilder::default();
+        assert!(builder.authority.is_none());
+        assert!(builder.merchant.is_none());
+        assert!(builder.new_tier.is_none());
+        assert!(builder.program_id.is_none());
+    }
+
+    #[test]
+    fn test_update_merchant_tier_convenience_function() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test using convenience function
+        let instruction = update_merchant_tier()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1)
+            .build_instruction()
+            .unwrap();
+
+        // Verify it works the same as using the builder directly
+        let direct_instruction = UpdateMerchantTierBuilder::new()
+            .authority(authority)
+            .merchant(merchant)
+            .new_tier(1)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, direct_instruction.program_id);
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
+        assert_eq!(instruction.data, direct_instruction.data);
     }
 }
