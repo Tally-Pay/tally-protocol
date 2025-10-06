@@ -866,6 +866,7 @@ mod tests {
             usdc_mint: Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
+            tier: 0,  // Free tier
             bump: 255,
         }
     }
@@ -1019,6 +1020,7 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a test mint for classic token
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
+            tier: 0,  // Free tier
             bump: 255,
         };
 
@@ -1027,6 +1029,7 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a different test mint for Token-2022
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
+            tier: 0,  // Free tier
             bump: 255,
         };
 
