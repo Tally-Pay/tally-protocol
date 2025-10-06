@@ -1,0 +1,151 @@
+name: Deploy to Devnet
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on signed version tags like v0.1.0, v0.2.0
+  workflow_dispatch:  # Allows manual triggering
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-devnet:
+    runs-on: self-hosted
+    environment: devnet  # Use GitHub environment for additional protection
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify tag signature
+        run: |
+          git verify-tag ${{ github.ref_name }} || {
+            echo "❌ Tag is not signed or signature verification failed"
+            exit 1
+          }
+          echo "✅ Tag signature verified"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install Solana CLI
+        run: |
+          if ! command -v solana &> /dev/null; then
+            sh -c "$(curl -sSfL https://release.solana.com/v2.1.7/install)"
+            echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          fi
+          solana --version
+
+      - name: Install Anchor CLI
+        run: |
+          if ! command -v anchor &> /dev/null; then
+            cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 anchor-cli --locked
+          fi
+          anchor --version
+
+      - name: Configure Solana CLI
+        env:
+          DEPLOYER_KEYPAIR: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+        run: |
+          mkdir -p ~/.config/solana
+          echo "$DEPLOYER_KEYPAIR" > ~/.config/solana/deployer.json
+          solana config set --url https://api.devnet.solana.com
+          solana config set --keypair ~/.config/solana/deployer.json
+
+          # Display wallet address (not private key)
+          echo "Deployer wallet address: $(solana address)"
+
+          # Check balance
+          BALANCE=$(solana balance | awk '{print $1}')
+          echo "Wallet balance: $BALANCE SOL"
+
+          # Warn if balance is low
+          if (( $(echo "$BALANCE < 1" | bc -l) )); then
+            echo "⚠️  Warning: Low SOL balance. Deployment may fail."
+            echo "Please fund this address: $(solana address)"
+          fi
+
+      - name: Build program
+        run: |
+          anchor build
+          echo "✅ Build completed successfully"
+
+      - name: Run program tests
+        run: |
+          cargo nextest run -p tally-subs || cargo test -p tally-subs
+          echo "✅ Tests passed"
+
+      - name: Run clippy
+        run: |
+          cargo clippy -p tally-subs --all-targets -- -D warnings
+          echo "✅ Clippy checks passed"
+
+      - name: Deploy/Upgrade program to Devnet
+        env:
+          PROGRAM_KEYPAIR: ${{ secrets.DEVNET_PROGRAM_KEYPAIR }}
+        run: |
+          PROGRAM_ID="6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+
+          # Check if program already exists
+          if solana program show "$PROGRAM_ID" &> /dev/null; then
+            echo "📦 Program exists. Upgrading..."
+
+            # Upgrade existing program
+            anchor upgrade \
+              target/deploy/tally_subs.so \
+              --program-id "$PROGRAM_ID" \
+              --provider.cluster devnet
+
+            echo "✅ Program upgraded successfully"
+          else
+            echo "🆕 Program does not exist. Initial deployment..."
+
+            # Save program keypair for initial deployment
+            echo "$PROGRAM_KEYPAIR" > target/deploy/tally_subs-keypair.json
+
+            # Deploy new program
+            anchor deploy \
+              --provider.cluster devnet \
+              --program-name tally-subs
+
+            echo "✅ Program deployed successfully"
+          fi
+
+      - name: Verify deployment
+        run: |
+          PROGRAM_ID="6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+
+          # Show program info
+          solana program show "$PROGRAM_ID"
+
+          # Verify upgrade authority
+          UPGRADE_AUTHORITY=$(solana program show "$PROGRAM_ID" | grep "Authority" | awk '{print $2}')
+          DEPLOYER_ADDRESS=$(solana address)
+
+          if [ "$UPGRADE_AUTHORITY" != "$DEPLOYER_ADDRESS" ]; then
+            echo "⚠️  Warning: Upgrade authority mismatch!"
+            echo "Expected: $DEPLOYER_ADDRESS"
+            echo "Actual: $UPGRADE_AUTHORITY"
+          else
+            echo "✅ Upgrade authority verified"
+          fi
+
+      - name: Cleanup sensitive data
+        if: always()
+        run: |
+          rm -f ~/.config/solana/deployer.json
+          rm -f target/deploy/tally_subs-keypair.json
+          echo "🧹 Cleanup completed"
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🎉 Deployment Summary"
+          echo "===================="
+          echo "Tag: ${{ github.ref_name }}"
+          echo "Program ID: 6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+          echo "Network: Devnet"
+          echo "Explorer: https://explorer.solana.com/address/6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5?cluster=devnet"
