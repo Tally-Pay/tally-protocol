@@ -77,12 +77,12 @@ jobs:
 
       - name: Run program tests
         run: |
-          cargo nextest run -p tally-subs || cargo test -p tally-subs
+          cargo nextest run -p tally_subs || cargo test -p tally_subs
           echo "✅ Tests passed"
 
       - name: Run clippy
         run: |
-          cargo clippy -p tally-subs --all-targets -- -D warnings
+          cargo clippy -p tally_subs --all-targets -- -D warnings
           echo "✅ Clippy checks passed"
 
       - name: Deploy/Upgrade program to Devnet
