@@ -1,0 +1,4132 @@
+{
+  "address": "6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5",
+  "metadata": {
+    "name": "subs",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "accept_authority",
+      "docs": [
+        "Accept platform authority transfer",
+        "",
+        "This completes a two-step authority transfer process. The new authority",
+        "must sign to accept the transfer initiated by the current authority.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- No pending transfer exists",
+        "- Caller is not the pending authority"
+      ],
+      "discriminator": [
+        107,
+        86,
+        198,
+        91,
+        33,
+        12,
+        107,
+        160
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_authority",
+          "docs": [
+            "New authority accepting the transfer (must sign)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "AcceptAuthorityArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_withdraw_fees",
+      "docs": [
+        "Admin function to withdraw accumulated platform fees",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not authorized as platform admin",
+        "- Insufficient fee balance to withdraw",
+        "- Token transfer operations fail",
+        "- Invalid withdrawal amount (zero or exceeds balance)"
+      ],
+      "discriminator": [
+        236,
+        186,
+        208,
+        151,
+        204,
+        142,
+        168,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "platform_treasury_ata",
+          "docs": [
+            "Platform treasury ATA where fees are currently stored"
+          ],
+          "writable": true
+        },
+        {
+          "name": "platform_destination_ata",
+          "docs": [
+            "Destination ATA where fees will be transferred"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint account for validation"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "AdminWithdrawFeesArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_authority_transfer",
+      "docs": [
+        "Cancel platform authority transfer",
+        "",
+        "This allows the current platform authority to cancel a pending authority",
+        "transfer. This is useful if the transfer was initiated in error or if",
+        "circumstances have changed.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the current platform authority",
+        "- No pending transfer exists to cancel"
+      ],
+      "discriminator": [
+        94,
+        131,
+        125,
+        184,
+        183,
+        24,
+        125,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "docs": [
+            "Current platform authority (must sign)"
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CancelAuthorityTransferArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancel_subscription",
+      "docs": [
+        "Cancel a subscription and revoke delegate approval",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Subscription does not exist or is already cancelled",
+        "- Unauthorized cancellation attempt (wrong subscriber)",
+        "- Token revoke operation fails",
+        "- Account update operations fail"
+      ],
+      "discriminator": [
+        60,
+        139,
+        189,
+        242,
+        191,
+        208,
+        143,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan"
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber",
+          "signer": true,
+          "relations": [
+            "subscription"
+          ]
+        },
+        {
+          "name": "subscriber_usdc_ata",
+          "docs": [
+            "Subscriber's USDC token account where delegate approval will be revoked"
+          ],
+          "writable": true
+        },
+        {
+          "name": "program_delegate",
+          "docs": [
+            "Program PDA that acts as delegate - used to validate delegate identity before revocation"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CancelSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_subscription",
+      "docs": [
+        "Close a canceled subscription account and reclaim rent",
+        "",
+        "This instruction allows subscribers to close their subscription accounts",
+        "after cancellation to reclaim the rent (~0.00099792 SOL). The subscription",
+        "must be inactive (canceled) before it can be closed.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Subscription is still active (must be canceled first)",
+        "- Unauthorized closure attempt (wrong subscriber)",
+        "- Subscription does not exist or is invalid",
+        "- Account closure operations fail"
+      ],
+      "discriminator": [
+        33,
+        214,
+        169,
+        135,
+        35,
+        127,
+        78,
+        7
+      ],
+      "accounts": [
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscription.plan",
+                "account": "Subscription"
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "subscription"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CloseSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_plan",
+      "docs": [
+        "Create a new subscription plan for a merchant",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Plan ID already exists for this merchant",
+        "- Price is zero or exceeds maximum",
+        "- Period is invalid (too short or too long)",
+        "- Grace period exceeds the period duration",
+        "- Account creation fails"
+      ],
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "args.plan_id_bytes"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "merchant"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CreatePlanArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_config",
+      "docs": [
+        "Initialize global program configuration",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- The config account already exists",
+        "- Account creation or initialization fails"
+      ],
+      "discriminator": [
+        23,
+        235,
+        115,
+        232,
+        168,
+        96,
+        1,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program_data",
+          "docs": [
+            "Program data account for upgrade authority validation"
+          ]
+        },
+        {
+          "name": "platform_treasury_ata",
+          "docs": [
+            "Platform treasury ATA for receiving platform fees",
+            "This ensures the platform authority has already created their USDC token account"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "init_merchant",
+      "docs": [
+        "Initialize a new merchant account with USDC treasury and fee configuration",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- The merchant account already exists",
+        "- Invalid USDC mint address",
+        "- Fee configuration exceeds maximum allowed (10,000 basis points)",
+        "- Account creation or initialization fails"
+      ],
+      "discriminator": [
+        209,
+        11,
+        214,
+        195,
+        222,
+        157,
+        124,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "usdc_mint",
+          "docs": [
+            "USDC mint account - will be validated in handler"
+          ]
+        },
+        {
+          "name": "treasury_ata",
+          "docs": [
+            "Treasury ATA for receiving merchant fees - will be validated in handler"
+          ]
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitMerchantArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "docs": [
+        "Pause the program",
+        "",
+        "This enables the emergency pause mechanism, disabling all user-facing operations",
+        "(`start_subscription`, `renew_subscription`, `create_plan`) while allowing admin",
+        "operations to continue for emergency fund recovery.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the platform authority"
+      ],
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "docs": [
+            "Platform authority (must sign)"
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PauseArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "renew_subscription",
+      "docs": [
+        "Renew an existing subscription by pulling funds via delegate",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Subscription is not active or has been cancelled",
+        "- Renewal is not yet due (before `next_renewal_ts`)",
+        "- Insufficient USDC balance for renewal",
+        "- Token transfer operations fail",
+        "- Subscription has exceeded grace period",
+        "- Delegate approval is insufficient or revoked"
+      ],
+      "discriminator": [
+        45,
+        75,
+        154,
+        194,
+        160,
+        10,
+        111,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              },
+              {
+                "kind": "account",
+                "path": "subscription.subscriber",
+                "account": "Subscription"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan"
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "merchant_treasury_ata",
+          "writable": true
+        },
+        {
+          "name": "platform_treasury_ata",
+          "writable": true
+        },
+        {
+          "name": "keeper",
+          "docs": [
+            "Keeper (transaction caller) who executes the renewal"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "keeper_usdc_ata",
+          "docs": [
+            "Keeper's USDC ATA where keeper fee will be sent"
+          ],
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "program_delegate",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "RenewSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "start_subscription",
+      "docs": [
+        "Start a new subscription for a user with delegate approval",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Subscription already exists for this user and plan",
+        "- Insufficient USDC balance in user's account",
+        "- Token transfer operations fail",
+        "- Delegate approval amount is insufficient",
+        "- Plan is inactive or expired",
+        "- Account creation fails"
+      ],
+      "discriminator": [
+        95,
+        237,
+        61,
+        140,
+        51,
+        173,
+        218,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan"
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan"
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriber",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subscriber_usdc_ata",
+          "writable": true
+        },
+        {
+          "name": "merchant_treasury_ata",
+          "writable": true
+        },
+        {
+          "name": "platform_treasury_ata",
+          "writable": true
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "program_delegate",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "StartSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "transfer_authority",
+      "docs": [
+        "Initiate platform authority transfer",
+        "",
+        "This begins a two-step authority transfer process. The current platform",
+        "authority proposes a new authority, which must then accept the transfer.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the current platform authority",
+        "- A pending transfer already exists",
+        "- New authority is the same as current authority"
+      ],
+      "discriminator": [
+        48,
+        169,
+        76,
+        72,
+        229,
+        180,
+        55,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "docs": [
+            "Current platform authority (must sign)"
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "TransferAuthorityArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "docs": [
+        "Unpause the program",
+        "",
+        "This disables the emergency pause mechanism, re-enabling all user-facing operations",
+        "(`start_subscription`, `renew_subscription`, `create_plan`).",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the platform authority"
+      ],
+      "discriminator": [
+        169,
+        144,
+        4,
+        38,
+        10,
+        141,
+        188,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "docs": [
+            "Platform authority (must sign)"
+          ],
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UnpauseArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Update global configuration parameters",
+        "",
+        "This allows the platform authority to update global configuration parameters",
+        "at runtime without redeploying the program. All changes take effect immediately.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the platform authority",
+        "- `keeper_fee_bps` exceeds 100 (1%)",
+        "- `min_platform_fee_bps` > `max_platform_fee_bps`",
+        "- Any value is zero where positive values are required",
+        "- No fields are provided for update"
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "platform_authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateConfigArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_merchant_tier",
+      "docs": [
+        "Update merchant tier",
+        "",
+        "This allows the merchant authority or platform admin to change a merchant's tier,",
+        "which automatically adjusts the platform fee rate:",
+        "- Free: 2.0% (200 basis points)",
+        "- Pro: 1.5% (150 basis points)",
+        "- Enterprise: 1.0% (100 basis points)",
+        "",
+        "Tier changes take effect immediately on the next renewal.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the merchant authority or platform admin",
+        "- New tier fee is outside config min/max bounds"
+      ],
+      "discriminator": [
+        24,
+        54,
+        190,
+        70,
+        221,
+        93,
+        3,
+        64
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "docs": [
+            "Merchant account to update"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Authority signer (either merchant authority OR platform authority)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateMerchantTierArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_plan",
+      "docs": [
+        "Update a subscription plan's active status",
+        "",
+        "Allows the merchant authority or platform admin to toggle whether a plan",
+        "accepts new subscriptions. This does NOT affect existing subscriptions,",
+        "which will continue to renew regardless of plan status.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the merchant authority or platform admin",
+        "- Plan does not exist or is invalid"
+      ],
+      "discriminator": [
+        119,
+        112,
+        58,
+        60,
+        76,
+        205,
+        1,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account for platform authority validation"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "docs": [
+            "Plan account to update"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "account",
+                "path": "plan.plan_id",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "docs": [
+            "Merchant account that owns the plan"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          },
+          "relations": [
+            "plan"
+          ]
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Authority signing the transaction (either merchant authority or platform admin)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdatePlanArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_plan_terms",
+      "docs": [
+        "Update subscription plan pricing and terms",
+        "",
+        "Allows the merchant authority to update an existing plan's price, period,",
+        "grace period, and name without creating a new plan. This is useful for",
+        "adjusting pricing, extending or shortening billing cycles, or updating",
+        "plan details based on market conditions.",
+        "",
+        "# Errors",
+        "Returns an error if:",
+        "- Caller is not the merchant authority",
+        "- No fields are provided for update (at least one required)",
+        "- New price is zero or exceeds maximum",
+        "- New period is below minimum period from config",
+        "- New grace period exceeds period or config maximum",
+        "- New name is empty"
+      ],
+      "discriminator": [
+        224,
+        68,
+        224,
+        41,
+        169,
+        52,
+        124,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "docs": [
+            "Global configuration account for validation"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan",
+          "docs": [
+            "Plan account to update"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "account",
+                "path": "plan.plan_id",
+                "account": "Plan"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "docs": [
+            "Merchant account that owns the plan"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          },
+          "relations": [
+            "plan"
+          ]
+        },
+        {
+          "name": "authority",
+          "docs": [
+            "Authority signing the transaction (must be merchant authority)"
+          ],
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdatePlanTermsArgs"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Merchant",
+      "discriminator": [
+        71,
+        235,
+        30,
+        40,
+        231,
+        21,
+        32,
+        64
+      ]
+    },
+    {
+      "name": "Plan",
+      "discriminator": [
+        161,
+        231,
+        251,
+        119,
+        2,
+        12,
+        162,
+        2
+      ]
+    },
+    {
+      "name": "Subscription",
+      "discriminator": [
+        64,
+        7,
+        26,
+        135,
+        102,
+        132,
+        98,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Canceled",
+      "discriminator": [
+        171,
+        91,
+        217,
+        19,
+        119,
+        196,
+        120,
+        190
+      ]
+    },
+    {
+      "name": "ConfigInitialized",
+      "discriminator": [
+        181,
+        49,
+        200,
+        156,
+        19,
+        167,
+        178,
+        91
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
+      "name": "DelegateMismatchWarning",
+      "discriminator": [
+        71,
+        215,
+        20,
+        37,
+        147,
+        109,
+        95,
+        141
+      ]
+    },
+    {
+      "name": "FeesWithdrawn",
+      "discriminator": [
+        234,
+        15,
+        0,
+        119,
+        148,
+        241,
+        40,
+        21
+      ]
+    },
+    {
+      "name": "LowAllowanceWarning",
+      "discriminator": [
+        238,
+        221,
+        129,
+        67,
+        35,
+        36,
+        19,
+        139
+      ]
+    },
+    {
+      "name": "MerchantInitialized",
+      "discriminator": [
+        96,
+        0,
+        189,
+        109,
+        128,
+        70,
+        106,
+        89
+      ]
+    },
+    {
+      "name": "MerchantTierChanged",
+      "discriminator": [
+        248,
+        6,
+        59,
+        15,
+        181,
+        99,
+        230,
+        24
+      ]
+    },
+    {
+      "name": "PaymentFailed",
+      "discriminator": [
+        169,
+        93,
+        117,
+        164,
+        245,
+        205,
+        208,
+        112
+      ]
+    },
+    {
+      "name": "PlanCreated",
+      "discriminator": [
+        215,
+        11,
+        135,
+        121,
+        208,
+        119,
+        149,
+        149
+      ]
+    },
+    {
+      "name": "PlanStatusChanged",
+      "discriminator": [
+        169,
+        108,
+        4,
+        226,
+        129,
+        54,
+        61,
+        117
+      ]
+    },
+    {
+      "name": "PlanTermsUpdated",
+      "discriminator": [
+        33,
+        97,
+        231,
+        46,
+        170,
+        74,
+        194,
+        98
+      ]
+    },
+    {
+      "name": "ProgramPaused",
+      "discriminator": [
+        247,
+        9,
+        236,
+        38,
+        105,
+        35,
+        112,
+        115
+      ]
+    },
+    {
+      "name": "ProgramUnpaused",
+      "discriminator": [
+        193,
+        183,
+        146,
+        52,
+        180,
+        17,
+        21,
+        26
+      ]
+    },
+    {
+      "name": "Renewed",
+      "discriminator": [
+        139,
+        252,
+        217,
+        35,
+        73,
+        42,
+        7,
+        87
+      ]
+    },
+    {
+      "name": "Subscribed",
+      "discriminator": [
+        135,
+        59,
+        105,
+        76,
+        190,
+        236,
+        138,
+        228
+      ]
+    },
+    {
+      "name": "SubscriptionClosed",
+      "discriminator": [
+        8,
+        104,
+        17,
+        72,
+        113,
+        51,
+        156,
+        92
+      ]
+    },
+    {
+      "name": "SubscriptionReactivated",
+      "discriminator": [
+        58,
+        201,
+        250,
+        128,
+        184,
+        35,
+        77,
+        228
+      ]
+    },
+    {
+      "name": "TrialConverted",
+      "discriminator": [
+        111,
+        30,
+        67,
+        48,
+        64,
+        127,
+        140,
+        0
+      ]
+    },
+    {
+      "name": "TrialStarted",
+      "discriminator": [
+        148,
+        69,
+        184,
+        116,
+        101,
+        5,
+        108,
+        162
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InsufficientAllowance",
+      "msg": "Insufficient USDC allowance. For new subscriptions, approve multi-period allowance (recommended: 3x plan price). For renewals, maintain at least 2x plan price to avoid interruptions."
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient USDC funds in your account to complete the subscription payment."
+    },
+    {
+      "code": 6002,
+      "name": "PastGrace",
+      "msg": "Subscription renewal window has expired. Grace period has passed."
+    },
+    {
+      "code": 6003,
+      "name": "Inactive",
+      "msg": "Subscription or plan is inactive and cannot be used for operations."
+    },
+    {
+      "code": 6004,
+      "name": "WrongMint",
+      "msg": "Invalid token mint provided. Only USDC is supported for subscriptions."
+    },
+    {
+      "code": 6005,
+      "name": "BadSeeds",
+      "msg": "Invalid PDA seeds provided. Account derivation failed."
+    },
+    {
+      "code": 6006,
+      "name": "InvalidPlan",
+      "msg": "Invalid plan configuration. Check price, period, or other plan parameters."
+    },
+    {
+      "code": 6007,
+      "name": "ArithmeticError",
+      "msg": "Arithmetic operation would result in overflow or underflow."
+    },
+    {
+      "code": 6008,
+      "name": "AlreadyActive",
+      "msg": "Subscription is already active and cannot be started again."
+    },
+    {
+      "code": 6009,
+      "name": "NotDue",
+      "msg": "Subscription is not due for renewal yet."
+    },
+    {
+      "code": 6010,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access. Only the merchant or platform admin can perform this action."
+    },
+    {
+      "code": 6011,
+      "name": "AlreadyCanceled",
+      "msg": "Subscription has already been canceled and cannot be operated on."
+    },
+    {
+      "code": 6012,
+      "name": "InvalidSubscriberTokenAccount",
+      "msg": "Invalid subscriber token account. Ensure the account is a valid USDC token account owned by the subscriber."
+    },
+    {
+      "code": 6013,
+      "name": "InvalidMerchantTreasuryAccount",
+      "msg": "Invalid merchant treasury token account. Ensure the account is a valid USDC token account."
+    },
+    {
+      "code": 6014,
+      "name": "InvalidPlatformTreasuryAccount",
+      "msg": "Invalid platform treasury token account. Ensure the account is a valid USDC token account."
+    },
+    {
+      "code": 6015,
+      "name": "InvalidUsdcMint",
+      "msg": "Invalid USDC mint account. Ensure the account is a valid token mint account."
+    },
+    {
+      "code": 6016,
+      "name": "MerchantNotFound",
+      "msg": "Merchant account not found or invalid. Ensure the merchant has been properly initialized."
+    },
+    {
+      "code": 6017,
+      "name": "PlanNotFound",
+      "msg": "Subscription plan not found or invalid. Ensure the plan exists and belongs to the specified merchant."
+    },
+    {
+      "code": 6018,
+      "name": "SubscriptionNotFound",
+      "msg": "Subscription not found or invalid. Ensure the subscription exists for this plan and subscriber."
+    },
+    {
+      "code": 6019,
+      "name": "ConfigNotFound",
+      "msg": "Global configuration account not found or invalid. Ensure the program has been properly initialized."
+    },
+    {
+      "code": 6020,
+      "name": "InvalidProgramData",
+      "msg": "Invalid program data account. Ensure the account is the correct program data account for this program."
+    },
+    {
+      "code": 6021,
+      "name": "NoPendingTransfer",
+      "msg": "No pending authority transfer. A transfer must be initiated before it can be accepted."
+    },
+    {
+      "code": 6022,
+      "name": "TransferAlreadyPending",
+      "msg": "Authority transfer already pending. Complete or cancel the current transfer before initiating a new one."
+    },
+    {
+      "code": 6023,
+      "name": "WithdrawLimitExceeded",
+      "msg": "Withdrawal amount exceeds maximum allowed per transaction. Please reduce the amount or contact platform admin to adjust limits."
+    },
+    {
+      "code": 6024,
+      "name": "InvalidTransferTarget",
+      "msg": "Invalid authority transfer target. The new authority must be different from the current authority."
+    },
+    {
+      "code": 6025,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount provided. Amount must be greater than zero and within acceptable limits."
+    },
+    {
+      "code": 6026,
+      "name": "PlanAlreadyExists",
+      "msg": "A plan with this ID already exists for this merchant. Each plan ID must be unique per merchant."
+    },
+    {
+      "code": 6027,
+      "name": "InvalidConfiguration",
+      "msg": "Invalid configuration parameters. Ensure min/max fee bounds are consistent and all values are within acceptable ranges."
+    },
+    {
+      "code": 6028,
+      "name": "InvalidTrialDuration",
+      "msg": "Invalid trial duration. Trial period must be exactly 7 days (604800 seconds), 14 days (1209600 seconds), or 30 days (2592000 seconds)."
+    },
+    {
+      "code": 6029,
+      "name": "TrialAlreadyUsed",
+      "msg": "Trial already used. Each subscriber can only use one free trial per plan."
+    }
+  ],
+  "types": [
+    {
+      "name": "AcceptAuthorityArgs",
+      "docs": [
+        "Arguments for accepting authority transfer"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "AdminWithdrawFeesArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CancelAuthorityTransferArgs",
+      "docs": [
+        "Arguments for canceling authority transfer"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "CancelSubscriptionArgs",
+      "docs": [
+        "Arguments for canceling an active subscription.",
+        "",
+        "# Rate Limiting Considerations",
+        "",
+        "This instruction has **no on-chain rate limiting** by design. While cancellation spam",
+        "is the **cheapest attack vector**, it is also the **lowest impact** since users can",
+        "only cancel their own subscriptions (self-inflicted spam).",
+        "",
+        "## Economic Deterrence",
+        "- **Transaction Fee**: 0.000005 SOL (~$0.0007) per cancellation",
+        "- **No Rent Refund**: Subscription account remains (can be reactivated)",
+        "- **Total Cost**: ~$0.0007 per cancellation (cheapest operation)",
+        "",
+        "**Cancellation Spam Cost**: Repeatedly canceling subscriptions:",
+        "- 1,000 cancellations: 0.005 SOL (~$0.70)",
+        "- **Lowest cost attack**, but also **lowest impact** (affects only attacker)",
+        "",
+        "## Why Cancellation Spam is Low Priority",
+        "",
+        "1. **Self-Inflicted**: Users can only cancel their own subscriptions, not others'",
+        "2. **No State Bloat**: Cancellation doesn't create new accounts",
+        "3. **Idempotent**: Canceling already-canceled subscriptions is safe (no-op)",
+        "4. **No System Impact**: Event spam doesn't affect protocol operations",
+        "5. **Economic Prerequisite**: Requires pre-existing subscriptions to cancel",
+        "",
+        "**Assessment**: Cancellation spam is a nuisance attack with minimal operational impact.",
+        "",
+        "## Off-Chain Monitoring",
+        "",
+        "Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):",
+        "- **Info Alert**: >10 cancellations per account per hour",
+        "- **Pattern Alert**: Repeated cancel-reactivate cycles on same subscription",
+        "- **Volume Alert**: Unusual spike in system-wide cancellation rate",
+        "",
+        "Detection is primarily for **observability and abuse prevention**, not critical",
+        "system protection, since the impact is limited to the attacker's own subscriptions.",
+        "",
+        "## Attack Scenarios",
+        "",
+        "### Cancellation Spam",
+        "**Attack**: User repeatedly cancels their own subscriptions to generate event noise.",
+        "**Cost**: ~$0.0007 per cancellation (cheapest attack).",
+        "**Impact**: Low - only affects attacker's subscriptions, no state bloat.",
+        "**Detection**: Monitor per-account cancellation frequency.",
+        "**Mitigation**: RPC rate limiting to 5 cancellations per hour per account.",
+        "",
+        "### Cancel-Reactivate Churn",
+        "**Attack**: User alternates between canceling and reactivating subscriptions.",
+        "**Cost**: ~$0.002 per cycle (cancel + reactivate).",
+        "**Impact**: Low - generates event noise but doesn't affect other users.",
+        "**Detection**: Track subscription state flip frequency.",
+        "**Mitigation**: Application-layer cooldown between state changes.",
+        "",
+        "## Why No On-Chain Rate Limiting?",
+        "",
+        "On-chain rate limiting for cancellation was deliberately not implemented because:",
+        "1. **Low Impact**: Self-inflicted spam doesn't affect other users or system stability",
+        "2. **User Rights**: Users should be able to cancel subscriptions freely",
+        "3. **State Efficiency**: Avoiding rate limit state keeps accounts lean",
+        "4. **Idempotency**: Repeated cancellations are safe and don't cause issues",
+        "",
+        "For comprehensive rate limiting strategy, see `/docs/RATE_LIMITING_STRATEGY.md`.",
+        "",
+        "## Mitigation Recommendations",
+        "",
+        "1. **RPC Layer**: Limit cancellations to 5-10 per hour per account (low priority)",
+        "2. **Indexer**: Monitor cancellation patterns for abuse detection",
+        "3. **Dashboard**: Track cancellation rates for merchant analytics",
+        "4. **Idempotency**: Already implemented - safe to call multiple times",
+        "",
+        "See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Canceled",
+      "docs": [
+        "Event emitted when a subscription is canceled"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan being canceled"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CloseSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Config",
+      "docs": [
+        "Global configuration account for program constants and settings",
+        "PDA seeds: `[\"config\"]`"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "platform_authority",
+            "docs": [
+              "Platform authority pubkey for admin operations"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_authority",
+            "docs": [
+              "Pending authority for two-step authority transfer"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "max_platform_fee_bps",
+            "docs": [
+              "Maximum platform fee in basis points (e.g., 1000 = 10%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_platform_fee_bps",
+            "docs": [
+              "Minimum platform fee in basis points (e.g., 50 = 0.5%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_period_seconds",
+            "docs": [
+              "Minimum subscription period in seconds (e.g., 86400 = 24 hours)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "default_allowance_periods",
+            "docs": [
+              "Default allowance periods multiplier (e.g., 3)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowed_mint",
+            "docs": [
+              "Allowed token mint address (e.g., official USDC mint)",
+              "This prevents merchants from using fake or arbitrary tokens"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "max_withdrawal_amount",
+            "docs": [
+              "Maximum withdrawal amount per transaction in USDC microlamports",
+              "Prevents accidental or malicious drainage of entire treasury"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_grace_period_seconds",
+            "docs": [
+              "Maximum grace period in seconds (e.g., 604800 = 7 days)",
+              "Prevents excessively long grace periods that increase merchant payment risk"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "docs": [
+              "Emergency pause state - when true, all user-facing operations are disabled",
+              "This allows the platform authority to halt operations in case of security incidents"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "keeper_fee_bps",
+            "docs": [
+              "Keeper fee in basis points (e.g., 25 = 0.25%)",
+              "This fee is paid to the transaction caller (keeper) to incentivize decentralized renewal network",
+              "Capped at 100 basis points (1%) to prevent excessive keeper fees"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigInitialized",
+      "docs": [
+        "Event emitted when global configuration is initialized"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "platform_authority",
+            "docs": [
+              "Platform authority pubkey for admin operations"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "max_platform_fee_bps",
+            "docs": [
+              "Maximum platform fee in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_platform_fee_bps",
+            "docs": [
+              "Minimum platform fee in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "min_period_seconds",
+            "docs": [
+              "Minimum subscription period in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "default_allowance_periods",
+            "docs": [
+              "Default allowance periods multiplier"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "allowed_mint",
+            "docs": [
+              "Allowed token mint address (e.g., official USDC mint)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "max_withdrawal_amount",
+            "docs": [
+              "Maximum withdrawal amount per transaction in USDC microlamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_grace_period_seconds",
+            "docs": [
+              "Maximum grace period in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when config was initialized"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "docs": [
+        "Event emitted when global configuration is updated",
+        "",
+        "This event provides transparency for all configuration changes made by the platform authority.",
+        "Off-chain systems can monitor this event to track configuration updates and adjust behavior accordingly."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "keeper_fee_bps",
+            "docs": [
+              "Keeper fee in basis points (e.g., 25 = 0.25%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_withdrawal_amount",
+            "docs": [
+              "Maximum withdrawal amount per transaction in USDC microlamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_grace_period_seconds",
+            "docs": [
+              "Maximum grace period in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_platform_fee_bps",
+            "docs": [
+              "Minimum platform fee in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_platform_fee_bps",
+            "docs": [
+              "Maximum platform fee in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "updated_by",
+            "docs": [
+              "Platform authority who made the update"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CreatePlanArgs",
+      "docs": [
+        "Arguments for creating a subscription plan.",
+        "",
+        "# Rate Limiting Considerations",
+        "",
+        "This instruction has **no on-chain rate limiting** by design. Spam prevention is handled",
+        "through economic incentives and off-chain monitoring:",
+        "",
+        "## Economic Deterrence",
+        "- **Transaction Fee**: 0.000005 SOL (~$0.0007) per plan creation",
+        "- **Rent Deposit**: 0.00089 SOL (~$0.12) per plan (129 bytes account size)",
+        "- **Total Cost**: ~$0.12 per plan, making mass spam attacks expensive",
+        "",
+        "Example: Creating 10,000 fake plans costs ~$1,253 (rent + fees), which provides",
+        "natural spam deterrence without requiring on-chain rate limiting logic.",
+        "",
+        "## Off-Chain Monitoring",
+        "",
+        "Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):",
+        "- **Critical Alert**: >100 plans created per merchant per hour",
+        "- **Warning Alert**: >10 plans created per merchant per hour",
+        "- **RPC Rate Limit**: Throttle to 10 plan creations per merchant per hour",
+        "",
+        "## Why No On-Chain Rate Limiting?",
+        "",
+        "On-chain rate limiting was deliberately not implemented because:",
+        "1. **Account Migration Complexity**: Adding rate limit fields (timestamps, counters) to",
+        "`Merchant` accounts requires migrating all existing accounts, risking data loss.",
+        "2. **Storage Costs**: Rate limit state increases account size and rent costs for all merchants.",
+        "3. **Solana Best Practices**: Rate limiting is more effectively handled at the RPC and",
+        "indexer layers where it's flexible, configurable, and doesn't bloat on-chain state.",
+        "4. **Economic Model**: Transaction fees + rent deposits already provide spam deterrence.",
+        "",
+        "For comprehensive rate limiting strategy, see `/docs/RATE_LIMITING_STRATEGY.md`.",
+        "",
+        "## Mitigation Recommendations",
+        "",
+        "1. **RPC Layer**: Configure rate limits (e.g., Nginx, `HAProxy`, or RPC provider limits)",
+        "2. **Indexer**: Deploy spam detection indexer to monitor merchant activity patterns",
+        "3. **Dashboard**: Real-time alerting for anomalous plan creation rates",
+        "4. **Auto-Throttle**: Implement automatic account throttling for detected spam patterns",
+        "",
+        "See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "type": "string"
+          },
+          {
+            "name": "plan_id_bytes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "period_secs",
+            "type": "u64"
+          },
+          {
+            "name": "grace_secs",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegateMismatchWarning",
+      "docs": [
+        "Event emitted when a delegate mismatch is detected during subscription renewal",
+        "",
+        "This warning event alerts off-chain systems and users when the token account's",
+        "current delegate does not match the expected merchant-specific delegate PDA.",
+        "",
+        "**Root Cause**: SPL Token accounts support only ONE delegate at a time. When users",
+        "have subscriptions with multiple merchants, starting or canceling a subscription",
+        "with one merchant will overwrite or revoke the delegate for ALL other merchants.",
+        "",
+        "This addresses audit finding M-3, documenting the fundamental architectural limitation",
+        "of SPL Token's single-delegate design. This is NOT a bug that can be fixed without",
+        "migrating to Token-2022 or implementing a global delegate architecture.",
+        "",
+        "**Scenarios that trigger this event:**",
+        "1. User subscribes to Merchant A, then Merchant B → A's delegate is overwritten",
+        "2. User cancels subscription with Merchant B → All delegates are revoked",
+        "3. User manually revokes delegate → All merchant subscriptions become non-functional",
+        "",
+        "Off-chain systems should monitor this event to:",
+        "- Alert users that their subscription is non-functional due to delegate mismatch",
+        "- Recommend reactivating the subscription (resets delegate correctly)",
+        "- Suggest using per-merchant token accounts as a workaround",
+        "- Display clear warnings about SPL Token single-delegate limitation",
+        "- Reference `docs/MULTI_MERCHANT_LIMITATION.md` for detailed explanation",
+        "",
+        "**Important**: This subscription will NOT renew until the user reactivates it,",
+        "which will reset the delegate approval correctly."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan with delegate mismatch"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber whose token account has incorrect delegate"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "expected_delegate",
+            "docs": [
+              "The expected delegate PDA for this merchant"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "actual_delegate",
+            "docs": [
+              "The actual delegate currently set on the token account (may be None or different merchant)"
+            ],
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeesWithdrawn",
+      "docs": [
+        "Event emitted when platform fees are withdrawn",
+        "",
+        "This event provides transparency and auditability for all platform fee withdrawals,",
+        "addressing audit finding L-8. Off-chain systems can monitor this event to:",
+        "- Track fee withdrawal history and patterns",
+        "- Generate financial reports and analytics",
+        "- Alert on unusual withdrawal activity",
+        "- Maintain audit trails for compliance"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "platform_authority",
+            "docs": [
+              "Platform authority who authorized the withdrawal"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "destination",
+            "docs": [
+              "Destination ATA where fees were sent"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount withdrawn in USDC micro-units"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when withdrawal occurred"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "platform_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "min_platform_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "min_period_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "default_allowance_periods",
+            "type": "u8"
+          },
+          {
+            "name": "allowed_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_withdrawal_amount",
+            "type": "u64"
+          },
+          {
+            "name": "max_grace_period_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitMerchantArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_ata",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LowAllowanceWarning",
+      "docs": [
+        "Event emitted when a subscription renewal succeeds but remaining allowance is low",
+        "",
+        "This warning event alerts off-chain systems and users when the delegate allowance",
+        "drops below a recommended threshold (2x the plan price). While the current renewal",
+        "succeeded, the low allowance may cause the next renewal to fail if not topped up.",
+        "",
+        "This addresses the allowance management UX concern from audit finding L-3, where",
+        "users may successfully start a subscription with multi-period allowance but find",
+        "renewals failing if allowance drops below the single-period price.",
+        "",
+        "Off-chain systems should monitor this event to:",
+        "- Send notifications to users to increase their allowance",
+        "- Display warnings in UI before the next renewal date",
+        "- Trigger automated allowance top-up workflows",
+        "- Generate analytics on allowance management patterns"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan with low allowance"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber who needs to increase allowance"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "current_allowance",
+            "docs": [
+              "Current remaining allowance (in USDC micro-units)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "recommended_allowance",
+            "docs": [
+              "Recommended minimum allowance (2x plan price)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "plan_price",
+            "docs": [
+              "Plan price for reference (in USDC micro-units)"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Merchant",
+      "docs": [
+        "Merchant account stores merchant configuration and settings",
+        "PDA seeds: [\"merchant\", authority]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Merchant authority (signer for merchant operations)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "docs": [
+              "Pinned USDC mint address for all transactions"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_ata",
+            "docs": [
+              "Merchant's USDC treasury ATA (where merchant fees are sent)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "docs": [
+              "Platform fee in basis points (0-1000, representing 0-10%)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "tier",
+            "docs": [
+              "Merchant tier (Free, Pro, Enterprise)"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerchantTier"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantInitialized",
+      "docs": [
+        "Event emitted when a merchant account is initialized"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant PDA account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Merchant authority (signer for merchant operations)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "docs": [
+              "Pinned USDC mint address for all transactions"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_ata",
+            "docs": [
+              "Merchant's USDC treasury ATA"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_fee_bps",
+            "docs": [
+              "Platform fee in basis points"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when merchant was initialized"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantTier",
+      "docs": [
+        "Merchant tier determines platform fee rate"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Free"
+          },
+          {
+            "name": "Pro"
+          },
+          {
+            "name": "Enterprise"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantTierChanged",
+      "docs": [
+        "Event emitted when a merchant's tier is changed",
+        "",
+        "This event provides transparency and auditability for merchant tier changes.",
+        "Tier changes immediately affect the platform fee rate applied to new renewals.",
+        "Off-chain systems can monitor this event to:",
+        "- Track merchant tier progression and revenue impact",
+        "- Generate analytics on tier adoption patterns",
+        "- Alert merchants of tier changes initiated by platform authority",
+        "- Maintain audit trails for billing and compliance"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant account whose tier changed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_tier",
+            "docs": [
+              "The previous tier before the change"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerchantTier"
+              }
+            }
+          },
+          {
+            "name": "new_tier",
+            "docs": [
+              "The new tier after the change"
+            ],
+            "type": {
+              "defined": {
+                "name": "MerchantTier"
+              }
+            }
+          },
+          {
+            "name": "new_fee_bps",
+            "docs": [
+              "The new platform fee in basis points corresponding to the new tier"
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PauseArgs",
+      "docs": [
+        "Arguments for pausing the program"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "PaymentFailed",
+      "docs": [
+        "Event emitted when a subscription payment fails"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan where payment failed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "reason",
+            "docs": [
+              "The reason for payment failure (encoded as string for off-chain analysis)"
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Plan",
+      "docs": [
+        "Plan account defines subscription plan details",
+        "PDA seeds: [\"plan\", merchant, `plan_id`]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "Reference to the merchant PDA"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan_id",
+            "docs": [
+              "Deterministic plan identifier (string as bytes, padded to 32)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "price_usdc",
+            "docs": [
+              "Price in USDC microlamports (6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "period_secs",
+            "docs": [
+              "Subscription period in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "grace_secs",
+            "docs": [
+              "Grace period for renewals in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Plan display name (string as bytes, padded to 32)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "active",
+            "docs": [
+              "Whether new subscriptions can be created for this plan"
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanCreated",
+      "docs": [
+        "Event emitted when a subscription plan is created"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "docs": [
+              "The plan PDA account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "docs": [
+              "Reference to the merchant PDA"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan_id",
+            "docs": [
+              "Deterministic plan identifier"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "price_usdc",
+            "docs": [
+              "Price in USDC microlamports (6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "period_secs",
+            "docs": [
+              "Subscription period in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "grace_secs",
+            "docs": [
+              "Grace period for renewals in seconds"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Plan display name"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when plan was created"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanStatusChanged",
+      "docs": [
+        "Event emitted when a plan's active status is changed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan whose status changed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "active",
+            "docs": [
+              "The new active status"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "changed_by",
+            "docs": [
+              "Who changed the status: \"merchant\" or \"platform\""
+            ],
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanTermsUpdated",
+      "docs": [
+        "Event emitted when a plan's pricing or terms are updated",
+        "",
+        "This event provides transparency for all plan term modifications made by merchant authority.",
+        "Term updates affect existing subscriptions starting from their next renewal.",
+        "Off-chain systems can monitor this event to:",
+        "- Track pricing changes and revenue impacts",
+        "- Alert subscribers of upcoming term changes",
+        "- Generate analytics on plan evolution patterns",
+        "- Maintain audit trails for subscription management"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "docs": [
+              "The plan account whose terms were updated"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "old_price",
+            "docs": [
+              "The old price before update (if price was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "new_price",
+            "docs": [
+              "The new price after update (if price was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "old_period",
+            "docs": [
+              "The old period before update (if period was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "new_period",
+            "docs": [
+              "The new period after update (if period was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "old_grace",
+            "docs": [
+              "The old grace period before update (if grace was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "new_grace",
+            "docs": [
+              "The new grace period after update (if grace was updated)"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "updated_by",
+            "docs": [
+              "Merchant authority who performed the update"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramPaused",
+      "docs": [
+        "Event emitted when the program is paused"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Platform authority who initiated the pause"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when program was paused"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramUnpaused",
+      "docs": [
+        "Event emitted when the program is unpaused"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Platform authority who initiated the unpause"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "docs": [
+              "Unix timestamp when program was unpaused"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RenewSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "Renewed",
+      "docs": [
+        "Event emitted when a subscription is successfully renewed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan being renewed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "The amount paid for the renewal (in USDC micro-units)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "keeper",
+            "docs": [
+              "The keeper (transaction caller) who executed the renewal"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper_fee",
+            "docs": [
+              "The fee paid to the keeper (in USDC micro-units)"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StartSubscriptionArgs",
+      "docs": [
+        "Arguments for starting a new subscription or reactivating a canceled subscription.",
+        "",
+        "# Rate Limiting Considerations",
+        "",
+        "This instruction has **no on-chain rate limiting** by design. Spam prevention relies on",
+        "economic costs and off-chain monitoring:",
+        "",
+        "## Economic Deterrence",
+        "- **Transaction Fee**: 0.000005 SOL (~$0.0007) per subscription start",
+        "- **Rent Deposit**: 0.00078 SOL (~$0.11) per new subscription (110 bytes account size)",
+        "- **USDC Payment**: Requires actual USDC transfer for initial payment",
+        "- **Delegate Approval**: Requires pre-approval of USDC token delegate",
+        "",
+        "**Subscription Churn Attack Cost**: Repeatedly starting and canceling the same subscription:",
+        "- Per cycle: 0.00001 SOL (start + cancel) + USDC for initial payment",
+        "- 1,000 cycles: ~$2-5 (depending on USDC amount and gas)",
+        "",
+        "The USDC payment requirement and delegate setup add friction that makes high-frequency",
+        "churn attacks more complex than simple account creation spam.",
+        "",
+        "## Off-Chain Monitoring",
+        "",
+        "Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):",
+        "- **Churn Alert**: >80% of subscriptions canceled within 1 hour of starting",
+        "- **Volume Alert**: >20 subscription operations (start/cancel) per account per hour",
+        "- **Pattern Alert**: Rapid start-cancel cycles on same plan/subscriber pairs",
+        "",
+        "## Attack Scenarios",
+        "",
+        "### Subscription Churn Attack",
+        "**Attack**: User repeatedly starts and cancels same subscription to generate event noise.",
+        "**Cost**: Low (~$0.002 per cycle), but requires USDC balance and delegate approval.",
+        "**Detection**: Monitor subscription lifetime duration; flag subscriptions lasting <5 minutes.",
+        "**Mitigation**: RPC rate limiting to 20 subscription operations per hour per account.",
+        "",
+        "### Reactivation Spam",
+        "**Attack**: User exploits `init_if_needed` to repeatedly reactivate canceled subscriptions.",
+        "**Cost**: 0.000005 SOL per reactivation (no rent deposit after first creation).",
+        "**Detection**: Track reactivation frequency; alert on >5 reactivations per hour.",
+        "**Mitigation**: Application-layer cooldown period between cancellation and reactivation.",
+        "",
+        "## Why No On-Chain Rate Limiting?",
+        "",
+        "On-chain rate limiting was deliberately not implemented because:",
+        "1. **Account Complexity**: Adding rate limit fields to `Subscription` accounts increases",
+        "complexity and storage costs for all users.",
+        "2. **State Bloat**: Tracking per-subscriber operation timestamps bloats on-chain state.",
+        "3. **Flexibility**: Off-chain rate limits can be adjusted dynamically based on observed",
+        "attack patterns without requiring program upgrades.",
+        "4. **Economic Model**: USDC payment requirement provides natural spam deterrence.",
+        "",
+        "For comprehensive rate limiting strategy, see `/docs/RATE_LIMITING_STRATEGY.md`.",
+        "",
+        "## Mitigation Recommendations",
+        "",
+        "1. **RPC Layer**: Limit subscription operations to 20/hour per account",
+        "2. **Indexer**: Monitor subscription lifetime and churn patterns",
+        "3. **Application Layer**: Implement cooldown periods between cancel and reactivation",
+        "4. **Dashboard**: Alert on abnormal subscription churn rates",
+        "",
+        "See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowance_periods",
+            "type": "u8"
+          },
+          {
+            "name": "trial_duration_secs",
+            "type": {
+              "option": "u64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscribed",
+      "docs": [
+        "Event emitted when a subscription is successfully started"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan being subscribed to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "The amount paid for the subscription (in USDC micro-units)"
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "docs": [
+        "Subscription account tracks individual user subscriptions",
+        "PDA seeds: [\"subscription\", plan, subscriber]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "docs": [
+              "Reference to the plan PDA"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "User's pubkey (the subscriber)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "next_renewal_ts",
+            "docs": [
+              "Unix timestamp for next renewal"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "active",
+            "docs": [
+              "Whether subscription is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "renewals",
+            "docs": [
+              "Number of renewals processed for this subscription.",
+              "",
+              "This counter increments with each successful renewal payment and is preserved",
+              "across subscription cancellation and reactivation cycles. When a subscription",
+              "is canceled and later reactivated, this field retains its historical value",
+              "rather than resetting to zero.",
+              "",
+              "# Reactivation Behavior",
+              "",
+              "- **New Subscription**: Initialized to `0`",
+              "- **Each Renewal**: Incremented by `1`",
+              "- **Cancellation**: Preserved (not reset)",
+              "- **Reactivation**: Preserved (continues from previous value)",
+              "",
+              "# Use Cases",
+              "",
+              "This preservation behavior is intentional to maintain a complete historical",
+              "record of all renewals across the lifetime of the subscription relationship,",
+              "regardless of interruptions. Off-chain systems using this field for analytics,",
+              "business logic, or rewards programs must account for the possibility that this",
+              "value may represent renewals from previous subscription sessions.",
+              "",
+              "# Example",
+              "",
+              "```ignore",
+              "// Initial subscription",
+              "subscription.renewals = 0;",
+              "",
+              "// After 10 renewals",
+              "subscription.renewals = 10;",
+              "",
+              "// User cancels subscription",
+              "subscription.active = false;",
+              "subscription.renewals = 10; // Preserved",
+              "",
+              "// User reactivates subscription",
+              "subscription.active = true;",
+              "subscription.renewals = 10; // Still preserved, not reset to 0",
+              "",
+              "// After 5 more renewals in the new session",
+              "subscription.renewals = 15; // Cumulative across all sessions",
+              "```"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "created_ts",
+            "docs": [
+              "Unix timestamp when subscription was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "last_amount",
+            "docs": [
+              "Last charged amount for audit purposes"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_renewed_ts",
+            "docs": [
+              "Unix timestamp when subscription was last renewed (prevents double-renewal attacks)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "trial_ends_at",
+            "docs": [
+              "Unix timestamp when free trial period ends (None if no trial)",
+              "",
+              "When present, indicates the subscription is in or was in a free trial period.",
+              "During the trial, no payment is required. After `trial_ends_at`, the first",
+              "renewal will process the initial payment.",
+              "",
+              "# Trial Behavior",
+              "",
+              "- **New Subscription with Trial**: Set to `current_time` + `trial_duration_secs`",
+              "- **During Trial**: No payment required, `in_trial` = true",
+              "- **Trial End**: First renewal processes payment, `in_trial` set to false",
+              "- **Reactivation**: Always None (trials only apply to first subscription)"
+            ],
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "in_trial",
+            "docs": [
+              "Whether subscription is currently in free trial period",
+              "",
+              "When true, the subscription is active but no payment has been made yet.",
+              "The first payment will occur at `next_renewal_ts` (when trial ends).",
+              "",
+              "# Trial State Transitions",
+              "",
+              "- **New Subscription**: Set to true if `trial_duration_secs` provided",
+              "- **Trial End (First Renewal)**: Set to false after successful payment",
+              "- **Reactivation**: Always false (no trials on reactivation)"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionClosed",
+      "docs": [
+        "Event emitted when a subscription account is closed and rent is reclaimed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan that was closed"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key who closed the subscription and received the rent"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionReactivated",
+      "docs": [
+        "Event emitted when a previously canceled subscription is reactivated"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "docs": [
+              "The merchant who owns the subscription plan"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan being reactivated"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber's public key"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "The amount paid for reactivation (in USDC micro-units)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_renewals",
+            "docs": [
+              "Cumulative number of renewals across all subscription sessions"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "original_created_ts",
+            "docs": [
+              "Original subscription creation timestamp (preserved from first session)"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferAuthorityArgs",
+      "docs": [
+        "Arguments for initiating authority transfer"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_authority",
+            "docs": [
+              "The new authority to transfer to"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrialConverted",
+      "docs": [
+        "Event emitted when a trial subscription converts to paid",
+        "",
+        "This event marks the successful conversion of a free trial subscription",
+        "to a paid subscription after the trial period ends. This occurs during",
+        "the first renewal after trial expiration.",
+        "",
+        "Off-chain systems can monitor this event to:",
+        "- Track trial-to-paid conversion rates",
+        "- Measure subscription revenue attribution",
+        "- Generate trial effectiveness metrics",
+        "- Trigger post-conversion workflows (welcome emails, etc.)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "docs": [
+              "The subscription account that converted from trial to paid"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber who converted to paid"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan that was converted"
+            ],
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrialStarted",
+      "docs": [
+        "Event emitted when a subscription starts with a free trial period",
+        "",
+        "This event indicates a new subscription was created with a trial period,",
+        "during which no payment is required. The first payment will occur when",
+        "the trial ends.",
+        "",
+        "Off-chain systems can monitor this event to:",
+        "- Track trial usage and conversion rates",
+        "- Send trial expiration reminders to subscribers",
+        "- Generate analytics on trial effectiveness",
+        "- Identify potential trial abuse patterns"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "docs": [
+              "The subscription account that entered trial period"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriber",
+            "docs": [
+              "The subscriber who started the trial"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "The subscription plan for this trial"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_ends_at",
+            "docs": [
+              "Unix timestamp when the trial period ends"
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnpauseArgs",
+      "docs": [
+        "Arguments for unpausing the program"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": []
+      }
+    },
+    {
+      "name": "UpdateConfigArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "keeper_fee_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "max_withdrawal_amount",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "max_grace_period_seconds",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "min_platform_fee_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "max_platform_fee_bps",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "min_period_seconds",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "default_allowance_periods",
+            "type": {
+              "option": "u8"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateMerchantTierArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "new_tier",
+            "type": {
+              "defined": {
+                "name": "MerchantTier"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdatePlanArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "active",
+            "docs": [
+              "New active status for the plan"
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdatePlanTermsArgs",
+      "docs": [
+        "Arguments for updating a subscription plan's pricing and terms",
+        "",
+        "All fields are optional - at least one must be provided.",
+        "Only the merchant authority can update plan terms."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price_usdc",
+            "docs": [
+              "Price in USDC microlamports (6 decimals)",
+              "Must be > 0 if provided"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "period_secs",
+            "docs": [
+              "Subscription period in seconds",
+              "Must be >= `config.min_period_seconds` if provided"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "grace_secs",
+            "docs": [
+              "Grace period for renewals in seconds",
+              "Must be <= period AND <= `config.max_grace_period_seconds` if provided"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Plan display name",
+              "Must not be empty if provided"
+            ],
+            "type": {
+              "option": "string"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

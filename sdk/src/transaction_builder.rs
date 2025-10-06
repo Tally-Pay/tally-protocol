@@ -129,6 +129,13 @@ pub struct CancelAuthorityTransferBuilder {
     program_id: Option<Pubkey>,
 }
 
+/// Builder for pause program transactions
+#[derive(Clone, Debug, Default)]
+pub struct PauseBuilder {
+    platform_authority: Option<Pubkey>,
+    program_id: Option<Pubkey>,
+}
+
 impl StartSubscriptionBuilder {
     /// Create a new start subscription builder
     #[must_use]
@@ -1211,6 +1218,66 @@ impl CancelAuthorityTransferBuilder {
     }
 }
 
+impl PauseBuilder {
+    /// Create a new pause builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the platform authority (must be signer)
+    #[must_use]
+    pub const fn platform_authority(mut self, platform_authority: Pubkey) -> Self {
+        self.platform_authority = Some(platform_authority);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `pause` instruction
+    /// * `Err(TallyError)` - If building fails
+    pub fn build_instruction(self) -> Result<Instruction> {
+        let platform_authority = self
+            .platform_authority
+            .ok_or("Platform authority not set")?;
+
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Compute config PDA
+        let config_pda = pda::config_address_with_program_id(&program_id);
+
+        let accounts = vec![
+            AccountMeta::new(config_pda, false),                     // config (PDA, mutable)
+            AccountMeta::new_readonly(platform_authority, true),     // platform_authority (signer)
+        ];
+
+        let args = crate::program_types::PauseArgs {};
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:pause")
+            data.extend_from_slice(&[211, 22, 221, 251, 74, 121, 193, 47]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -1283,6 +1350,12 @@ pub fn accept_authority() -> AcceptAuthorityBuilder {
 #[must_use]
 pub fn cancel_authority_transfer() -> CancelAuthorityTransferBuilder {
     CancelAuthorityTransferBuilder::new()
+}
+
+/// Create a pause program transaction builder
+#[must_use]
+pub fn pause() -> PauseBuilder {
+    PauseBuilder::new()
 }
 
 #[cfg(test)]
@@ -2347,6 +2420,147 @@ mod tests {
 
         // Verify it works the same as using the builder directly
         let direct_instruction = CancelAuthorityTransferBuilder::new()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, direct_instruction.program_id);
+        assert_eq!(instruction.accounts.len(), direct_instruction.accounts.len());
+        assert_eq!(instruction.data, direct_instruction.data);
+    }
+
+    #[test]
+    fn test_pause_builder() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = pause()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 2);
+
+        // Verify instruction discriminator matches program
+        assert_eq!(
+            &instruction.data[..8],
+            &[211, 22, 221, 251, 74, 121, 193, 47]
+        );
+
+        // Verify account structure
+        assert!(instruction.accounts[0].is_writable); // config (mutable)
+        assert!(!instruction.accounts[0].is_signer); // config (not signer, it's a PDA)
+        assert!(!instruction.accounts[1].is_writable); // platform_authority (readonly)
+        assert!(instruction.accounts[1].is_signer); // platform_authority (signer)
+
+        // Verify account addresses
+        assert_eq!(
+            instruction.accounts[0].pubkey,
+            pda::config_address_with_program_id(&program_id)
+        );
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_pause_builder_missing_required_fields() {
+        // Test missing platform_authority
+        let result = pause().build_instruction();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Platform authority not set"));
+    }
+
+    #[test]
+    fn test_pause_builder_custom_program_id() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = pause()
+            .platform_authority(platform_authority)
+            .program_id(custom_program_id)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, custom_program_id);
+    }
+
+    #[test]
+    fn test_pause_builder_pda_computation() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = pause()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the computed config PDA is correct
+        let program_id = program_id();
+        let expected_config_pda = pda::config_address_with_program_id(&program_id);
+
+        assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
+        assert_eq!(instruction.accounts[1].pubkey, platform_authority);
+    }
+
+    #[test]
+    fn test_pause_args_serialization() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test that args can be serialized and included in instruction data
+        let instruction = pause()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify the data contains the discriminator (8 bytes) followed by serialized args
+        // PauseArgs is empty, so data should be exactly 8 bytes (discriminator only)
+        assert_eq!(instruction.data.len(), 8);
+
+        // Verify the discriminator matches
+        assert_eq!(
+            &instruction.data[..8],
+            &[211, 22, 221, 251, 74, 121, 193, 47]
+        );
+    }
+
+    #[test]
+    fn test_pause_builder_clone_debug() {
+        let builder = pause()
+            .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
+
+        // Test Clone trait
+        let cloned_builder = builder.clone();
+        assert_eq!(
+            cloned_builder.platform_authority,
+            builder.platform_authority
+        );
+
+        // Test Debug trait
+        let debug_str = format!("{builder:?}");
+        assert!(debug_str.contains("PauseBuilder"));
+    }
+
+    #[test]
+    fn test_pause_builder_default() {
+        let builder = PauseBuilder::default();
+        assert!(builder.platform_authority.is_none());
+        assert!(builder.program_id.is_none());
+    }
+
+    #[test]
+    fn test_pause_convenience_function() {
+        let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test using convenience function
+        let instruction = pause()
+            .platform_authority(platform_authority)
+            .build_instruction()
+            .unwrap();
+
+        // Verify it works the same as using the builder directly
+        let direct_instruction = PauseBuilder::new()
             .platform_authority(platform_authority)
             .build_instruction()
             .unwrap();
