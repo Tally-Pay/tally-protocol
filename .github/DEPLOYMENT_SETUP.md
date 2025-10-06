@@ -82,7 +82,7 @@ cat target/deploy/tally_subs-keypair.json | gh secret set DEVNET_PROGRAM_KEYPAIR
 
 ## Creating a Signed Release
 
-The workflow requires signed tags. Here's how to create one:
+The workflow requires signed tags with the `program-v*.*.*` prefix to distinguish program deployments from SDK releases.
 
 ```bash
 # Configure Git signing (one-time setup)
@@ -90,9 +90,13 @@ git config --global user.signingkey <your-gpg-key-id>
 git config --global commit.gpgsign true
 git config --global tag.gpgsign true
 
-# Create and push a signed tag
-git tag -s v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+# Create and push a signed tag for program deployment
+git tag -s program-v0.1.0 -m "Deploy program v0.1.0"
+git push origin program-v0.1.0
+
+# For SDK releases (separate workflow)
+git tag -s sdk-v0.1.0 -m "Release SDK v0.1.0"
+git push origin sdk-v0.1.0
 ```
 
 ## Workflow Behavior
@@ -107,6 +111,13 @@ git push origin v0.1.0
 - If yes, performs upgrade using `anchor upgrade`
 - Uses `DEVNET_DEPLOYER_KEYPAIR` as the upgrade authority
 - Verifies the upgrade authority matches
+
+## Tag Naming Convention
+
+To avoid triggering multiple workflows, use prefixed tags:
+
+- **`program-v*.*.*`** - Triggers devnet deployment only (e.g., `program-v0.1.0`)
+- **`sdk-v*.*.*`** - Triggers SDK publish to crates.io only (e.g., `sdk-v0.1.0`)
 
 ## Monitoring Deployments
 

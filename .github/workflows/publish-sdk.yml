@@ -3,7 +3,7 @@ name: Publish SDK to crates.io
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v0.1.0, v0.2.0, etc.
+      - 'sdk-v*.*.*'  # Triggers on SDK version tags like sdk-v0.1.0
   workflow_dispatch:  # Allows manual triggering
 
 permissions:

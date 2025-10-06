@@ -3,7 +3,7 @@ name: Deploy to Devnet
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on signed version tags like v0.1.0, v0.2.0
+      - 'program-v*.*.*'  # Triggers on program version tags like program-v0.1.0
   workflow_dispatch:  # Allows manual triggering
 
 permissions:
