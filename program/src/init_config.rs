@@ -101,7 +101,7 @@ const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
     not(feature = "testnet")
 ))]
 #[allow(dead_code)] // Used conditionally based on feature flags
-const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = None;
+const EXPECTED_UPGRADE_AUTHORITY: Option<Pubkey> = Some(anchor_lang::solana_program::pubkey!("GfWVT8jVGigcgFCCd2CRqYvvRXS2D21ymsRKt74gPGFc"));
 
 // Testnet upgrade authority (REPLACE WITH YOUR TESTNET AUTHORITY)
 #[cfg(all(
