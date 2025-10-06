@@ -7,6 +7,7 @@ use crate::{
     program_types::{
         AdminWithdrawFeesArgs, CancelSubscriptionArgs, CreatePlanArgs, InitConfigArgs,
         InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdateConfigArgs, UpdatePlanArgs,
+        UpdatePlanTermsArgs,
     },
 };
 use anchor_client::solana_sdk::instruction::{AccountMeta, Instruction};
@@ -163,6 +164,18 @@ pub struct UpdateMerchantTierBuilder {
     authority: Option<Pubkey>,
     merchant: Option<Pubkey>,
     new_tier: Option<u8>,
+    program_id: Option<Pubkey>,
+}
+
+/// Builder for update plan terms transactions
+#[derive(Clone, Debug, Default)]
+pub struct UpdatePlanTermsBuilder {
+    authority: Option<Pubkey>,
+    plan_key: Option<Pubkey>,
+    price_usdc: Option<u64>,
+    period_secs: Option<u64>,
+    grace_secs: Option<u64>,
+    name: Option<String>,
     program_id: Option<Pubkey>,
 }
 
@@ -1631,6 +1644,166 @@ impl UpdateMerchantTierBuilder {
     }
 }
 
+impl UpdatePlanTermsBuilder {
+    /// Create a new update plan terms builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the authority (must be merchant authority)
+    #[must_use]
+    pub const fn authority(mut self, authority: Pubkey) -> Self {
+        self.authority = Some(authority);
+        self
+    }
+
+    /// Set the plan PDA to update
+    #[must_use]
+    pub const fn plan_key(mut self, plan_key: Pubkey) -> Self {
+        self.plan_key = Some(plan_key);
+        self
+    }
+
+    /// Set the plan price in USDC microlamports
+    #[must_use]
+    pub const fn price_usdc(mut self, price_usdc: u64) -> Self {
+        self.price_usdc = Some(price_usdc);
+        self
+    }
+
+    /// Set the subscription period in seconds
+    #[must_use]
+    pub const fn period_secs(mut self, period_secs: u64) -> Self {
+        self.period_secs = Some(period_secs);
+        self
+    }
+
+    /// Set the grace period in seconds
+    #[must_use]
+    pub const fn grace_secs(mut self, grace_secs: u64) -> Self {
+        self.grace_secs = Some(grace_secs);
+        self
+    }
+
+    /// Set the plan name
+    #[must_use]
+    pub fn name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    /// Set the program ID to use
+    #[must_use]
+    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
+        self.program_id = Some(program_id);
+        self
+    }
+
+    /// Build the transaction instruction
+    ///
+    /// # Returns
+    /// * `Ok(Instruction)` - The `update_plan_terms` instruction
+    /// * `Err(TallyError)` - If building fails
+    ///
+    /// # Validation
+    /// * Authority must be set
+    /// * Plan key must be set
+    /// * At least one field must be set for update
+    /// * Price > 0 if provided
+    /// * Price <= `MAX_PLAN_PRICE_USDC` (1,000,000 USDC) if provided
+    /// * Period >= `config.min_period_seconds` if provided (validated on-chain)
+    /// * Grace <= 30% of period if both provided
+    /// * Grace <= `config.max_grace_period_seconds` if provided (validated on-chain)
+    /// * Name not empty if provided
+    ///
+    /// # Note
+    /// Some validations (`min_period_seconds`, `max_grace_period_seconds`) require config
+    /// and are validated on-chain. This builder performs client-side validations where possible.
+    pub fn build_instruction(self) -> Result<Instruction> {
+        const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000; // 1 million USDC
+
+        let authority = self.authority.ok_or("Authority not set")?;
+        let plan_key = self.plan_key.ok_or("Plan key not set")?;
+        let program_id = self.program_id.unwrap_or_else(program_id);
+
+        // Validate at least one field is set for update
+        let has_update = self.price_usdc.is_some()
+            || self.period_secs.is_some()
+            || self.grace_secs.is_some()
+            || self.name.is_some();
+
+        if !has_update {
+            return Err("At least one field must be set for update".into());
+        }
+
+        // Validate price > 0 if provided
+        if let Some(price) = self.price_usdc {
+            if price == 0 {
+                return Err("Price must be > 0".into());
+            }
+            if price > MAX_PLAN_PRICE_USDC {
+                return Err("Price must be <= 1,000,000 USDC".into());
+            }
+        }
+
+        // Validate grace <= 30% of period if both provided
+        if let (Some(grace), Some(period)) = (self.grace_secs, self.period_secs) {
+            let max_grace = period
+                .checked_mul(3)
+                .and_then(|v| v.checked_div(10))
+                .ok_or("Arithmetic overflow calculating max grace period")?;
+
+            if grace > max_grace {
+                return Err("Grace period must be <= 30% of billing period".into());
+            }
+        }
+
+        // Validate name not empty if provided
+        if let Some(ref name) = self.name {
+            if name.is_empty() {
+                return Err("Name must not be empty".into());
+            }
+            if name.len() > 32 {
+                return Err("Name must be <= 32 bytes".into());
+            }
+        }
+
+        // Compute PDAs
+        let config_pda = pda::config_address_with_program_id(&program_id);
+        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
+
+        let accounts = vec![
+            AccountMeta::new_readonly(config_pda, false),  // config (PDA, readonly)
+            AccountMeta::new(plan_key, false),             // plan (PDA, mutable)
+            AccountMeta::new_readonly(merchant_pda, false), // merchant (PDA, readonly)
+            AccountMeta::new_readonly(authority, true),    // authority (signer)
+        ];
+
+        let args = UpdatePlanTermsArgs {
+            price_usdc: self.price_usdc,
+            period_secs: self.period_secs,
+            grace_secs: self.grace_secs,
+            name: self.name,
+        };
+
+        let data = {
+            let mut data = Vec::new();
+            // Instruction discriminator (computed from "global:update_plan_terms")
+            data.extend_from_slice(&[224, 68, 224, 41, 169, 52, 124, 221]);
+            borsh::to_writer(&mut data, &args)
+                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
+            data
+        };
+
+        Ok(Instruction {
+            program_id,
+            accounts,
+            data,
+        })
+    }
+}
+
 // Convenience functions for common transaction building patterns
 
 /// Create a start subscription transaction builder
@@ -1727,6 +1900,12 @@ pub fn update_config() -> UpdateConfigBuilder {
 #[must_use]
 pub fn update_merchant_tier() -> UpdateMerchantTierBuilder {
     UpdateMerchantTierBuilder::new()
+}
+
+/// Create an update plan terms transaction builder
+#[must_use]
+pub fn update_plan_terms() -> UpdatePlanTermsBuilder {
+    UpdatePlanTermsBuilder::new()
 }
 
 #[cfg(test)]
@@ -3687,6 +3866,240 @@ mod tests {
             .authority(authority)
             .merchant(merchant)
             .new_tier(1)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, direct_instruction.program_id);
+        assert_eq!(
+            instruction.accounts.len(),
+            direct_instruction.accounts.len()
+        );
+        assert_eq!(instruction.data, direct_instruction.data);
+    }
+
+    #[test]
+    fn test_update_plan_terms_builder_all_fields() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(10_000_000) // 10 USDC
+            .period_secs(2_592_000) // 30 days
+            .grace_secs(777_600)    // 9 days (< 30% of 30 days = 7.776 days)
+            .name("Updated Plan".to_string())
+            .build_instruction()
+            .unwrap();
+
+        let program_id = program_id();
+        assert_eq!(instruction.program_id, program_id);
+        assert_eq!(instruction.accounts.len(), 4);
+
+        // Verify discriminator is correct for "global:update_plan_terms"
+        assert_eq!(&instruction.data[..8], &[224, 68, 224, 41, 169, 52, 124, 221]);
+    }
+
+    #[test]
+    fn test_update_plan_terms_builder_single_field() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test updating only price
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(20_000_000)
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 4);
+
+        // Test updating only period
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .period_secs(604_800) // 7 days
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 4);
+
+        // Test updating only grace
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .grace_secs(86_400) // 1 day
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 4);
+
+        // Test updating only name
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .name("New Name".to_string())
+            .build_instruction()
+            .unwrap();
+
+        assert_eq!(instruction.program_id, program_id());
+        assert_eq!(instruction.accounts.len(), 4);
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_no_fields() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("At least one field must be set"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_missing_authority() {
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .plan_key(plan_key)
+            .price_usdc(10_000_000)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Authority not set"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_missing_plan() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .price_usdc(10_000_000)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Plan key not set"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_zero_price() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(0)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Price must be > 0"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_max_price() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(1_000_000_000_001) // Just over 1 million USDC
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Price must be <= 1,000,000 USDC"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_grace_exceeds_30_percent() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .period_secs(2_592_000) // 30 days
+            .grace_secs(800_000)    // > 30% of 30 days (should be <= 777,600)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Grace period must be <= 30%"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_empty_name() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .name(String::new())
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Name must not be empty"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_validation_name_too_long() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let long_name = "a".repeat(33); // 33 bytes, > 32
+
+        let result = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .name(long_name)
+            .build_instruction();
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Name must be <= 32 bytes"));
+    }
+
+    #[test]
+    fn test_update_plan_terms_convenience_function() {
+        let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instruction = update_plan_terms()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(15_000_000)
+            .build_instruction()
+            .unwrap();
+
+        // Verify it works the same as using the builder directly
+        let direct_instruction = UpdatePlanTermsBuilder::new()
+            .authority(authority)
+            .plan_key(plan_key)
+            .price_usdc(15_000_000)
             .build_instruction()
             .unwrap();
 
