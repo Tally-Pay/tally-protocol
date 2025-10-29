@@ -33,6 +33,7 @@ tasks:
 
     build:
         desc: "Build Anchor program"
+        deps: [validate:program-id]
         sources: ["program/**/*.rs", "Anchor.toml", "program/Cargo.toml"]
         generates: ["target/deploy/tally_subs.so"]
         cmds:
@@ -208,6 +209,18 @@ tasks:
     # =============================================================================
     # UTILITY TASKS
     # =============================================================================
+
+    validate:program-id:
+        desc: "Validate TALLY_PROGRAM_ID is set and matches Anchor.toml"
+        cmds:
+            - |
+                if [ -z "${TALLY_PROGRAM_ID}" ]; then
+                    echo "❌ ERROR: TALLY_PROGRAM_ID environment variable is not set"
+                    exit 1
+                fi
+                echo "✅ TALLY_PROGRAM_ID is set: ${TALLY_PROGRAM_ID}"
+
+                # TODO: Add validation that Anchor.toml matches TALLY_PROGRAM_ID
 
     clean:
         desc: "Clean build artifacts"
