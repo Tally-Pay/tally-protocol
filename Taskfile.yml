@@ -1,0 +1,251 @@
+version: "3"
+silent: true
+output: group
+
+env:
+    PATH:
+        sh: 'echo "$HOME/.local/share/solana/install/active_release/bin:$PATH"'
+
+vars:
+    # Default configurations
+    RPC_URL: '{{.RPC_URL | default "http://127.0.0.1:8899"}}'
+    # TALLY_PROGRAM_ID must be set - no fallbacks
+    PROGRAM_ID:
+        sh: |
+            if [ -z "${TALLY_PROGRAM_ID}" ]; then
+                echo "ERROR: TALLY_PROGRAM_ID environment variable is not set" >&2
+                echo "Please set it in your .env.local file or export it" >&2
+                echo "Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7" >&2
+                exit 1
+            fi
+            echo "${TALLY_PROGRAM_ID}"
+
+    # Tool paths
+    SOLANA_CLI: '{{.SOLANA_CLI | default "solana"}}'
+    ANCHOR_CLI: '{{.ANCHOR_CLI | default "anchor"}}'
+
+dotenv: [".env.local", ".env.devnet", ".env"]
+
+tasks:
+    # =============================================================================
+    # BUILD OPERATIONS
+    # =============================================================================
+
+    build:
+        desc: "Build Anchor program"
+        sources: ["program/**/*.rs", "Anchor.toml", "program/Cargo.toml"]
+        generates: ["target/deploy/tally_subs.so"]
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🔨 Building Anchor program..."
+                {{.ANCHOR_CLI}} build
+                echo "✅ Anchor program built"
+
+    build:verifiable:
+        desc: "Build verifiable Anchor program"
+        sources: ["program/**/*.rs", "Anchor.toml", "program/Cargo.toml"]
+        generates: ["target/verifiable/tally_subs.so"]
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🔨 Building verifiable Anchor program..."
+                {{.ANCHOR_CLI}} build --verifiable
+                echo "✅ Verifiable program built"
+
+    # =============================================================================
+    # TESTING
+    # =============================================================================
+
+    test:
+        desc: "Run Anchor program tests"
+        deps: [build]
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🧪 Running Anchor tests..."
+                {{.ANCHOR_CLI}} test --skip-local-validator
+                echo "✅ Anchor tests passed"
+
+    test:full:
+        desc: "Run Anchor tests with local validator"
+        deps: [build]
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🧪 Running Anchor tests with validator..."
+                {{.ANCHOR_CLI}} test
+                echo "✅ Anchor tests passed"
+
+    # =============================================================================
+    # DEPLOYMENT
+    # =============================================================================
+
+    deploy:localnet:
+        run: once
+        desc: "Deploy to local validator"
+        deps: [build]
+        status:
+            # Only run if validator is running and program is not already deployed
+            - solana cluster-version >/dev/null 2>&1
+            - "! {{.SOLANA_CLI}} account {{.PROGRAM_ID}} >/dev/null 2>&1"
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🚀 Deploying to localnet..."
+                # Ensure validator is fully ready
+                echo "⏳ Waiting for validator readiness..."
+                for i in {1..30}; do
+                  if {{.SOLANA_CLI}} cluster-version >/dev/null 2>&1 && {{.SOLANA_CLI}} slot >/dev/null 2>&1; then
+                    echo "✅ Validator ready for deployment"
+                    break
+                  fi
+                  if [ $i -eq 30 ]; then
+                    echo "❌ Validator not ready for deployment after 30 seconds"
+                    exit 1
+                  fi
+                  sleep 1
+                done
+                # Deploy program using solana CLI with existing keypair from anchor build
+                {{.SOLANA_CLI}} program deploy target/deploy/tally_subs.so --program-id target/deploy/tally_subs-keypair.json
+                echo "✅ Deployed to localnet"
+                # Verify deployment
+                {{.SOLANA_CLI}} account {{.PROGRAM_ID}} >/dev/null 2>&1 && echo "✅ Program deployment verified" || echo "⚠️ Program deployment verification failed"
+
+    deploy:devnet:
+        desc: "Deploy to devnet using funded wallet"
+        deps: [build]
+        status:
+            # Only deploy if program doesn't exist yet or .env.devnet doesn't have PROGRAM_ID
+            - "! test -f .env.devnet || ! grep -q 'PROGRAM_ID=' .env.devnet"
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🚀 Deploying to devnet..."
+
+                # Get deployer wallet
+                CURRENT_WALLET=$({{.SOLANA_CLI}} address)
+                echo "📋 Deployer wallet: $CURRENT_WALLET"
+
+                {{.SOLANA_CLI}} config set --url devnet
+                BALANCE=$({{.SOLANA_CLI}} balance | awk '{print $1}')
+                echo "💰 Wallet balance before deployment: $BALANCE SOL"
+
+                # Check if we have enough SOL for deployment
+                if (( $(echo "$BALANCE < 2.0" | bc -l) )); then
+                    echo "❌ Insufficient SOL for deployment. Need at least 2.0 SOL, have $BALANCE SOL"
+                    exit 1
+                fi
+
+                # Generate fresh program keypair to avoid authority conflicts
+                echo "🔑 Generating fresh program keypair..."
+                {{.SOLANA_CLI}}-keygen new --outfile target/deploy/tally_subs-keypair.json --force --no-bip39-passphrase
+
+                # Rebuild with new program ID
+                echo "🔨 Rebuilding with new program ID..."
+                {{.ANCHOR_CLI}} build
+
+                # Get new program ID for verification
+                NEW_PROGRAM_ID=$({{.SOLANA_CLI}}-keygen pubkey target/deploy/tally_subs-keypair.json)
+                echo "📋 New Program ID: $NEW_PROGRAM_ID"
+
+                # Deploy using solana CLI directly
+                {{.SOLANA_CLI}} program deploy target/deploy/tally_subs.so --program-id target/deploy/tally_subs-keypair.json
+                echo "✅ Deployed to devnet"
+                echo "💰 Wallet balance after deployment: $({{.SOLANA_CLI}} balance)"
+
+                # Update .env.devnet with new program ID
+                if [ -f .env.devnet ]; then
+                    sed -i "s/^PROGRAM_ID=.*/PROGRAM_ID=$NEW_PROGRAM_ID/" .env.devnet
+                    echo "📋 Updated .env.devnet with new Program ID: $NEW_PROGRAM_ID"
+                else
+                    echo "PROGRAM_ID=$NEW_PROGRAM_ID" >> .env.devnet
+                    echo "📋 Added Program ID to .env.devnet: $NEW_PROGRAM_ID"
+                fi
+
+    deploy:mainnet:
+        desc: "Deploy to mainnet (with safety checks)"
+        deps: [build:verifiable, test]
+        preconditions:
+            - sh: '[ "$MAINNET_DEPLOY_CONFIRMED" = "true" ]'
+              msg: "Set MAINNET_DEPLOY_CONFIRMED=true to confirm mainnet deployment"
+        cmds:
+            - |
+                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+                echo "🚀 Deploying to mainnet..."
+                {{.SOLANA_CLI}} config set --url mainnet-beta
+                {{.ANCHOR_CLI}} deploy --provider.cluster mainnet-beta
+                echo "✅ Deployed to mainnet"
+
+    # =============================================================================
+    # PROGRAM MANAGEMENT
+    # =============================================================================
+
+    program:verify:
+        desc: "Verify deployed program"
+        cmds:
+            - |
+                echo "🔍 Verifying deployed program..."
+                {{.ANCHOR_CLI}} verify {{.PROGRAM_ID}}
+                echo "✅ Program verified"
+
+    program:upgrade:
+        desc: "Upgrade deployed program"
+        deps: [build]
+        cmds:
+            - |
+                echo "⬆️ Upgrading program..."
+                {{.ANCHOR_CLI}} upgrade target/deploy/tally_subs.so --program-id {{.PROGRAM_ID}}
+                echo "✅ Program upgraded"
+
+    program:info:
+        desc: "Show program information"
+        cmds:
+            - |
+                echo "📋 Program Information:"
+                {{.SOLANA_CLI}} program show {{.PROGRAM_ID}}
+
+    # =============================================================================
+    # UTILITY TASKS
+    # =============================================================================
+
+    clean:
+        desc: "Clean build artifacts"
+        cmds:
+            - |
+                echo "🧹 Cleaning build artifacts..."
+                rm -rf target/
+                rm -rf .anchor/
+                echo "✅ Clean complete"
+
+    info:
+        desc: "Show protocol configuration"
+        cmds:
+            - |
+                echo "📋 Tally Protocol Configuration:"
+                echo "RPC_URL: {{.RPC_URL}}"
+                echo "PROGRAM_ID: {{.PROGRAM_ID}}"
+                echo "Anchor Version: $({{.ANCHOR_CLI}} --version)"
+                echo "Solana Version: $({{.SOLANA_CLI}} --version)"
+
+    help:
+        desc: "Show available tasks"
+        cmds:
+            - task --list
+
+    default:
+        desc: "Show protocol information"
+        cmds:
+            - echo "🎯 Tally Protocol - Solana Subscription Program"
+            - echo "=============================================="
+            - task: info
+            - echo ""
+            - echo "📚 Common Commands:"
+            - echo "  task build              - Build Anchor program"
+            - echo "  task test               - Run tests (skip validator)"
+            - echo "  task test:full          - Run tests with validator"
+            - echo "  task deploy:localnet    - Deploy to localnet"
+            - echo "  task deploy:devnet      - Deploy to devnet"
+            - echo "  task program:info       - Show program information"
+            - echo ""
+            - echo "Run 'task help' for complete task list"
