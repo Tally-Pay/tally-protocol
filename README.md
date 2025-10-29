@@ -315,7 +315,7 @@ solana-test-validator
 # Deploy to localnet
 anchor deploy --provider.cluster localnet
 
-# Program ID: Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV
+# Program ID: eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
 ```
 
 ### Testing
