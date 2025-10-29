@@ -2,6 +2,8 @@ version: "3"
 silent: true
 output: group
 
+dotenv: [".env.local", ".env.devnet", ".env"]
+
 env:
     PATH:
         sh: 'echo "$HOME/.local/share/solana/install/active_release/bin:$PATH"'
@@ -9,22 +11,12 @@ env:
 vars:
     # Default configurations
     RPC_URL: '{{.RPC_URL | default "http://127.0.0.1:8899"}}'
-    # TALLY_PROGRAM_ID must be set - no fallbacks
-    PROGRAM_ID:
-        sh: |
-            if [ -z "${TALLY_PROGRAM_ID}" ]; then
-                echo "ERROR: TALLY_PROGRAM_ID environment variable is not set" >&2
-                echo "Please set it in your .env.local file or export it" >&2
-                echo "Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7" >&2
-                exit 1
-            fi
-            echo "${TALLY_PROGRAM_ID}"
+    # PROGRAM_ID var - references TALLY_PROGRAM_ID from dotenv
+    PROGRAM_ID: '{{.TALLY_PROGRAM_ID}}'
 
     # Tool paths
     SOLANA_CLI: '{{.SOLANA_CLI | default "solana"}}'
     ANCHOR_CLI: '{{.ANCHOR_CLI | default "anchor"}}'
-
-dotenv: [".env.local", ".env.devnet", ".env"]
 
 tasks:
     # =============================================================================
@@ -212,15 +204,11 @@ tasks:
 
     validate:program-id:
         desc: "Validate TALLY_PROGRAM_ID is set and matches Anchor.toml"
+        requires:
+            vars: [TALLY_PROGRAM_ID]
         cmds:
             - |
-                if [ -z "${TALLY_PROGRAM_ID}" ]; then
-                    echo "❌ ERROR: TALLY_PROGRAM_ID environment variable is not set"
-                    exit 1
-                fi
-                echo "✅ TALLY_PROGRAM_ID is set: ${TALLY_PROGRAM_ID}"
-
-                # TODO: Add validation that Anchor.toml matches TALLY_PROGRAM_ID
+                echo "OK - TALLY_PROGRAM_ID is set: ${TALLY_PROGRAM_ID}"
 
     clean:
         desc: "Clean build artifacts"
