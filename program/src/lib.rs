@@ -66,7 +66,10 @@ use update_merchant_tier::*;
 use update_plan::*;
 use update_plan_terms::*;
 
-declare_id!("6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5");
+// Program ID is read from TALLY_PROGRAM_ID environment variable at compile time.
+// This fails compilation if TALLY_PROGRAM_ID is not set, which is intentional.
+// Set before building: export TALLY_PROGRAM_ID=<your-program-id>
+declare_id!(env!("TALLY_PROGRAM_ID"));
 
 #[program]
 pub mod subs {
