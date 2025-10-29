@@ -10506,6 +10506,7 @@ dependencies = [
  "anchor-spl",
  "anyhow",
  "bincode",
+ "bs58",
  "solana-program-test",
  "solana-sdk 3.0.0",
  "tokio",
