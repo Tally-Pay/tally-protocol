@@ -23,13 +23,13 @@ echo '6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5' | gh secret set DEVNET_PROGR
 
 **Purpose**: The on-chain program address for localnet testing.
 
-**Value**: `Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV`
+**Value**: `eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7`
 
 **How to create**:
 
 ```bash
 # Set as org secret
-echo 'Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV' | gh secret set LOCALNET_PROGRAM_ID --org Tally-Pay --visibility all
+echo 'eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7' | gh secret set LOCALNET_PROGRAM_ID --org Tally-Pay --visibility all
 ```
 
 ### 3. `DEVNET_DEPLOYER_KEYPAIR`

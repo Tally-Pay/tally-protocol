@@ -10480,6 +10480,7 @@ dependencies = [
  "dirs",
  "hex",
  "lru 0.12.5",
+ "once_cell",
  "serde",
  "serde_json",
  "solana-account-decoder 3.0.5",

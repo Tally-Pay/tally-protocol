@@ -11,7 +11,7 @@ wallet = "~/.config/solana/id.json"
 anchor_version = "0.31.1"
 
 [programs.localnet]
-tally-subs = "Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV"
+tally-subs = "eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7"
 
 [programs.devnet]
 tally-subs = "6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
