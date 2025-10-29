@@ -66,10 +66,12 @@ use update_merchant_tier::*;
 use update_plan::*;
 use update_plan_terms::*;
 
-// Program ID for localnet - this is baked into the compiled binary
-// The deployed program ID is determined by the keypair in target/deploy/tally_subs-keypair.json
-// For devnet/mainnet, update this to match Anchor.toml [programs.<network>] section
-declare_id!("eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7");
+// Program ID is loaded from TALLY_PROGRAM_ID environment variable at compile time
+// The build script (build.rs) converts the base58 program ID to bytes
+// This approach ensures the program ID comes from the environment while satisfying
+// Anchor's requirement for a compile-time constant in declare_id!()
+const PROGRAM_ID_BYTES: &[u8; 32] = include_bytes!(concat!(env!("OUT_DIR"), "/program_id.bin"));
+declare_id!(Pubkey::new_from_array(*PROGRAM_ID_BYTES));
 
 #[program]
 pub mod subs {

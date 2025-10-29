@@ -31,3 +31,6 @@ solana-program-test = { workspace = true }
 solana-sdk = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+
+[build-dependencies]
+bs58 = "0.5"
