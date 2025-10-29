@@ -71,11 +71,15 @@ jobs:
           fi
 
       - name: Build program
+        env:
+          TALLY_PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
           anchor build
           echo "✅ Build completed successfully"
 
       - name: Run program tests
+        env:
+          TALLY_PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
           cargo nextest run -p tally_subs || cargo test -p tally_subs
           echo "✅ Tests passed"
@@ -88,18 +92,18 @@ jobs:
       - name: Deploy/Upgrade program to Devnet
         env:
           PROGRAM_KEYPAIR: ${{ secrets.DEVNET_PROGRAM_KEYPAIR }}
-          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
+          TALLY_PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
           ANCHOR_WALLET: /home/rodzilla/.config/solana/deployer.json
           ANCHOR_PROVIDER_URL: https://api.devnet.solana.com
         run: |
           # Check if program already exists
-          if solana program show "$PROGRAM_ID" &> /dev/null; then
+          if solana program show "$TALLY_PROGRAM_ID" &> /dev/null; then
             echo "📦 Program exists. Upgrading..."
 
             # Upgrade existing program
             anchor upgrade \
               target/deploy/tally_subs.so \
-              --program-id "$PROGRAM_ID" \
+              --program-id "$TALLY_PROGRAM_ID" \
               --provider.cluster devnet
 
             echo "✅ Program upgraded successfully"
@@ -119,13 +123,13 @@ jobs:
 
       - name: Verify deployment
         env:
-          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
+          TALLY_PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
           # Show program info
-          solana program show "$PROGRAM_ID"
+          solana program show "$TALLY_PROGRAM_ID"
 
           # Verify upgrade authority
-          UPGRADE_AUTHORITY=$(solana program show "$PROGRAM_ID" | grep "Authority" | awk '{print $2}')
+          UPGRADE_AUTHORITY=$(solana program show "$TALLY_PROGRAM_ID" | grep "Authority" | awk '{print $2}')
           DEPLOYER_ADDRESS=$(solana address)
 
           if [ "$UPGRADE_AUTHORITY" != "$DEPLOYER_ADDRESS" ]; then
@@ -146,11 +150,11 @@ jobs:
       - name: Deployment summary
         if: success()
         env:
-          PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
+          TALLY_PROGRAM_ID: ${{ secrets.DEVNET_PROGRAM_ID }}
         run: |
           echo "🎉 Deployment Summary"
           echo "===================="
           echo "Tag: ${{ github.ref_name }}"
-          echo "Program ID: $PROGRAM_ID"
+          echo "Program ID: $TALLY_PROGRAM_ID"
           echo "Network: Devnet"
-          echo "Explorer: https://explorer.solana.com/address/$PROGRAM_ID?cluster=devnet"
+          echo "Explorer: https://explorer.solana.com/address/$TALLY_PROGRAM_ID?cluster=devnet"

@@ -22,22 +22,21 @@ describe('Configuration', () => {
 
     it('should return environment variable when set', () => {
       const testProgramId = 'So11111111111111111111111111111111111111112';
-      process.env.PROGRAM_ID = testProgramId;
+      process.env.TALLY_PROGRAM_ID = testProgramId;
       const result = getProgramId();
       expect(result).toBe(testProgramId);
     });
 
-    it('should return default when no override or env var', () => {
-      delete process.env.PROGRAM_ID;
-      const result = getProgramId();
-      expect(result).toBe('11111111111111111111111111111111');
+    it('should throw error when no override or env var', () => {
+      delete process.env.TALLY_PROGRAM_ID;
+      expect(() => getProgramId()).toThrow('TALLY_PROGRAM_ID environment variable is required');
     });
 
     it('should prioritize override over environment variable', () => {
       const envProgramId = 'So11111111111111111111111111111111111111112';
       const overrideProgramId = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 
-      process.env.PROGRAM_ID = envProgramId;
+      process.env.TALLY_PROGRAM_ID = envProgramId;
       const result = getProgramId(overrideProgramId);
 
       expect(result).toBe(overrideProgramId);
