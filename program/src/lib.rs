@@ -66,10 +66,10 @@ use update_merchant_tier::*;
 use update_plan::*;
 use update_plan_terms::*;
 
-// Program ID is read from TALLY_PROGRAM_ID environment variable at compile time.
-// This fails compilation if TALLY_PROGRAM_ID is not set, which is intentional.
-// Set before building: export TALLY_PROGRAM_ID=<your-program-id>
-declare_id!(env!("TALLY_PROGRAM_ID"));
+// Program ID for localnet - this is baked into the compiled binary
+// The deployed program ID is determined by the keypair in target/deploy/tally_subs-keypair.json
+// For devnet/mainnet, update this to match Anchor.toml [programs.<network>] section
+declare_id!("eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7");
 
 #[program]
 pub mod subs {
