@@ -298,24 +298,26 @@ pnpm build
 
 #### Devnet
 ```bash
+# Set program ID (required)
+export TALLY_PROGRAM_ID=6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5
+
 # Build program
 anchor build
 
 # Deploy to devnet
 anchor deploy --provider.cluster devnet
-
-# Program ID: 6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5
 ```
 
 #### Localnet
 ```bash
+# Set program ID (required)
+export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+
 # Start local validator
 solana-test-validator
 
 # Deploy to localnet
 anchor deploy --provider.cluster localnet
-
-# Program ID: eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
 ```
 
 ### Testing
