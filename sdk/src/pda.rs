@@ -515,12 +515,17 @@ mod tests {
     }
 
     #[test]
-    fn test_known_program_id() {
-        // Test with the actual program ID to ensure consistency
-        let program_id_str = "Fwrs8tRRtw8HwmQZFS3XRRVcKBQhe1nuZ5heB4FgySXV";
-        let expected_program_id = Pubkey::from_str(program_id_str).unwrap();
+    fn test_program_id_from_env() {
+        // Test requires TALLY_PROGRAM_ID to be set
+        // In CI/local testing, this must be set before running tests
+        let program_id_str = std::env::var("TALLY_PROGRAM_ID")
+            .expect("TALLY_PROGRAM_ID must be set for tests. \
+                     Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7");
+
+        let expected_program_id = Pubkey::from_str(&program_id_str).unwrap();
         let actual_program_id = program_id_string().parse().unwrap();
 
-        assert_eq!(expected_program_id, actual_program_id);
+        assert_eq!(expected_program_id, actual_program_id,
+                   "Program ID from program_id_string() should match TALLY_PROGRAM_ID env var");
     }
 }
