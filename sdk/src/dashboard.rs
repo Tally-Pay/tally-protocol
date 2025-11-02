@@ -1182,6 +1182,8 @@ mod tests {
             plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             amount: 5_000_000,
+            keeper: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            keeper_fee: 25_000,
         });
 
         let canceled_event = TallyEvent::Canceled(Canceled {
