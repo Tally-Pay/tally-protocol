@@ -50,3 +50,6 @@ tokio = { workspace = true, features = ["test-util"] }
 
 [features]
 default = []
+# Enable platform-level administration functions (init_config, update_config, admin_withdraw_fees, etc.)
+# Required for Tally platform operators only, not needed by merchants or application builders
+platform-admin = []

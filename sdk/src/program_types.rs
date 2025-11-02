@@ -198,6 +198,7 @@ pub struct UpdatePlanArgs {
 pub struct CancelSubscriptionArgs;
 
 /// Arguments for admin fee withdrawal
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -245,6 +246,7 @@ pub struct Config {
 }
 
 /// Arguments for initializing global program configuration
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -433,6 +435,7 @@ pub struct CloseSubscriptionArgs {
 }
 
 /// Arguments for initiating authority transfer
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -442,6 +445,7 @@ pub struct TransferAuthorityArgs {
 }
 
 /// Arguments for accepting authority transfer
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -450,6 +454,7 @@ pub struct AcceptAuthorityArgs {
 }
 
 /// Arguments for canceling authority transfer
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -458,18 +463,21 @@ pub struct CancelAuthorityTransferArgs {
 }
 
 /// Arguments for pausing the program
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct PauseArgs {}
 
 /// Arguments for unpausing the program
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct UnpauseArgs {}
 
 /// Arguments for updating global program configuration
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
@@ -491,6 +499,7 @@ pub struct UpdateConfigArgs {
 }
 
 /// Arguments for updating merchant tier
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
