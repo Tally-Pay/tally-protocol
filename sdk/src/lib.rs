@@ -113,19 +113,28 @@ pub use anchor_lang::{AnchorDeserialize, AnchorSerialize};
 pub use spl_associated_token_account;
 pub use spl_token;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-/// Program ID loaded from TALLY_PROGRAM_ID environment variable at runtime.
+/// Valid trial duration: 7 days in seconds
+pub const TRIAL_DURATION_7_DAYS: u64 = 604_800;
+
+/// Valid trial duration: 14 days in seconds
+pub const TRIAL_DURATION_14_DAYS: u64 = 1_209_600;
+
+/// Valid trial duration: 30 days in seconds
+pub const TRIAL_DURATION_30_DAYS: u64 = 2_592_000;
+
+/// Program ID loaded from `TALLY_PROGRAM_ID` environment variable at runtime.
 ///
 /// # Panics
-/// Panics if TALLY_PROGRAM_ID environment variable is not set. This is intentional
+/// Panics if `TALLY_PROGRAM_ID` environment variable is not set. This is intentional
 /// to prevent using the wrong program ID or silently falling back to incorrect defaults.
 ///
 /// # Example
 /// ```bash
 /// export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111
 /// ```
-pub static PROGRAM_ID: Lazy<String> = Lazy::new(|| {
+pub static PROGRAM_ID: LazyLock<String> = LazyLock::new(|| {
     std::env::var("TALLY_PROGRAM_ID")
         .expect("TALLY_PROGRAM_ID environment variable must be set. \
                  Set it to your deployed program ID (localnet/devnet/mainnet).\n\
@@ -135,7 +144,7 @@ pub static PROGRAM_ID: Lazy<String> = Lazy::new(|| {
 /// Get the program ID as a string
 ///
 /// # Panics
-/// Panics if TALLY_PROGRAM_ID environment variable is not set
+/// Panics if `TALLY_PROGRAM_ID` environment variable is not set
 ///
 /// # Example
 /// ```bash

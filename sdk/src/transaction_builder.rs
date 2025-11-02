@@ -25,6 +25,7 @@ pub struct StartSubscriptionBuilder {
     subscriber: Option<Pubkey>,
     payer: Option<Pubkey>,
     allowance_periods: Option<u8>,
+    trial_duration_secs: Option<u64>,
     token_program: Option<TokenProgram>,
     program_id: Option<Pubkey>,
 }
@@ -214,6 +215,20 @@ impl StartSubscriptionBuilder {
         self
     }
 
+    /// Set the trial duration in seconds (optional)
+    ///
+    /// Valid values:
+    /// - 604800 (7 days) - Use `TRIAL_DURATION_7_DAYS` constant
+    /// - 1209600 (14 days) - Use `TRIAL_DURATION_14_DAYS` constant
+    /// - 2592000 (30 days) - Use `TRIAL_DURATION_30_DAYS` constant
+    ///
+    /// Any other value will be rejected by the program with `InvalidTrialDuration` error.
+    #[must_use]
+    pub const fn trial_duration_secs(mut self, duration: u64) -> Self {
+        self.trial_duration_secs = Some(duration);
+        self
+    }
+
     /// Set the token program to use
     #[must_use]
     pub const fn token_program(mut self, token_program: TokenProgram) -> Self {
@@ -310,7 +325,10 @@ impl StartSubscriptionBuilder {
             AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
-        let start_sub_args = StartSubscriptionArgs { allowance_periods };
+        let start_sub_args = StartSubscriptionArgs {
+            allowance_periods,
+            trial_duration_secs: self.trial_duration_secs,
+        };
         let start_sub_data = {
             let mut data = Vec::new();
             // Instruction discriminator (computed from "start_subscription")

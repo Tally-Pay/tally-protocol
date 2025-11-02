@@ -156,11 +156,14 @@ pub struct CreatePlanArgs {
 
 /// Arguments for starting a subscription
 #[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize, Default,
 )]
 pub struct StartSubscriptionArgs {
     /// Allowance periods multiplier (default 3)
     pub allowance_periods: u8,
+    /// Optional trial period duration in seconds (7, 14, or 30 days)
+    /// Valid values: 604800 (7 days), 1209600 (14 days), 2592000 (30 days)
+    pub trial_duration_secs: Option<u64>,
 }
 
 /// Arguments for renewing a subscription
