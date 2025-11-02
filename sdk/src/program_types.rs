@@ -250,12 +250,20 @@ pub struct InitConfigArgs {
     pub platform_authority: Pubkey,
     /// Maximum platform fee in basis points (e.g., 1000 = 10%)
     pub max_platform_fee_bps: u16,
-    /// Basis points divisor (e.g., 10000 for percentage calculations)
-    pub fee_basis_points_divisor: u16,
+    /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
+    pub min_platform_fee_bps: u16,
     /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
     pub min_period_seconds: u64,
     /// Default allowance periods multiplier (e.g., 3)
     pub default_allowance_periods: u8,
+    /// Allowed USDC mint address
+    pub allowed_mint: Pubkey,
+    /// Maximum withdrawal amount per transaction
+    pub max_withdrawal_amount: u64,
+    /// Maximum grace period in seconds
+    pub max_grace_period_seconds: u64,
+    /// Keeper fee in basis points
+    pub keeper_fee_bps: u16,
 }
 
 impl Plan {

@@ -866,15 +866,30 @@ impl InitConfigBuilder {
         // Compute config PDA
         let config_pda = pda::config_address_with_program_id(&program_id);
 
+        // Compute program data address for upgrade authority validation
+        let (program_data_address, _) = Pubkey::find_program_address(
+            &[program_id.as_ref()],
+            &anchor_lang::solana_program::bpf_loader_upgradeable::id(),
+        );
+
+        // Compute platform treasury ATA
+        let platform_treasury_ata = crate::ata::get_associated_token_address_for_mint(
+            &config_args.platform_authority,
+            &config_args.allowed_mint,
+        )?;
+
         let accounts = vec![
-            AccountMeta::new(config_pda, false), // config (PDA)
-            AccountMeta::new(authority, true),   // authority (signer)
-            AccountMeta::new_readonly(system_program::ID, false), // system_program
+            AccountMeta::new(config_pda, false),                      // config (PDA)
+            AccountMeta::new(authority, true),                        // authority (signer)
+            AccountMeta::new_readonly(program_data_address, false),   // program_data
+            AccountMeta::new_readonly(platform_treasury_ata, false),  // platform_treasury_ata
+            AccountMeta::new_readonly(spl_token::ID, false),          // token_program
+            AccountMeta::new_readonly(system_program::ID, false),     // system_program
         ];
 
         let data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "init_config")
+            // Instruction discriminator (computed from "global:init_config")
             data.extend_from_slice(&[23, 235, 115, 232, 168, 96, 1, 231]);
             borsh::to_writer(&mut data, &config_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
@@ -1958,14 +1973,135 @@ mod tests {
             .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
             .unwrap();
 
-        assert_eq!(instructions.len(), 2);
+        assert_eq!(instructions.len(), 2, "Should have 2 instructions: approve_checked and start_subscription");
 
-        // First instruction should be approve_checked
-        assert_eq!(instructions[0].program_id, spl_token::id());
+        // ========== Validate approve_checked instruction ==========
+        let approve_ix = &instructions[0];
+        assert_eq!(approve_ix.program_id, spl_token::id(), "First instruction must be SPL Token program");
 
-        // Second instruction should be start_subscription
-        let program_id = program_id();
-        assert_eq!(instructions[1].program_id, program_id);
+        // Validate allowance calculation (3 periods × plan price)
+        let expected_allowance = plan_data.price_usdc.checked_mul(3).expect("Allowance overflow");
+
+        // Decode approve_checked data to validate amount
+        // approve_checked format: [discriminator(1 byte), amount(8 bytes), decimals(1 byte)]
+        assert!(approve_ix.data.len() >= 10, "approve_checked data should be at least 10 bytes");
+
+        // The first byte should be the ApproveChecked discriminator (13)
+        assert_eq!(approve_ix.data[0], 13, "approve_checked instruction discriminator should be 13");
+
+        // Extract amount (bytes 1-8, little-endian u64)
+        let amount_bytes: [u8; 8] = approve_ix.data[1..9].try_into().unwrap();
+        let actual_amount = u64::from_le_bytes(amount_bytes);
+        assert_eq!(actual_amount, expected_allowance, "Allowance amount should be 3x plan price");
+
+        // Decimals byte (byte 9) should be 6 for USDC
+        assert_eq!(approve_ix.data[9], 6, "USDC decimals should be 6");
+
+        // Validate approve_checked accounts structure
+        assert_eq!(approve_ix.accounts.len(), 4, "approve_checked requires 4 accounts");
+
+        // Account 0: Source account (subscriber's token account, writable)
+        assert!(approve_ix.accounts[0].is_writable, "Source account must be writable");
+
+        // Account 1: Mint (USDC mint, readonly)
+        assert!(!approve_ix.accounts[1].is_writable, "Mint must be readonly");
+        assert_eq!(approve_ix.accounts[1].pubkey, merchant.usdc_mint, "Second account must be USDC mint");
+
+        // Account 2: Delegate (program delegate PDA, readonly)
+        assert!(!approve_ix.accounts[2].is_writable, "Delegate must be readonly");
+
+        // Account 3: Owner (subscriber, signer)
+        assert!(approve_ix.accounts[3].is_signer, "Owner must be signer");
+
+        // ========== Validate start_subscription instruction ==========
+        let start_sub_ix = &instructions[1];
+        let expected_program_id = program_id();
+        assert_eq!(start_sub_ix.program_id, expected_program_id, "Second instruction must be Tally program");
+
+        // Validate start_subscription discriminator
+        // start_subscription discriminator: [167, 59, 160, 222, 194, 175, 3, 13]
+        assert!(start_sub_ix.data.len() >= 8, "Instruction data should include discriminator");
+        assert_eq!(&start_sub_ix.data[0..8], &[167, 59, 160, 222, 194, 175, 3, 13],
+            "start_subscription discriminator mismatch");
+
+        // Validate account count for start_subscription
+        assert_eq!(start_sub_ix.accounts.len(), 12, "start_subscription requires 12 accounts");
+
+        // Validate key accounts are present (specific indices)
+        // Account indices based on actual start_subscription builder:
+        // 0: config, 1: subscription, 2: plan, 3: merchant, 4: subscriber,
+        // 5: subscriber_ata, 6: merchant_treasury_ata, 7: platform_treasury_ata,
+        // 8: usdc_mint, 9: delegate, 10: token_program, 11: system_program
+
+        assert_eq!(start_sub_ix.accounts[2].pubkey, plan_key, "Plan account mismatch");
+        assert_eq!(start_sub_ix.accounts[8].pubkey, merchant.usdc_mint, "USDC mint account mismatch");
+        assert_eq!(start_sub_ix.accounts[7].pubkey, platform_treasury_ata, "Platform treasury ATA mismatch");
+
+        // Subscriber must be signer and writable (pays for subscription account creation)
+        assert!(start_sub_ix.accounts[4].is_signer, "Subscriber must be signer");
+        assert!(start_sub_ix.accounts[4].is_writable, "Subscriber must be writable");
+
+        // Subscription PDA must be writable (created in instruction)
+        assert!(start_sub_ix.accounts[1].is_writable, "Subscription PDA must be writable");
+    }
+
+    #[test]
+    fn test_start_subscription_allowance_edge_cases() {
+        let merchant = create_test_merchant();
+        let plan_data = create_test_plan();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        // Test with 1 period (minimum)
+        let instructions_min = start_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .allowance_periods(1)
+            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        let approve_ix_min = &instructions_min[0];
+        let amount_bytes_min: [u8; 8] = approve_ix_min.data[1..9].try_into().unwrap();
+        let amount_min = u64::from_le_bytes(amount_bytes_min);
+        assert_eq!(amount_min, plan_data.price_usdc, "1 period should equal plan price");
+
+        // Test with 10 periods
+        let instructions_max = start_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .allowance_periods(10)
+            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        let approve_ix_max = &instructions_max[0];
+        let amount_bytes_max: [u8; 8] = approve_ix_max.data[1..9].try_into().unwrap();
+        let amount_max = u64::from_le_bytes(amount_bytes_max);
+        assert_eq!(amount_max, plan_data.price_usdc * 10, "10 periods should be 10x plan price");
+    }
+
+    #[test]
+    fn test_start_subscription_with_token2022() {
+        let mut merchant = create_test_merchant();
+        merchant.usdc_mint = Pubkey::from(Keypair::new().pubkey().to_bytes()); // Custom Token2022 mint
+
+        let plan_data = create_test_plan();
+        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
+
+        let instructions = start_subscription()
+            .plan(plan_key)
+            .subscriber(subscriber)
+            .allowance_periods(3)
+            .token_program(TokenProgram::Token2022)
+            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .unwrap();
+
+        // Verify Token2022 program is used
+        assert_eq!(instructions[0].program_id, spl_token_2022::id(), "Should use Token2022 program");
+        assert_eq!(instructions[1].accounts[10].pubkey, spl_token_2022::id(),
+            "start_subscription should reference Token2022");
     }
 
     #[test]
