@@ -9,8 +9,8 @@
 //!
 //! # Feature Flags
 //!
-//! - **`platform-admin`** - Enables platform-level administration functions (init_config,
-//!   update_config, admin_withdraw_fees, pause, unpause, authority transfer, etc.).
+//! - **`platform-admin`** - Enables platform-level administration functions (`init_config`,
+//!   `update_config`, `admin_withdraw_fees`, pause, unpause, authority transfer, etc.).
 //!   Required for Tally platform operators only. Not needed by merchants or application
 //!   builders integrating subscriptions.
 //!
@@ -95,8 +95,12 @@ pub use error::{Result, TallyError};
 pub use event_query::{EventQueryClient, EventQueryClientConfig, EventQueryConfig, ParsedEvent};
 pub use events::{
     create_receipt, create_receipt_legacy, extract_memo_from_logs, parse_events_from_logs,
-    parse_events_with_context, Canceled, ParsedEventWithContext, PaymentFailed, ReceiptParams,
-    Renewed, StreamableEventData, Subscribed, TallyEvent, TallyReceipt,
+    parse_events_with_context, Canceled, ConfigInitialized, ConfigUpdated,
+    DelegateMismatchWarning, FeesWithdrawn, LowAllowanceWarning, MerchantInitialized,
+    MerchantTier, MerchantTierChanged, ParsedEventWithContext, PaymentFailed, PlanCreated,
+    PlanStatusChanged, PlanTermsUpdated, ProgramPaused, ProgramUnpaused, ReceiptParams, Renewed,
+    StreamableEventData, Subscribed, SubscriptionClosed, SubscriptionReactivated, TallyEvent,
+    TallyReceipt, TrialConverted, TrialStarted,
 };
 pub use keypair::load_keypair;
 pub use program_types::*;

@@ -711,6 +711,10 @@ impl DashboardClient {
                     total_revenue = total_revenue.saturating_add(event.amount);
                     unique_subscribers.insert(event.subscriber);
                 }
+                TallyEvent::SubscriptionReactivated(event) => {
+                    total_revenue = total_revenue.saturating_add(event.amount);
+                    unique_subscribers.insert(event.subscriber);
+                }
                 TallyEvent::Renewed(event) => {
                     total_revenue = total_revenue.saturating_add(event.amount);
                     unique_subscribers.insert(event.subscriber);
@@ -721,6 +725,8 @@ impl DashboardClient {
                 TallyEvent::PaymentFailed(event) => {
                     unique_subscribers.insert(event.subscriber);
                 }
+                // Ignore other event types for analytics
+                _ => {}
             }
         }
 
@@ -826,9 +832,25 @@ impl DashboardClient {
     fn get_event_type_name(event: &TallyEvent) -> String {
         match event {
             TallyEvent::Subscribed(_) => "SubscriptionStarted".to_string(),
+            TallyEvent::SubscriptionReactivated(_) => "SubscriptionReactivated".to_string(),
             TallyEvent::Renewed(_) => "SubscriptionRenewed".to_string(),
             TallyEvent::Canceled(_) => "SubscriptionCanceled".to_string(),
+            TallyEvent::SubscriptionClosed(_) => "SubscriptionClosed".to_string(),
             TallyEvent::PaymentFailed(_) => "PaymentFailed".to_string(),
+            TallyEvent::PlanStatusChanged(_) => "PlanStatusChanged".to_string(),
+            TallyEvent::ConfigInitialized(_) => "ConfigInitialized".to_string(),
+            TallyEvent::MerchantInitialized(_) => "MerchantInitialized".to_string(),
+            TallyEvent::PlanCreated(_) => "PlanCreated".to_string(),
+            TallyEvent::ProgramPaused(_) => "ProgramPaused".to_string(),
+            TallyEvent::ProgramUnpaused(_) => "ProgramUnpaused".to_string(),
+            TallyEvent::LowAllowanceWarning(_) => "LowAllowanceWarning".to_string(),
+            TallyEvent::FeesWithdrawn(_) => "FeesWithdrawn".to_string(),
+            TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning".to_string(),
+            TallyEvent::ConfigUpdated(_) => "ConfigUpdated".to_string(),
+            TallyEvent::MerchantTierChanged(_) => "MerchantTierChanged".to_string(),
+            TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated".to_string(),
+            TallyEvent::TrialStarted(_) => "TrialStarted".to_string(),
+            TallyEvent::TrialConverted(_) => "TrialConverted".to_string(),
         }
     }
 
@@ -864,6 +886,14 @@ impl DashboardClient {
                     Some(event.plan),
                     None,
                     Some(event.subscriber),
+                    None,
+                ),
+                // Handle all other event types with default values
+                _ => (
+                    DashboardEventType::SubscriptionStarted, // Default type
+                    None,
+                    None,
+                    None,
                     None,
                 ),
             };

@@ -5,11 +5,14 @@ use crate::{
     error::{Result, TallyError},
     pda, program_id,
     program_types::{
-        AdminWithdrawFeesArgs, CancelSubscriptionArgs, CreatePlanArgs, InitConfigArgs,
-        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdateConfigArgs, UpdatePlanArgs,
+        CancelSubscriptionArgs, CreatePlanArgs,
+        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdatePlanArgs,
         UpdatePlanTermsArgs,
     },
 };
+
+#[cfg(feature = "platform-admin")]
+use crate::program_types::{AdminWithdrawFeesArgs, InitConfigArgs, UpdateConfigArgs};
 use anchor_client::solana_sdk::instruction::{AccountMeta, Instruction};
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
@@ -71,6 +74,7 @@ pub struct UpdatePlanBuilder {
 }
 
 /// Builder for admin fee withdrawal transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct AdminWithdrawFeesBuilder {
     platform_authority: Option<Pubkey>,
@@ -82,11 +86,15 @@ pub struct AdminWithdrawFeesBuilder {
 }
 
 /// Builder for initialize config transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct InitConfigBuilder {
     authority: Option<Pubkey>,
     payer: Option<Pubkey>,
+    #[cfg(feature = "platform-admin")]
     config_args: Option<InitConfigArgs>,
+    #[cfg(not(feature = "platform-admin"))]
+    config_args: Option<()>,
     program_id: Option<Pubkey>,
 }
 
@@ -110,6 +118,7 @@ pub struct CloseSubscriptionBuilder {
 }
 
 /// Builder for transfer authority transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct TransferAuthorityBuilder {
     platform_authority: Option<Pubkey>,
@@ -118,6 +127,7 @@ pub struct TransferAuthorityBuilder {
 }
 
 /// Builder for accept authority transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct AcceptAuthorityBuilder {
     new_authority: Option<Pubkey>,
@@ -125,6 +135,7 @@ pub struct AcceptAuthorityBuilder {
 }
 
 /// Builder for cancel authority transfer transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct CancelAuthorityTransferBuilder {
     platform_authority: Option<Pubkey>,
@@ -133,6 +144,7 @@ pub struct CancelAuthorityTransferBuilder {
 
 /// Builder for pause program transactions
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 pub struct PauseBuilder {
     platform_authority: Option<Pubkey>,
     program_id: Option<Pubkey>,
@@ -140,12 +152,14 @@ pub struct PauseBuilder {
 
 /// Builder for unpause program transactions
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 pub struct UnpauseBuilder {
     platform_authority: Option<Pubkey>,
     program_id: Option<Pubkey>,
 }
 
 /// Builder for update config transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct UpdateConfigBuilder {
     platform_authority: Option<Pubkey>,
@@ -160,6 +174,7 @@ pub struct UpdateConfigBuilder {
 }
 
 /// Builder for update merchant tier transactions
+#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
 #[derive(Clone, Debug, Default)]
 pub struct UpdateMerchantTierBuilder {
     authority: Option<Pubkey>,
