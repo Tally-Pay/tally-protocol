@@ -124,6 +124,25 @@ pub const TRIAL_DURATION_14_DAYS: u64 = 1_209_600;
 /// Valid trial duration: 30 days in seconds
 pub const TRIAL_DURATION_30_DAYS: u64 = 2_592_000;
 
+/// Absolute minimum subscription period in seconds (24 hours)
+///
+/// This security constant prevents spam attacks by enforcing a minimum billing cycle.
+/// Any configuration attempting to set `min_period_seconds` below this value will be
+/// rejected by the program.
+pub const ABSOLUTE_MIN_PERIOD_SECONDS: u64 = 86_400;
+
+/// Maximum plan price in USDC micro-units (1 million USDC)
+///
+/// This security constant prevents social engineering attacks with extreme prices.
+/// Any plan with a price exceeding this value will be rejected by the program.
+pub const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000;
+
+/// Maximum keeper fee in basis points (1% = 100 bp)
+///
+/// This constant limits the fee that can be charged by keepers for renewal operations.
+/// Any configuration attempting to set `keeper_fee_bps` above this value will be rejected.
+pub const MAX_KEEPER_FEE_BPS: u16 = 100;
+
 /// Program ID loaded from `TALLY_PROGRAM_ID` environment variable at runtime.
 ///
 /// # Panics

@@ -9,6 +9,51 @@ use crate::{
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
+/// Calculate the maximum allowed grace period for a given billing period
+///
+/// The program enforces that grace periods cannot exceed 30% of the billing period.
+/// This formula matches the program's validation logic exactly.
+///
+/// # Arguments
+/// * `period_secs` - The billing period in seconds
+///
+/// # Returns
+/// The maximum allowed grace period in seconds (30% of billing period)
+///
+/// # Example
+/// ```
+/// # use tally_sdk::validation::calculate_max_grace_period;
+/// // For a 30-day billing period (2,592,000 seconds)
+/// let max_grace = calculate_max_grace_period(2_592_000);
+/// assert_eq!(max_grace, 777_600); // 9 days (30% of 30 days)
+/// ```
+#[must_use]
+pub const fn calculate_max_grace_period(period_secs: i64) -> i64 {
+    // Grace period cannot exceed 30% of billing period
+    // Formula: period_secs * 3 / 10 (equivalent to 30%)
+    period_secs
+        .saturating_mul(3)
+        .saturating_div(10)
+}
+
+/// Calculate the maximum allowed grace period for a given billing period (u64 version)
+///
+/// This is a convenience wrapper for `calculate_max_grace_period` that works with u64 values.
+///
+/// # Arguments
+/// * `period_secs` - The billing period in seconds
+///
+/// # Returns
+/// The maximum allowed grace period in seconds (30% of billing period)
+#[must_use]
+pub const fn calculate_max_grace_period_u64(period_secs: u64) -> u64 {
+    // Grace period cannot exceed 30% of billing period
+    // Formula: period_secs * 3 / 10 (equivalent to 30%)
+    period_secs
+        .saturating_mul(3)
+        .saturating_div(10)
+}
+
 /// Get and validate USDC mint address
 ///
 /// # Errors
@@ -52,11 +97,11 @@ pub fn validate_plan_parameters(price_usdc: u64, period_secs: i64, grace_secs: i
         )));
     }
 
-    // Grace period cannot exceed 2x the billing period
-    let max_grace_secs = 2_i64.saturating_mul(period_secs);
+    // Grace period cannot exceed 30% of the billing period
+    let max_grace_secs = calculate_max_grace_period(period_secs);
     if grace_secs > max_grace_secs {
         return Err(TallyError::Generic(format!(
-            "Grace period ({grace_secs} seconds) cannot exceed 2x the billing period ({period_secs} seconds). Maximum allowed: {max_grace_secs}"
+            "Grace period ({grace_secs} seconds) cannot exceed 30% of the billing period ({period_secs} seconds). Maximum allowed: {max_grace_secs}"
         )));
     }
 
@@ -223,10 +268,10 @@ pub fn validate_plan_update_args(
                 ));
             };
 
-            let max_grace_secs = 2_u64.saturating_mul(period_to_check);
+            let max_grace_secs = calculate_max_grace_period_u64(period_to_check);
             if grace_secs > max_grace_secs {
                 return Err(TallyError::Generic(format!(
-                    "Grace period ({grace_secs} seconds) cannot exceed 2x the billing period ({period_to_check} seconds). Maximum allowed: {max_grace_secs}"
+                    "Grace period ({grace_secs} seconds) cannot exceed 30% of the billing period ({period_to_check} seconds). Maximum allowed: {max_grace_secs}"
                 )));
             }
         }
@@ -248,10 +293,10 @@ pub fn validate_plan_update_args(
     // Cross-field validation for period and grace period
     if let (Some(period_secs), Some(grace_secs)) = (update_args.period_secs, update_args.grace_secs)
     {
-        let max_grace_secs = 2_u64.saturating_mul(period_secs);
+        let max_grace_secs = calculate_max_grace_period_u64(period_secs);
         if grace_secs > max_grace_secs {
             return Err(TallyError::Generic(format!(
-                "Grace period ({grace_secs} seconds) cannot exceed 2x the billing period ({period_secs} seconds). Maximum allowed: {max_grace_secs}"
+                "Grace period ({grace_secs} seconds) cannot exceed 30% of the billing period ({period_secs} seconds). Maximum allowed: {max_grace_secs}"
             )));
         }
     }
