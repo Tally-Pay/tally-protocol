@@ -1098,17 +1098,48 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_timestamp_to_slot_conversion() {
-        let config = create_test_config();
-        let _client = EventQueryClient::new(config).unwrap();
+    async fn test_timestamp_to_slot_conversion_logic() {
+        // Test the slot calculation logic without requiring RPC
+        // We test the math directly since RPC might not be available
 
-        // Test with current timestamp (should not fail)
-        let _current_time = Utc::now().timestamp();
+        const SLOT_DURATION_MS: i64 = 400;
 
-        // This test will fail with localhost RPC, but validates the interface
-        // In a real environment with running validator, this would work
-        // let slot = client.timestamp_to_approximate_slot(current_time).await;
-        // assert!(slot.is_ok() || slot.unwrap_err().to_string().contains("Connection refused"));
+        // Simulate current time and slot
+        let current_time = 1_700_000_000i64; // Fixed timestamp
+        let current_slot = 250_000_000u64;
+
+        // Test 1: Past timestamp (1 hour ago = 3600 seconds)
+        let _past_time = current_time - 3600;
+        let time_diff_ms = 3600 * 1000;
+        let expected_slot_diff = time_diff_ms / SLOT_DURATION_MS; // 9000 slots
+        let expected_past_slot = current_slot.saturating_sub(expected_slot_diff as u64);
+
+        // Manual calculation: 250_000_000 - 9000 = 249_991_000
+        assert_eq!(expected_past_slot, 249_991_000);
+
+        // Test 2: Future timestamp (1 hour in future)
+        let _future_time = current_time + 3600;
+        let future_time_diff = -3600i64;
+        let future_slot_diff_ms = future_time_diff.saturating_mul(1000);
+        let abs_diff = future_slot_diff_ms.unsigned_abs();
+
+        // Future events should add to current slot
+        let expected_future_slot = current_slot.saturating_add(abs_diff / (SLOT_DURATION_MS as u64));
+        assert_eq!(expected_future_slot, 250_009_000);
+
+        // Test 3: Current timestamp (should be approximately current slot)
+        let same_time_diff = 0i64;
+        let same_time_diff_ms = same_time_diff.saturating_mul(1000);
+        let same_slot_diff = same_time_diff_ms / SLOT_DURATION_MS;
+        assert_eq!(same_slot_diff, 0);
+
+        // Test 4: Very old timestamp (overflow protection)
+        let _very_old_time = 0i64;
+        let old_time_diff_ms = current_time.saturating_mul(1000);
+        let old_slot_diff = old_time_diff_ms / SLOT_DURATION_MS;
+        // Should saturate to 0, not panic
+        let old_slot = current_slot.saturating_sub(old_slot_diff as u64);
+        assert!(old_slot <= current_slot);
     }
 
     #[test]

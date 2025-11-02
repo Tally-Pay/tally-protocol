@@ -16,8 +16,8 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::errors::SubscriptionError;
-use tally_subs::state::{Merchant, MerchantTier};
+use tally_protocol::errors::SubscriptionError;
+use tally_protocol::state::{Merchant, MerchantTier};
 
 /// Test MerchantTier enum fee mapping
 #[test]
@@ -331,7 +331,7 @@ fn test_invalid_configuration_error_code() {
 /// Test merchant PDA derivation consistency
 #[test]
 fn test_merchant_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
     let authority = Pubkey::new_unique();
 
     let (merchant_pda, _bump) =
@@ -349,7 +349,7 @@ fn test_merchant_pda_derivation() {
 /// Test config PDA derivation consistency
 #[test]
 fn test_config_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
 
     let (config_pda, _bump) = Pubkey::find_program_address(&[b"config"], &program_id);
     let (config_pda_2, _bump_2) = Pubkey::find_program_address(&[b"config"], &program_id);

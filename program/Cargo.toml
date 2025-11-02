@@ -1,5 +1,5 @@
 [package]
-name = "tally_subs"
+name = "tally-protocol"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,7 +8,7 @@ workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "tally_subs"
+name = "tally_protocol"
 
 [features]
 no-entrypoint = []

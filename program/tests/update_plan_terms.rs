@@ -18,9 +18,9 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::constants::MAX_PLAN_PRICE_USDC;
-use tally_subs::errors::SubscriptionError;
-use tally_subs::state::Plan;
+use tally_protocol::constants::MAX_PLAN_PRICE_USDC;
+use tally_protocol::errors::SubscriptionError;
+use tally_protocol::state::Plan;
 
 /// Test that merchant authority validation works correctly
 #[test]
@@ -395,7 +395,7 @@ fn test_arithmetic_error_code() {
 /// Test config PDA derivation
 #[test]
 fn test_config_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
 
     let (config_pda, _bump) = Pubkey::find_program_address(&[b"config"], &program_id);
 
@@ -411,7 +411,7 @@ fn test_config_pda_derivation() {
 /// Test merchant PDA derivation
 #[test]
 fn test_merchant_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
     let authority = Pubkey::new_unique();
 
     let (merchant_pda, _bump) =
@@ -430,7 +430,7 @@ fn test_merchant_pda_derivation() {
 /// Test plan PDA derivation
 #[test]
 fn test_plan_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
     let merchant = Pubkey::new_unique();
     let mut plan_id = [0u8; 32];
     plan_id[..4].copy_from_slice(b"test");

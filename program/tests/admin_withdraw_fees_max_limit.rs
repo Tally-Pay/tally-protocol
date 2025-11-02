@@ -33,7 +33,7 @@
 //! Note: These are unit tests that validate the business logic.
 //! Full end-to-end integration tests should be run with `anchor test`.
 
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::errors::SubscriptionError;
 
 /// Test that withdrawal at maximum limit passes validation
 ///

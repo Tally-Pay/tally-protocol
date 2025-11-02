@@ -123,13 +123,13 @@ use once_cell::sync::Lazy;
 ///
 /// # Example
 /// ```bash
-/// export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+/// export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111
 /// ```
 pub static PROGRAM_ID: Lazy<String> = Lazy::new(|| {
     std::env::var("TALLY_PROGRAM_ID")
         .expect("TALLY_PROGRAM_ID environment variable must be set. \
                  Set it to your deployed program ID (localnet/devnet/mainnet).\n\
-                 Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7")
+                 Example: export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111")
 });
 
 /// Get the program ID as a string
@@ -139,7 +139,7 @@ pub static PROGRAM_ID: Lazy<String> = Lazy::new(|| {
 ///
 /// # Example
 /// ```bash
-/// export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+/// export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111
 /// ```
 #[must_use]
 pub fn program_id_string() -> String {

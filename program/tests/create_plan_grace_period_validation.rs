@@ -40,7 +40,7 @@
 //! );
 //! ```
 
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::errors::SubscriptionError;
 
 // ============================================================================
 // Constants for Realistic Testing

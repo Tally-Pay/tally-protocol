@@ -17,7 +17,7 @@
 //! This enables permissionless keeper participation while maintaining profitability even
 //! on small subscriptions ($0.025 fee on $10 subscription vs $0.001 tx cost = 25x margin).
 
-use tally_subs::constants::FEE_BASIS_POINTS_DIVISOR;
+use tally_protocol::constants::FEE_BASIS_POINTS_DIVISOR;
 
 /// Test keeper fee calculation with default 0.25% (25 bps)
 #[test]

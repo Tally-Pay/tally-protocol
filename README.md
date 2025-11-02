@@ -311,7 +311,7 @@ anchor deploy --provider.cluster devnet
 #### Localnet
 ```bash
 # Set program ID (required)
-export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111
 
 # Start local validator
 solana-test-validator

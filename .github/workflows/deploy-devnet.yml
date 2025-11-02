@@ -102,7 +102,7 @@ jobs:
 
             # Upgrade existing program
             anchor upgrade \
-              target/deploy/tally_subs.so \
+              target/deploy/tally_protocol.so \
               --program-id "$TALLY_PROGRAM_ID" \
               --provider.cluster devnet
 
@@ -111,12 +111,12 @@ jobs:
             echo "🆕 Program does not exist. Initial deployment..."
 
             # Save program keypair for initial deployment
-            echo "$PROGRAM_KEYPAIR" > target/deploy/tally_subs-keypair.json
+            echo "$PROGRAM_KEYPAIR" > target/deploy/tally_protocol-keypair.json
 
             # Deploy new program
             anchor deploy \
               --provider.cluster devnet \
-              --program-name tally-subs
+              --program-name tally-protocol
 
             echo "✅ Program deployed successfully"
           fi

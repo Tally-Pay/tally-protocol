@@ -36,8 +36,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
 use std::str::FromStr;
-use tally_subs::errors::SubscriptionError;
-use tally_subs::state::Config;
+use tally_protocol::errors::SubscriptionError;
+use tally_protocol::state::Config;
 
 /// Test that platform authority matches correctly
 #[test]
@@ -221,7 +221,7 @@ fn test_prevents_cross_authority_withdrawal() {
 /// Validates that the config PDA is derived deterministically.
 #[test]
 fn test_config_pda_derivation() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
 
     let (config_pda, _bump) = Pubkey::find_program_address(&[b"config"], &program_id);
 
@@ -239,7 +239,7 @@ fn test_config_pda_derivation() {
 /// Validates that the config PDA is specific to this program ID.
 #[test]
 fn test_config_pda_uniqueness() {
-    let program_id = tally_subs::id();
+    let program_id = tally_protocol::id();
     let other_program_id = Pubkey::new_unique();
 
     let (config_pda, _) = Pubkey::find_program_address(&[b"config"], &program_id);
@@ -546,7 +546,7 @@ fn test_same_mint_different_authorities_validation() {
 /// defined and can be instantiated with appropriate field values.
 #[test]
 fn test_fees_withdrawn_event_structure() {
-    use tally_subs::events::FeesWithdrawn;
+    use tally_protocol::events::FeesWithdrawn;
 
     let platform_authority = Pubkey::new_unique();
     let destination = Pubkey::new_unique();
@@ -577,7 +577,7 @@ fn test_fees_withdrawn_event_structure() {
 /// handler to ensure the event can be properly constructed with real data.
 #[test]
 fn test_fees_withdrawn_event_emission_logic() {
-    use tally_subs::events::FeesWithdrawn;
+    use tally_protocol::events::FeesWithdrawn;
 
     // Simulate handler context values
     let platform_authority = Pubkey::new_unique();
@@ -618,7 +618,7 @@ fn test_fees_withdrawn_event_emission_logic() {
 /// information for creating a complete audit trail of fee withdrawal activity.
 #[test]
 fn test_fees_withdrawn_event_audit_trail() {
-    use tally_subs::events::FeesWithdrawn;
+    use tally_protocol::events::FeesWithdrawn;
 
     // Simulate multiple fee withdrawal events
     let platform_authority = Pubkey::new_unique();
@@ -674,7 +674,7 @@ fn test_fees_withdrawn_event_audit_trail() {
 /// monitoring and alerting on fee withdrawal activity.
 #[test]
 fn test_fees_withdrawn_event_monitoring() {
-    use tally_subs::events::FeesWithdrawn;
+    use tally_protocol::events::FeesWithdrawn;
 
     let platform_authority = Pubkey::new_unique();
     let destination = Pubkey::new_unique();

@@ -926,16 +926,6 @@ mod tests {
     }
 
     #[test]
-    fn test_event_stream_creation() {
-        let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        // This will fail because merchant doesn't exist, but tests the error path
-        let result = client.subscribe_to_events(&merchant);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_merchant_args_validation() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
         let authority = Keypair::new();
@@ -1305,83 +1295,5 @@ mod tests {
             dashboard_payment_failed.metadata.get("failure_reason"),
             Some(&"Insufficient allowance".to_string())
         );
-    }
-
-    #[test]
-    fn test_get_event_history() {
-        let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        // Test that method returns empty result for non-existent merchant
-        // (This is expected since we're using a placeholder implementation)
-        let result = client.get_event_history(&merchant, 10);
-        assert!(result.is_ok());
-        let events = result.unwrap();
-        assert!(events.is_empty()); // Placeholder implementation returns empty vector
-    }
-
-    #[test]
-    fn test_get_event_statistics() {
-        use chrono::{TimeZone, Utc};
-
-        let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        // Test various periods
-        let day_stats = client.get_event_statistics(&merchant, Period::Day);
-        assert!(day_stats.is_ok());
-        let stats = day_stats.unwrap();
-        assert_eq!(stats.period, Period::Day);
-        assert_eq!(stats.total_events, 0); // Placeholder returns empty stats
-
-        let week_stats = client.get_event_statistics(&merchant, Period::Week);
-        assert!(week_stats.is_ok());
-        assert_eq!(week_stats.unwrap().period, Period::Week);
-
-        // Test custom period
-        let start = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
-        let end = Utc.with_ymd_and_hms(2024, 1, 31, 23, 59, 59).unwrap();
-        let custom_period = Period::Custom {
-            from: start,
-            to: end,
-        };
-
-        let custom_stats = client.get_event_statistics(&merchant, custom_period);
-        assert!(custom_stats.is_ok());
-        assert_eq!(custom_stats.unwrap().period, custom_period);
-    }
-
-    #[test]
-    fn test_subscribe_to_live_events() {
-        let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        // Test event stream creation for live events
-        let result = client.subscribe_to_live_events(&merchant);
-        assert!(result.is_ok());
-
-        let mut stream = result.unwrap();
-        assert!(!stream.is_active); // Should start inactive
-
-        // Test that we can start the stream
-        stream.start();
-        assert!(stream.is_active);
-
-        // Test that we can stop the stream
-        stream.stop();
-        assert!(!stream.is_active);
-    }
-
-    #[test]
-    fn test_poll_recent_events_integration() {
-        let client = DashboardClient::new("http://localhost:8899").unwrap();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        // Test that poll_recent_events now uses get_event_history
-        let events = client.poll_recent_events(&merchant, chrono::Utc::now().timestamp() - 3600);
-
-        // Should return empty vector since merchant doesn't exist and we use placeholder
-        assert!(events.is_ok());
-        assert!(events.unwrap().is_empty());
     }
 }

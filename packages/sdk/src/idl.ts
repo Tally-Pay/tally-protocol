@@ -1,5 +1,5 @@
 import { getProgramId, getSystemProgramId } from './config';
-import subsIdl from '../../idl/tally-subs.json';
+import protocolIdl from '../../idl/tally-protocol.json';
 
 export interface IdlConfig {
   programId?: string;
@@ -16,10 +16,10 @@ export function getIdl(config?: IdlConfig) {
   const systemProgramId = getSystemProgramId(config?.systemProgramId);
 
   return {
-    ...subsIdl,
+    ...protocolIdl,
     address: programId,
     // Update system program addresses in accounts if needed
-    instructions: subsIdl.instructions.map(instruction => ({
+    instructions: protocolIdl.instructions.map(instruction => ({
       ...instruction,
       accounts: instruction.accounts.map(account => {
         // Update system program address if it's hardcoded
@@ -35,4 +35,4 @@ export function getIdl(config?: IdlConfig) {
   };
 }
 
-export { subsIdl as rawIdl };
+export { protocolIdl as rawIdl };

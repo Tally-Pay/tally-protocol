@@ -37,7 +37,7 @@
 //! Full end-to-end integration tests with actual account creation should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::errors::SubscriptionError;
 
 // ============================================================================
 // PlanAlreadyExists Error Tests (Error Code 6026)

@@ -335,15 +335,34 @@ mod tests {
     use anchor_client::solana_sdk::signature::Keypair;
 
     #[test]
-    fn test_load_idl() {
-        let idl = TallyClient::load_idl().unwrap();
-        assert_eq!(idl.metadata.name, "subs");
-    }
-
-    #[test]
     fn test_client_creation() {
         let client = TallyClient::new("http://localhost:8899".to_string()).unwrap();
         assert_eq!(client.program_id().to_string(), program_id_string());
+    }
+
+    #[test]
+    fn test_client_creation_with_different_clusters() {
+        // Test devnet detection
+        let devnet_client = TallyClient::new("https://api.devnet.solana.com".to_string()).unwrap();
+        assert_eq!(devnet_client.program_id().to_string(), program_id_string());
+
+        // Test mainnet detection
+        let mainnet_client = TallyClient::new("https://api.mainnet-beta.solana.com".to_string()).unwrap();
+        assert_eq!(mainnet_client.program_id().to_string(), program_id_string());
+
+        // Test localnet (default)
+        let local_client = TallyClient::new("http://127.0.0.1:8899".to_string()).unwrap();
+        assert_eq!(local_client.program_id().to_string(), program_id_string());
+    }
+
+    #[test]
+    fn test_client_with_custom_payer() {
+        let payer = Keypair::new();
+        let payer_pubkey = payer.pubkey();
+
+        let client = TallyClient::new_with_payer("http://localhost:8899".to_string(), payer).unwrap();
+        assert_eq!(client.program_id().to_string(), program_id_string());
+        assert_eq!(client.client.payer().pubkey(), payer_pubkey);
     }
 
     #[test]

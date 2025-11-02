@@ -11,10 +11,10 @@ wallet = "~/.config/solana/id.json"
 anchor_version = "0.31.1"
 
 [programs.localnet]
-tally-subs = "eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7"
+tally-protocol = "Em6skegRoagqF9BG4CRfewVN8JebsyrEKGwzDfcnAXku"
 
 [programs.devnet]
-tally-subs = "6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
+tally-protocol = "6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5"
 
 [registry]
 url = "https://anchor.projectserum.com"

@@ -25,8 +25,8 @@
 //! This provides a reasonable ceiling for legitimate subscription services while
 //! blocking extreme values that enable malicious behavior.
 
-use tally_subs::constants::MAX_PLAN_PRICE_USDC;
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::constants::MAX_PLAN_PRICE_USDC;
+use tally_protocol::errors::SubscriptionError;
 
 // ============================================================================
 // Constants for Testing

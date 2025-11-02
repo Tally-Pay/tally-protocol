@@ -6,7 +6,7 @@ fn main() {
     // Read TALLY_PROGRAM_ID from environment
     let program_id = env::var("TALLY_PROGRAM_ID").expect(
         "TALLY_PROGRAM_ID environment variable must be set. \
-         Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7",
+         Example: export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111",
     );
 
     // Parse the base58 string into a Pubkey to validate it and get bytes

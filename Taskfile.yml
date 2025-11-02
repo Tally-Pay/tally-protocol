@@ -1,6 +1,6 @@
 version: "3"
 silent: true
-output: group
+output: interleaved
 
 dotenv: [".env.local", ".env.devnet", ".env"]
 
@@ -27,7 +27,7 @@ tasks:
         desc: "Build Anchor program"
         deps: [validate:program-id]
         sources: ["program/**/*.rs", "Anchor.toml", "program/Cargo.toml"]
-        generates: ["target/deploy/tally_subs.so"]
+        generates: ["target/deploy/tally_protocol.so"]
         cmds:
             - |
                 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
@@ -38,7 +38,7 @@ tasks:
     build:verifiable:
         desc: "Build verifiable Anchor program"
         sources: ["program/**/*.rs", "Anchor.toml", "program/Cargo.toml"]
-        generates: ["target/verifiable/tally_subs.so"]
+        generates: ["target/verifiable/tally_protocol.so"]
         cmds:
             - |
                 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
@@ -99,8 +99,11 @@ tasks:
                   fi
                   sleep 1
                 done
-                # Deploy program using solana CLI with existing keypair from anchor build
-                {{.SOLANA_CLI}} program deploy target/deploy/tally_subs.so --program-id target/deploy/tally_subs-keypair.json
+                # Copy persistent keypair to deployment location
+                echo "🔑 Using persistent program keypair..."
+                cp .keys/localnet-program-keypair.json target/deploy/tally_protocol-keypair.json
+                # Deploy program using solana CLI with persistent keypair
+                {{.SOLANA_CLI}} program deploy target/deploy/tally_protocol.so --program-id target/deploy/tally_protocol-keypair.json
                 echo "✅ Deployed to localnet"
                 # Verify deployment
                 {{.SOLANA_CLI}} account {{.PROGRAM_ID}} >/dev/null 2>&1 && echo "✅ Program deployment verified" || echo "⚠️ Program deployment verification failed"
@@ -132,18 +135,18 @@ tasks:
 
                 # Generate fresh program keypair to avoid authority conflicts
                 echo "🔑 Generating fresh program keypair..."
-                {{.SOLANA_CLI}}-keygen new --outfile target/deploy/tally_subs-keypair.json --force --no-bip39-passphrase
+                {{.SOLANA_CLI}}-keygen new --outfile target/deploy/tally_protocol-keypair.json --force --no-bip39-passphrase
 
                 # Rebuild with new program ID
                 echo "🔨 Rebuilding with new program ID..."
                 {{.ANCHOR_CLI}} build
 
                 # Get new program ID for verification
-                NEW_PROGRAM_ID=$({{.SOLANA_CLI}}-keygen pubkey target/deploy/tally_subs-keypair.json)
+                NEW_PROGRAM_ID=$({{.SOLANA_CLI}}-keygen pubkey target/deploy/tally_protocol-keypair.json)
                 echo "📋 New Program ID: $NEW_PROGRAM_ID"
 
                 # Deploy using solana CLI directly
-                {{.SOLANA_CLI}} program deploy target/deploy/tally_subs.so --program-id target/deploy/tally_subs-keypair.json
+                {{.SOLANA_CLI}} program deploy target/deploy/tally_protocol.so --program-id target/deploy/tally_protocol-keypair.json
                 echo "✅ Deployed to devnet"
                 echo "💰 Wallet balance after deployment: $({{.SOLANA_CLI}} balance)"
 
@@ -188,7 +191,7 @@ tasks:
         cmds:
             - |
                 echo "⬆️ Upgrading program..."
-                {{.ANCHOR_CLI}} upgrade target/deploy/tally_subs.so --program-id {{.PROGRAM_ID}}
+                {{.ANCHOR_CLI}} upgrade target/deploy/tally_protocol.so --program-id {{.PROGRAM_ID}}
                 echo "✅ Program upgraded"
 
     program:info:

@@ -227,7 +227,7 @@ fn test_error_code_is_bad_seeds() {
 
     // Verify the error constant exists by attempting to compile
     const _ERROR_CHECK: () = {
-        use tally_subs::errors::SubscriptionError;
+        use tally_protocol::errors::SubscriptionError;
         let _ = SubscriptionError::BadSeeds;
     };
 }

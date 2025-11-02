@@ -27,7 +27,7 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::errors::SubscriptionError;
 
 /// Test that keeper_fee_bps can be updated with valid value
 #[test]

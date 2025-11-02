@@ -520,7 +520,7 @@ mod tests {
         // In CI/local testing, this must be set before running tests
         let program_id_str = std::env::var("TALLY_PROGRAM_ID")
             .expect("TALLY_PROGRAM_ID must be set for tests. \
-                     Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7");
+                     Example: export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111");
 
         let expected_program_id = Pubkey::from_str(&program_id_str).unwrap();
         let actual_program_id = program_id_string().parse().unwrap();

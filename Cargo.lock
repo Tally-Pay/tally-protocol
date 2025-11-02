@@ -10466,6 +10466,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tally-protocol"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "bincode",
+ "bs58",
+ "solana-program-test",
+ "solana-sdk 3.0.0",
+ "tokio",
+]
+
+[[package]]
 name = "tally-sdk"
 version = "0.2.1"
 dependencies = [
@@ -10496,20 +10510,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
-]
-
-[[package]]
-name = "tally_subs"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "bincode",
- "bs58",
- "solana-program-test",
- "solana-sdk 3.0.0",
- "tokio",
 ]
 
 [[package]]

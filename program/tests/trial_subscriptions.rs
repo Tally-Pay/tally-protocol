@@ -28,7 +28,7 @@
 //! - Renewal logic clears trial flags after successful payment
 //! - Reactivation rejects trial_duration_secs with TrialAlreadyUsed error
 
-use tally_subs::{
+use tally_protocol::{
     constants::{TRIAL_DURATION_14_DAYS, TRIAL_DURATION_30_DAYS, TRIAL_DURATION_7_DAYS},
     errors::SubscriptionError,
 };

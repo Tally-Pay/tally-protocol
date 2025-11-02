@@ -32,7 +32,7 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_subs::errors::SubscriptionError;
+use tally_protocol::errors::SubscriptionError;
 
 /// Test that Config paused field defaults to false on initialization
 #[test]

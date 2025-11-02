@@ -74,7 +74,7 @@ const PROGRAM_ID_BYTES: &[u8; 32] = include_bytes!(concat!(env!("OUT_DIR"), "/pr
 declare_id!(Pubkey::new_from_array(*PROGRAM_ID_BYTES));
 
 #[program]
-pub mod subs {
+pub mod tally_protocol {
     use super::*;
 
     /// Initialize global program configuration

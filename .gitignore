@@ -9,6 +9,13 @@ test-ledger/
 .task/
 .claude
 
+# Keypairs (IMPORTANT: Never commit private keys)
+.keys/
+*.json
+!package*.json
+!pnpm-lock.json
+!tsconfig*.json
+
 # Log files
 *.log
 

@@ -23,13 +23,13 @@ echo '6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5' | gh secret set DEVNET_PROGR
 
 **Purpose**: The on-chain program address for localnet testing.
 
-**Value**: `eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7`
+**Value**: `YourProgramIdHere111111111111111111111111111` (see Anchor.toml for actual value)
 
 **How to create**:
 
 ```bash
-# Set as org secret
-echo 'eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7' | gh secret set LOCALNET_PROGRAM_ID --org Tally-Pay --visibility all
+# Set as org secret (use actual program ID from Anchor.toml)
+echo 'YourProgramIdHere111111111111111111111111111' | gh secret set LOCALNET_PROGRAM_ID --org Tally-Pay --visibility all
 ```
 
 ### 3. `DEVNET_DEPLOYER_KEYPAIR`
@@ -143,8 +143,8 @@ To avoid triggering multiple workflows, use prefixed tags:
 - Update authority if needed: `solana program set-upgrade-authority <program-id> --new-upgrade-authority <deployer-address> --url devnet`
 
 ### Build failures
-- Ensure all tests pass locally: `cargo nextest run -p tally-subs`
-- Verify clippy checks: `cargo clippy -p tally-subs --all-targets -- -D warnings`
+- Ensure all tests pass locally: `cargo nextest run -p tally-protocol`
+- Verify clippy checks: `cargo clippy -p tally-protocol --all-targets -- -D warnings`
 
 ## Security Notes
 
@@ -169,10 +169,10 @@ solana config set --keypair ~/.config/solana/devnet-deployer.json
 anchor build
 
 # Upgrade existing program
-anchor upgrade target/deploy/tally_subs.so \
+anchor upgrade target/deploy/tally_protocol.so \
   --program-id 6jsdZp5TovWbPGuXcKvnNaBZr1EBYwVTWXW1RhGa2JM5 \
   --provider.cluster devnet
 
 # OR: Initial deploy (first time only)
-anchor deploy --provider.cluster devnet --program-name tally-subs
+anchor deploy --provider.cluster devnet --program-name tally-protocol
 ```

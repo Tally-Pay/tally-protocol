@@ -256,7 +256,7 @@ fn test_error_code_is_bad_seeds_for_ata_mismatch() {
 
     // Verify the error constant exists by attempting to compile
     const _ERROR_CHECK: () = {
-        use tally_subs::errors::SubscriptionError;
+        use tally_protocol::errors::SubscriptionError;
         let _ = SubscriptionError::BadSeeds;
     };
 }
@@ -269,19 +269,19 @@ fn test_error_code_is_bad_seeds_for_ata_mismatch() {
 fn test_error_codes_for_token_account_validation() {
     // Error for invalid token account structure
     const _INVALID_ACCOUNT_CHECK: () = {
-        use tally_subs::errors::SubscriptionError;
+        use tally_protocol::errors::SubscriptionError;
         let _ = SubscriptionError::InvalidPlatformTreasuryAccount;
     };
 
     // Error for wrong mint
     const _WRONG_MINT_CHECK: () = {
-        use tally_subs::errors::SubscriptionError;
+        use tally_protocol::errors::SubscriptionError;
         let _ = SubscriptionError::WrongMint;
     };
 
     // Error for wrong owner
     const _UNAUTHORIZED_CHECK: () = {
-        use tally_subs::errors::SubscriptionError;
+        use tally_protocol::errors::SubscriptionError;
         let _ = SubscriptionError::Unauthorized;
     };
 }

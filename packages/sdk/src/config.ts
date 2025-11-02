@@ -13,7 +13,7 @@ const SYSTEM_PROGRAM_ID_CONSTANT = '11111111111111111111111111111111';
  *
  * @example
  * ```bash
- * export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+ * export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111
  * ```
  */
 export function getProgramId(override?: string): string {
@@ -24,7 +24,7 @@ export function getProgramId(override?: string): string {
     throw new Error(
       'TALLY_PROGRAM_ID environment variable is required. ' +
       'Set it to your deployed program ID (localnet/devnet/mainnet).\n' +
-      'Example: export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7'
+      'Example: export TALLY_PROGRAM_ID=YourProgramIdHere111111111111111111111111111'
     );
   }
 
