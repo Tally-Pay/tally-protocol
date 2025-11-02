@@ -376,9 +376,25 @@ async fn test_multiple_events_in_logs() {
         .iter()
         .map(|e| match e {
             TallyEvent::Subscribed(_) => "Subscribed",
+            TallyEvent::SubscriptionReactivated(_) => "SubscriptionReactivated",
             TallyEvent::Renewed(_) => "Renewed",
             TallyEvent::Canceled(_) => "Canceled",
+            TallyEvent::SubscriptionClosed(_) => "SubscriptionClosed",
             TallyEvent::PaymentFailed(_) => "PaymentFailed",
+            TallyEvent::PlanStatusChanged(_) => "PlanStatusChanged",
+            TallyEvent::ConfigInitialized(_) => "ConfigInitialized",
+            TallyEvent::MerchantInitialized(_) => "MerchantInitialized",
+            TallyEvent::PlanCreated(_) => "PlanCreated",
+            TallyEvent::ProgramPaused(_) => "ProgramPaused",
+            TallyEvent::ProgramUnpaused(_) => "ProgramUnpaused",
+            TallyEvent::LowAllowanceWarning(_) => "LowAllowanceWarning",
+            TallyEvent::FeesWithdrawn(_) => "FeesWithdrawn",
+            TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning",
+            TallyEvent::ConfigUpdated(_) => "ConfigUpdated",
+            TallyEvent::MerchantTierChanged(_) => "MerchantTierChanged",
+            TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated",
+            TallyEvent::TrialStarted(_) => "TrialStarted",
+            TallyEvent::TrialConverted(_) => "TrialConverted",
         })
         .collect();
 
