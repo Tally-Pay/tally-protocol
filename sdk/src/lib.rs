@@ -7,6 +7,13 @@
 //! - Building subscription transactions (approve→start, revoke→cancel flows)
 //! - Token program detection (SPL Token vs Token-2022)
 //!
+//! # Feature Flags
+//!
+//! - **`platform-admin`** - Enables platform-level administration functions (init_config,
+//!   update_config, admin_withdraw_fees, pause, unpause, authority transfer, etc.).
+//!   Required for Tally platform operators only. Not needed by merchants or application
+//!   builders integrating subscriptions.
+//!
 //! # Example Usage
 //!
 //! ```no_run
@@ -30,6 +37,22 @@
 //!
 //! # Ok(())
 //! # }
+//! ```
+//!
+//! # Platform Administration
+//!
+//! If you need platform administration capabilities, enable the `platform-admin` feature:
+//!
+//! ```toml
+//! [dependencies]
+//! tally-sdk = { version = "0.2", features = ["platform-admin"] }
+//! ```
+//!
+//! Then access admin functions via the `admin` module:
+//!
+//! ```no_run
+//! # #[cfg(feature = "platform-admin")]
+//! use tally_sdk::admin::*;
 //! ```
 
 #![forbid(unsafe_code)]
@@ -56,6 +79,10 @@ pub mod transaction_utils;
 pub mod utils;
 pub mod validation;
 
+// Platform administration module (requires 'platform-admin' feature flag)
+#[cfg(feature = "platform-admin")]
+pub mod admin;
+
 // Re-export commonly used items
 pub use simple_client::SimpleTallyClient;
 // pub use client::TallyClient;  // Disabled for now
@@ -73,15 +100,21 @@ pub use events::{
 };
 pub use keypair::load_keypair;
 pub use program_types::*;
+// Re-export transaction builders for common operations
 pub use transaction_builder::{
-    accept_authority, admin_withdraw_fees, cancel_authority_transfer, cancel_subscription,
-    close_subscription, create_merchant, create_plan, init_config, pause, renew_subscription,
-    start_subscription, transfer_authority, unpause, update_config, update_merchant_tier,
-    update_plan_terms, AcceptAuthorityBuilder, AdminWithdrawFeesBuilder,
-    CancelAuthorityTransferBuilder, CancelSubscriptionBuilder, CloseSubscriptionBuilder,
-    CreateMerchantBuilder, CreatePlanBuilder, InitConfigBuilder, PauseBuilder,
-    RenewSubscriptionBuilder, StartSubscriptionBuilder, TransferAuthorityBuilder, UnpauseBuilder,
-    UpdateConfigBuilder, UpdateMerchantTierBuilder, UpdatePlanTermsBuilder,
+    cancel_subscription, close_subscription, create_merchant, create_plan, renew_subscription,
+    start_subscription, update_plan_terms, CancelSubscriptionBuilder, CloseSubscriptionBuilder,
+    CreateMerchantBuilder, CreatePlanBuilder, RenewSubscriptionBuilder, StartSubscriptionBuilder,
+    UpdatePlanTermsBuilder,
+};
+
+// Re-export admin transaction builders (only with 'platform-admin' feature)
+#[cfg(feature = "platform-admin")]
+pub use transaction_builder::{
+    accept_authority, admin_withdraw_fees, cancel_authority_transfer, init_config, pause,
+    transfer_authority, unpause, update_config, update_merchant_tier, AcceptAuthorityBuilder,
+    AdminWithdrawFeesBuilder, CancelAuthorityTransferBuilder, InitConfigBuilder, PauseBuilder,
+    TransferAuthorityBuilder, UnpauseBuilder, UpdateConfigBuilder, UpdateMerchantTierBuilder,
 };
 pub use validation::*;
 

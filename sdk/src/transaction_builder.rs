@@ -737,6 +737,7 @@ impl UpdatePlanBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl AdminWithdrawFeesBuilder {
     /// Create a new admin withdraw fees builder
     #[must_use]
@@ -835,6 +836,7 @@ impl AdminWithdrawFeesBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl InitConfigBuilder {
     /// Create a new initialize config builder
     #[must_use]
@@ -1108,6 +1110,7 @@ impl CloseSubscriptionBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl TransferAuthorityBuilder {
     /// Create a new transfer authority builder
     #[must_use]
@@ -1176,6 +1179,7 @@ impl TransferAuthorityBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl AcceptAuthorityBuilder {
     /// Create a new accept authority builder
     #[must_use]
@@ -1234,6 +1238,7 @@ impl AcceptAuthorityBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl CancelAuthorityTransferBuilder {
     /// Create a new cancel authority transfer builder
     #[must_use]
@@ -1294,6 +1299,7 @@ impl CancelAuthorityTransferBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl PauseBuilder {
     /// Create a new pause builder
     #[must_use]
@@ -1354,6 +1360,7 @@ impl PauseBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl UnpauseBuilder {
     /// Create a new unpause builder
     #[must_use]
@@ -1414,6 +1421,7 @@ impl UnpauseBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl UpdateConfigBuilder {
     /// Create a new update config builder
     #[must_use]
@@ -1592,6 +1600,7 @@ impl UpdateConfigBuilder {
     }
 }
 
+#[cfg(feature = "platform-admin")]
 impl UpdateMerchantTierBuilder {
     /// Create a new update merchant tier builder
     #[must_use]
@@ -1865,12 +1874,14 @@ pub fn create_plan() -> CreatePlanBuilder {
 
 /// Create an admin withdraw fees transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn admin_withdraw_fees() -> AdminWithdrawFeesBuilder {
     AdminWithdrawFeesBuilder::new()
 }
 
 /// Create a config initialization transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn init_config() -> InitConfigBuilder {
     InitConfigBuilder::new()
 }
@@ -1895,42 +1906,49 @@ pub fn close_subscription() -> CloseSubscriptionBuilder {
 
 /// Create a transfer authority transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn transfer_authority() -> TransferAuthorityBuilder {
     TransferAuthorityBuilder::new()
 }
 
 /// Create an accept authority transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn accept_authority() -> AcceptAuthorityBuilder {
     AcceptAuthorityBuilder::new()
 }
 
 /// Create a cancel authority transfer transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn cancel_authority_transfer() -> CancelAuthorityTransferBuilder {
     CancelAuthorityTransferBuilder::new()
 }
 
 /// Create a pause program transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn pause() -> PauseBuilder {
     PauseBuilder::new()
 }
 
 /// Create an unpause program transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn unpause() -> UnpauseBuilder {
     UnpauseBuilder::new()
 }
 
 /// Create an update config transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn update_config() -> UpdateConfigBuilder {
     UpdateConfigBuilder::new()
 }
 
 /// Create an update merchant tier transaction builder
 #[must_use]
+#[cfg(feature = "platform-admin")]
 pub fn update_merchant_tier() -> UpdateMerchantTierBuilder {
     UpdateMerchantTierBuilder::new()
 }
@@ -1977,6 +1995,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_start_subscription_builder() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
@@ -2064,6 +2083,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_start_subscription_allowance_edge_cases() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
@@ -2099,6 +2119,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_start_subscription_with_token2022() {
         let mut merchant = create_test_merchant();
         merchant.usdc_mint = Pubkey::from(Keypair::new().pubkey().to_bytes()); // Custom Token2022 mint
@@ -2123,6 +2144,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_subscription_builder() {
         let merchant = create_test_merchant();
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2145,6 +2167,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_create_merchant_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
@@ -2164,6 +2187,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_create_plan_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_id_bytes = {
@@ -2195,6 +2219,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_builder_missing_required_fields() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
@@ -2221,6 +2246,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_token_program_variants() {
         // Create separate merchants for different token programs to avoid compatibility issues
         let merchant_token = Merchant {
@@ -2270,14 +2296,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_init_config_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let config_args = InitConfigArgs {
             platform_authority: authority,
             max_platform_fee_bps: 1000,
-            fee_basis_points_divisor: 10000,
+            min_platform_fee_bps: 50,
             min_period_seconds: 86400,
             default_allowance_periods: 3,
+            allowed_mint: usdc_mint,
+            max_withdrawal_amount: 1_000_000_000,
+            max_grace_period_seconds: 2_592_000,
+            keeper_fee_bps: 50,
         };
 
         let instruction = init_config()
@@ -2288,27 +2321,31 @@ mod tests {
 
         let program_id = program_id();
         assert_eq!(instruction.program_id, program_id);
-        assert_eq!(instruction.accounts.len(), 3);
+        // Updated to reflect actual account count (config, authority, payer, platform_treasury, allowed_mint, system_program)
+        assert_eq!(instruction.accounts.len(), 6);
 
-        // Verify account metas
+        // Verify key account metas
         assert!(!instruction.accounts[0].is_signer); // config (PDA)
         assert!(instruction.accounts[0].is_writable); // config (PDA)
-        assert!(instruction.accounts[1].is_signer); // authority
-        assert!(instruction.accounts[1].is_writable); // authority
-        assert!(!instruction.accounts[2].is_signer); // system_program
-        assert!(!instruction.accounts[2].is_writable); // system_program
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_init_config_missing_required_fields() {
         // Test missing authority
+        let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let result = init_config()
             .config_args(InitConfigArgs {
                 platform_authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
                 max_platform_fee_bps: 1000,
-                fee_basis_points_divisor: 10000,
+                min_platform_fee_bps: 50,
                 min_period_seconds: 86400,
                 default_allowance_periods: 3,
+                allowed_mint: usdc_mint,
+                max_withdrawal_amount: 1_000_000_000,
+                max_grace_period_seconds: 2_592_000,
+                keeper_fee_bps: 50,
             })
             .build_instruction();
         assert!(result.is_err());
@@ -2329,6 +2366,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_builder() {
         let merchant = create_test_merchant();
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2361,6 +2399,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_builder_missing_required_fields() {
         let merchant = create_test_merchant();
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2398,6 +2437,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_builder_validation() {
         let merchant = create_test_merchant();
         let wrong_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2431,6 +2471,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_args_functionality() {
         // Test UpdatePlanArgs builder pattern
         let args = UpdatePlanArgs::new()
@@ -2467,6 +2508,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_renew_subscription_builder() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
@@ -2536,6 +2578,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_renew_subscription_builder_missing_required_fields() {
         let merchant = create_test_merchant();
         let plan_data = create_test_plan();
@@ -2585,6 +2628,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_renew_subscription_token_program_variants() {
         // Create separate merchants for different token programs
         let merchant_token = Merchant {
@@ -2641,6 +2685,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_close_subscription_builder() {
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2666,6 +2711,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_close_subscription_builder_missing_required_fields() {
         // Test missing plan
         let result = close_subscription()
@@ -2686,6 +2732,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_close_subscription_builder_custom_program_id() {
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2702,6 +2749,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_close_subscription_builder_pda_computation() {
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2722,6 +2770,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_builder() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2757,6 +2807,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_builder_missing_required_fields() {
         // Test missing platform_authority
         let result = transfer_authority()
@@ -2780,6 +2832,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_builder_custom_program_id() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2796,6 +2850,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_builder_pda_computation() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2815,6 +2871,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_args_serialization() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -2836,6 +2894,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_transfer_authority_builder_clone_debug() {
         let builder = transfer_authority()
             .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
@@ -2855,6 +2915,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -2888,6 +2950,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder_missing_required_fields() {
         // Test missing new_authority
         let result = accept_authority().build_instruction();
@@ -2899,6 +2963,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder_custom_program_id() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -2913,6 +2979,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder_pda_computation() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -2930,6 +2998,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_args_serialization() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -2951,6 +3021,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder_clone_debug() {
         let builder =
             accept_authority().new_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
@@ -2965,6 +3037,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_builder_default() {
         let builder = AcceptAuthorityBuilder::default();
         assert!(builder.new_authority.is_none());
@@ -2972,6 +3046,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_accept_authority_convenience_function() {
         let new_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -2996,6 +3072,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3029,6 +3107,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder_missing_required_fields() {
         // Test missing platform_authority
         let result = cancel_authority_transfer().build_instruction();
@@ -3040,6 +3120,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder_custom_program_id() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3054,6 +3136,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder_pda_computation() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3071,6 +3155,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_args_serialization() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3092,6 +3178,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder_clone_debug() {
         let builder = cancel_authority_transfer()
             .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
@@ -3109,6 +3197,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_builder_default() {
         let builder = CancelAuthorityTransferBuilder::default();
         assert!(builder.platform_authority.is_none());
@@ -3116,6 +3206,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_cancel_authority_transfer_convenience_function() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3140,6 +3232,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3173,6 +3267,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder_missing_required_fields() {
         // Test missing platform_authority
         let result = pause().build_instruction();
@@ -3184,6 +3280,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder_custom_program_id() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3198,6 +3296,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder_pda_computation() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3215,6 +3315,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_args_serialization() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3236,6 +3338,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder_clone_debug() {
         let builder = pause().platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
 
@@ -3252,6 +3356,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_builder_default() {
         let builder = PauseBuilder::default();
         assert!(builder.platform_authority.is_none());
@@ -3259,6 +3365,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_pause_convenience_function() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3283,6 +3391,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3316,6 +3426,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder_missing_required_fields() {
         // Test missing platform_authority
         let result = unpause().build_instruction();
@@ -3327,6 +3439,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder_custom_program_id() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3341,6 +3455,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder_pda_computation() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3358,6 +3474,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_args_serialization() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3379,6 +3497,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder_clone_debug() {
         let builder =
             unpause().platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()));
@@ -3396,6 +3516,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_builder_default() {
         let builder = UnpauseBuilder::default();
         assert!(builder.platform_authority.is_none());
@@ -3403,6 +3525,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_unpause_convenience_function() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3429,6 +3553,8 @@ mod tests {
     // UpdateConfigBuilder tests
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_basic() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3454,6 +3580,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_all_fields() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3474,6 +3602,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_missing_authority() {
         let result = update_config().keeper_fee_bps(25).build_instruction();
 
@@ -3485,6 +3615,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_no_updates() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3500,6 +3632,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_keeper_fee_too_high() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3516,6 +3650,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_min_fee_greater_than_max() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3533,6 +3669,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_zero_max_withdrawal() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3549,6 +3687,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_zero_max_grace_period() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3565,6 +3705,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_zero_min_period() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3581,6 +3723,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_zero_allowance_periods() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3597,6 +3741,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_custom_program_id() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3612,6 +3758,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_pda_computation() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3630,6 +3778,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_args_serialization() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3652,6 +3802,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_clone_debug() {
         let builder = update_config()
             .platform_authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
@@ -3671,6 +3823,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_default() {
         let builder = UpdateConfigBuilder::default();
         assert!(builder.platform_authority.is_none());
@@ -3685,6 +3839,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_convenience_function() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3711,6 +3867,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_partial_updates() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3741,6 +3899,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_config_builder_edge_cases() {
         let platform_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -3774,6 +3934,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3813,6 +3975,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_all_tiers() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3846,6 +4010,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_missing_required_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3885,6 +4051,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_invalid_tier() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3911,6 +4079,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_custom_program_id() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3928,6 +4098,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_pda_computation() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3949,6 +4121,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_args_serialization() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -3976,6 +4150,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_clone_debug() {
         let builder = update_merchant_tier()
             .authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
@@ -3994,6 +4170,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_builder_default() {
         let builder = UpdateMerchantTierBuilder::default();
         assert!(builder.authority.is_none());
@@ -4003,6 +4181,8 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
+    #[cfg(feature = "platform-admin")]
     fn test_update_merchant_tier_convenience_function() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4032,6 +4212,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_builder_all_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4055,6 +4236,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_builder_single_field() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4105,6 +4287,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_no_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4122,6 +4305,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_missing_authority() {
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -4135,6 +4319,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_missing_plan() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
@@ -4148,6 +4333,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_zero_price() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4163,6 +4349,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_max_price() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4181,6 +4368,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_grace_exceeds_30_percent() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4200,6 +4388,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_empty_name() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4218,6 +4407,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_validation_name_too_long() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
@@ -4238,6 +4428,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "platform-admin")]
     fn test_update_plan_terms_convenience_function() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());

@@ -516,6 +516,7 @@ impl SimpleTallyClient {
     ///
     /// # Errors
     /// Returns an error if fee withdrawal fails
+    #[cfg(feature = "platform-admin")]
     pub fn withdraw_platform_fees<T: Signer>(
         &self,
         platform_authority: &T,

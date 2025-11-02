@@ -850,11 +850,14 @@ mod tests {
         let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
+        let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let event = Renewed {
             merchant,
             plan,
             subscriber,
             amount: 10_000_000, // 10 USDC
+            keeper,
+            keeper_fee: 50_000, // 0.05 USDC keeper fee
         };
 
         let encoded_data = create_test_event_data("Renewed", &event);
