@@ -36,6 +36,10 @@ pub struct Renewed {
     pub subscriber: Pubkey,
     /// The amount paid for the renewal (in USDC micro-units)
     pub amount: u64,
+    /// The keeper who executed the renewal
+    pub keeper: Pubkey,
+    /// The fee paid to the keeper (in USDC micro-units)
+    pub keeper_fee: u64,
 }
 
 /// Event emitted when a subscription is canceled
@@ -141,49 +145,49 @@ impl ParsedEventWithContext {
     /// Convert to streamable event data for WebSocket
     #[must_use]
     pub fn to_streamable(&self) -> StreamableEventData {
-        let (event_type, merchant_pda, plan_address, subscriber, amount, reason) = match &self.event
-        {
-            TallyEvent::Subscribed(e) => (
-                "subscribed".to_string(),
-                e.merchant.to_string(),
-                Some(e.plan.to_string()),
-                Some(e.subscriber.to_string()),
-                Some(e.amount),
-                None,
-            ),
-            TallyEvent::Renewed(e) => (
-                "renewed".to_string(),
-                e.merchant.to_string(),
-                Some(e.plan.to_string()),
-                Some(e.subscriber.to_string()),
-                Some(e.amount),
-                None,
-            ),
-            TallyEvent::Canceled(e) => (
-                "canceled".to_string(),
-                e.merchant.to_string(),
-                Some(e.plan.to_string()),
-                Some(e.subscriber.to_string()),
-                None,
-                None,
-            ),
-            TallyEvent::PaymentFailed(e) => (
-                "payment_failed".to_string(),
-                e.merchant.to_string(),
-                Some(e.plan.to_string()),
-                Some(e.subscriber.to_string()),
-                None,
-                Some(e.reason.clone()),
-            ),
-        };
-
         let mut metadata = HashMap::new();
-        if let Some(subscriber) = subscriber {
-            metadata.insert("subscriber".to_string(), subscriber);
-        }
-        if let Some(reason) = reason {
-            metadata.insert("reason".to_string(), reason);
-        }
+
+        let (event_type, merchant_pda, plan_address, amount) = match &self.event {
+            TallyEvent::Subscribed(e) => {
+                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                (
+                    "subscribed".to_string(),
+                    e.merchant.to_string(),
+                    Some(e.plan.to_string()),
+                    Some(e.amount),
+                )
+            }
+            TallyEvent::Renewed(e) => {
+                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                metadata.insert("keeper".to_string(), e.keeper.to_string());
+                metadata.insert("keeper_fee".to_string(), e.keeper_fee.to_string());
+                (
+                    "renewed".to_string(),
+                    e.merchant.to_string(),
+                    Some(e.plan.to_string()),
+                    Some(e.amount),
+                )
+            }
+            TallyEvent::Canceled(e) => {
+                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                (
+                    "canceled".to_string(),
+                    e.merchant.to_string(),
+                    Some(e.plan.to_string()),
+                    None,
+                )
+            }
+            TallyEvent::PaymentFailed(e) => {
+                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                metadata.insert("reason".to_string(), e.reason.clone());
+                (
+                    "payment_failed".to_string(),
+                    e.merchant.to_string(),
+                    Some(e.plan.to_string()),
+                    None,
+                )
+            }
+        };
         metadata.insert("slot".to_string(), self.slot.to_string());
         metadata.insert("success".to_string(), self.success.to_string());
 
