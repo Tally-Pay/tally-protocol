@@ -70,12 +70,14 @@ impl EventTestFixture {
     }
 
     /// Create a Renewed event
-    const fn create_renewed_event(&self, amount: u64) -> Renewed {
+    const fn create_renewed_event(&self, amount: u64, keeper: Pubkey, keeper_fee: u64) -> Renewed {
         Renewed {
             merchant: self.merchant,
             plan: self.plan,
             subscriber: self.subscriber,
             amount,
+            keeper,
+            keeper_fee,
         }
     }
 
@@ -169,7 +171,8 @@ async fn test_renewed_event_parsing_comprehensive() {
     ];
 
     for (amount, description) in renewal_scenarios {
-        let event = fixture.create_renewed_event(amount);
+        let keeper_fee = amount / 200; // 0.5% keeper fee
+        let event = fixture.create_renewed_event(amount, fixture.merchant, keeper_fee);
         let encoded_data = EventTestFixture::create_encoded_event("Renewed", &event);
 
         let result = parse_single_event(&encoded_data);
@@ -339,7 +342,8 @@ async fn test_multiple_events_in_logs() {
 
     // Create multiple events of different types
     let subscribed = fixture.create_subscribed_event(5_000_000);
-    let renewed = fixture.create_renewed_event(5_000_000);
+    let keeper_fee = 5_000_000 / 200; // 0.5% keeper fee
+    let renewed = fixture.create_renewed_event(5_000_000, fixture.merchant, keeper_fee);
     let canceled = fixture.create_canceled_event();
     let payment_failed = fixture.create_payment_failed_event("Test failure".to_string());
 
@@ -561,7 +565,8 @@ async fn test_receipt_event_getters() {
 
     // Create receipt with multiple event types
     let subscribed = fixture.create_subscribed_event(5_000_000);
-    let renewed = fixture.create_renewed_event(5_000_000);
+    let keeper_fee = 5_000_000 / 200; // 0.5% keeper fee
+    let renewed = fixture.create_renewed_event(5_000_000, fixture.merchant, keeper_fee);
     let canceled = fixture.create_canceled_event();
     let payment_failed = fixture.create_payment_failed_event("Test failure".to_string());
 
