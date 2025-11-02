@@ -1112,7 +1112,7 @@ mod tests {
         let _past_time = current_time - 3600;
         let time_diff_ms = 3600 * 1000;
         let expected_slot_diff = time_diff_ms / SLOT_DURATION_MS; // 9000 slots
-        let expected_past_slot = current_slot.saturating_sub(expected_slot_diff as u64);
+        let expected_past_slot = current_slot.saturating_sub(expected_slot_diff.unsigned_abs());
 
         // Manual calculation: 250_000_000 - 9000 = 249_991_000
         assert_eq!(expected_past_slot, 249_991_000);
@@ -1138,7 +1138,7 @@ mod tests {
         let old_time_diff_ms = current_time.saturating_mul(1000);
         let old_slot_diff = old_time_diff_ms / SLOT_DURATION_MS;
         // Should saturate to 0, not panic
-        let old_slot = current_slot.saturating_sub(old_slot_diff as u64);
+        let old_slot = current_slot.saturating_sub(old_slot_diff.unsigned_abs());
         assert!(old_slot <= current_slot);
     }
 
