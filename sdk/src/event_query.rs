@@ -1109,7 +1109,7 @@ mod tests {
         let current_slot = 250_000_000u64;
 
         // Test 1: Past timestamp (1 hour ago = 3600 seconds)
-        let _past_time = current_time - 3600;
+        // past_time would be: current_time - 3600
         let time_diff_ms = 3600 * 1000;
         let expected_slot_diff = time_diff_ms / SLOT_DURATION_MS; // 9000 slots
         let expected_past_slot = current_slot.saturating_sub(expected_slot_diff.unsigned_abs());
@@ -1118,7 +1118,7 @@ mod tests {
         assert_eq!(expected_past_slot, 249_991_000);
 
         // Test 2: Future timestamp (1 hour in future)
-        let _future_time = current_time + 3600;
+        // future_time would be: current_time + 3600
         let future_time_diff = -3600i64;
         let future_slot_diff_ms = future_time_diff.saturating_mul(1000);
         let abs_diff = future_slot_diff_ms.unsigned_abs();
@@ -1134,7 +1134,7 @@ mod tests {
         assert_eq!(same_slot_diff, 0);
 
         // Test 4: Very old timestamp (overflow protection)
-        let _very_old_time = 0i64;
+        // very_old_time would be: 0i64
         let old_time_diff_ms = current_time.saturating_mul(1000);
         let old_slot_diff = old_time_diff_ms / SLOT_DURATION_MS;
         // Should saturate to 0, not panic

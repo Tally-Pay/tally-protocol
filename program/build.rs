@@ -14,12 +14,10 @@ fn main() {
         .into_vec()
         .expect("TALLY_PROGRAM_ID must be a valid base58-encoded public key");
 
-    if pubkey_bytes.len() != 32 {
-        panic!(
+    assert!((pubkey_bytes.len() == 32), 
             "TALLY_PROGRAM_ID must decode to exactly 32 bytes, got {} bytes",
             pubkey_bytes.len()
         );
-    }
 
     // Write the bytes to a file that can be included at compile time
     let out_dir = env::var("OUT_DIR").unwrap();
