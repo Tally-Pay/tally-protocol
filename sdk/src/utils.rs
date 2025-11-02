@@ -73,6 +73,31 @@ pub fn usdc_to_micro_lamports(usdc_amount: f64) -> u64 {
     }
 }
 
+/// Convert basis points to percentage
+///
+/// Basis points (bps) are a common unit for expressing fees and percentages in finance.
+/// 1 basis point = 0.01% = 1/10000.
+///
+/// # Arguments
+/// * `basis_points` - Fee or percentage in basis points
+///
+/// # Returns
+/// Percentage value (e.g., 100 bps -> 1.0%)
+///
+/// # Examples
+/// ```
+/// use tally_sdk::utils::basis_points_to_percentage;
+///
+/// assert_eq!(basis_points_to_percentage(100), 1.0);   // 100 bps = 1%
+/// assert_eq!(basis_points_to_percentage(50), 0.5);    // 50 bps = 0.5%
+/// assert_eq!(basis_points_to_percentage(1000), 10.0); // 1000 bps = 10%
+/// assert_eq!(basis_points_to_percentage(10000), 100.0); // 10000 bps = 100%
+/// ```
+#[must_use]
+pub fn basis_points_to_percentage(basis_points: u16) -> f64 {
+    f64::from(basis_points) / 100.0
+}
+
 /// Check if a pubkey is a valid Solana address
 ///
 /// # Arguments
