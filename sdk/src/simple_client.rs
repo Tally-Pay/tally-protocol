@@ -171,6 +171,60 @@ impl SimpleTallyClient {
         Ok(Some(plan))
     }
 
+    /// Get config account data
+    ///
+    /// # Errors
+    /// Returns an error if the account doesn't exist or can't be deserialized
+    pub fn get_config(&self) -> Result<Option<crate::program_types::Config>> {
+        let config_address = crate::pda::config_address_with_program_id(&self.program_id);
+
+        let account_data = match self
+            .rpc_client
+            .get_account_with_commitment(&config_address, CommitmentConfig::confirmed())
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch config account: {e}")))?
+            .value
+        {
+            Some(account) => account.data,
+            None => return Ok(None),
+        };
+
+        if account_data.len() < 8 {
+            return Err(TallyError::Generic("Invalid config account data".to_string()));
+        }
+
+        let config = crate::program_types::Config::try_from_slice(&account_data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize config: {e}")))?;
+
+        Ok(Some(config))
+    }
+
+    /// Get subscription account data
+    ///
+    /// # Errors
+    /// Returns an error if the account doesn't exist or can't be deserialized
+    pub fn get_subscription(&self, subscription_address: &Pubkey) -> Result<Option<Subscription>> {
+        let account_data = match self
+            .rpc_client
+            .get_account_with_commitment(subscription_address, CommitmentConfig::confirmed())
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch subscription account: {e}")))?
+            .value
+        {
+            Some(account) => account.data,
+            None => return Ok(None),
+        };
+
+        if account_data.len() < 8 {
+            return Err(TallyError::Generic(
+                "Invalid subscription account data".to_string(),
+            ));
+        }
+
+        let subscription = Subscription::try_from_slice(&account_data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize subscription: {e}")))?;
+
+        Ok(Some(subscription))
+    }
+
     /// List all plans for a merchant
     ///
     /// # Errors
