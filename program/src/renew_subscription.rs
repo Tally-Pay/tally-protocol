@@ -244,7 +244,8 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
     // - This provides off-chain systems with actionable information about why renewal failed
     let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
 
-    if actual_delegate.is_none() || actual_delegate.unwrap() != expected_delegate_pda {
+    // Safe delegate validation without unwrap - use direct comparison
+    if actual_delegate != Some(expected_delegate_pda) {
         // Emit warning event with diagnostic information
         emit!(crate::events::DelegateMismatchWarning {
             merchant: merchant.key(),

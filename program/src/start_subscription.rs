@@ -320,9 +320,8 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     // Users should either:
     // - Use separate token accounts for each merchant (recommended)
     // - Only subscribe to one merchant at a time per token account
-    if subscriber_ata_data.delegate.is_none()
-        || subscriber_ata_data.delegate.unwrap() != expected_delegate_pda
-    {
+    let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
+    if actual_delegate != Some(expected_delegate_pda) {
         return Err(SubscriptionError::Unauthorized.into());
     }
 
@@ -402,7 +401,8 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     // For trial subscriptions: next_renewal_ts = trial_ends_at (when trial period ends)
     // For paid subscriptions: next_renewal_ts = current_time + period_secs
     let next_renewal_ts = if is_trial {
-        let trial_secs = args.trial_duration_secs.unwrap();
+        let trial_secs = args.trial_duration_secs
+            .ok_or(SubscriptionError::InvalidTrialDuration)?;
         let trial_duration_i64 =
             i64::try_from(trial_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
         current_time
