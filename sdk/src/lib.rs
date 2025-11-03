@@ -107,9 +107,9 @@ pub use program_types::*;
 // Re-export transaction builders for common operations
 pub use transaction_builder::{
     cancel_subscription, close_subscription, create_merchant, create_plan, renew_subscription,
-    start_subscription, update_plan_terms, CancelSubscriptionBuilder, CloseSubscriptionBuilder,
-    CreateMerchantBuilder, CreatePlanBuilder, RenewSubscriptionBuilder, StartSubscriptionBuilder,
-    UpdatePlanTermsBuilder,
+    start_subscription, update_plan, update_plan_terms, CancelSubscriptionBuilder,
+    CloseSubscriptionBuilder, CreateMerchantBuilder, CreatePlanBuilder, RenewSubscriptionBuilder,
+    StartSubscriptionBuilder, UpdatePlanBuilder, UpdatePlanTermsBuilder,
 };
 
 // Re-export admin transaction builders (only with 'platform-admin' feature)
