@@ -333,9 +333,7 @@ impl anchor_lang::AnchorDeserialize for MerchantTier {
 }
 
 /// Event emitted when a merchant's tier is changed
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MerchantTierChanged {
     /// The merchant account whose tier changed
     pub merchant: Pubkey,

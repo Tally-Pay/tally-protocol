@@ -460,24 +460,24 @@ mod tests {
             active: true,
         };
 
-        // Valid grace period update (within 2x current period)
-        let valid_grace = UpdatePlanArgs::new().with_grace_secs(172_800); // 2 days
+        // Valid grace period update (within 30% of current period)
+        let valid_grace = UpdatePlanArgs::new().with_grace_secs(25_920); // 30% of 1 day = 25,920 seconds
         assert!(validate_plan_update_args(&valid_grace, Some(&current_plan)).is_ok());
 
-        // Invalid grace period (exceeds 2x current period)
-        let invalid_grace = UpdatePlanArgs::new().with_grace_secs(172_801); // > 2 days
+        // Invalid grace period (exceeds 30% of current period)
+        let invalid_grace = UpdatePlanArgs::new().with_grace_secs(25_921); // > 30% of 1 day
         assert!(validate_plan_update_args(&invalid_grace, Some(&current_plan)).is_err());
 
         // Valid period and grace combination
         let valid_combo = UpdatePlanArgs::new()
             .with_period_secs(172_800) // 2 days
-            .with_grace_secs(345_600); // 4 days (2x new period)
+            .with_grace_secs(51_840); // 30% of 2 days = 51,840 seconds
         assert!(validate_plan_update_args(&valid_combo, Some(&current_plan)).is_ok());
 
         // Invalid period and grace combination
         let invalid_combo = UpdatePlanArgs::new()
             .with_period_secs(86400) // 1 day
-            .with_grace_secs(345_600); // 4 days (> 2x period)
+            .with_grace_secs(25_921); // > 30% of 1 day
         assert!(validate_plan_update_args(&invalid_combo, Some(&current_plan)).is_err());
     }
 

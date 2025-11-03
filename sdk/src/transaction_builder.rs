@@ -1976,10 +1976,14 @@ pub fn update_plan_terms() -> UpdatePlanTermsBuilder {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "platform-admin")]
     use super::*;
+    #[cfg(feature = "platform-admin")]
     use anchor_client::solana_sdk::signature::{Keypair, Signer};
+    #[cfg(feature = "platform-admin")]
     use std::str::FromStr;
 
+    #[cfg(feature = "platform-admin")]
     fn create_test_merchant() -> Merchant {
         Merchant {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -1991,6 +1995,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "platform-admin")]
     fn create_test_plan() -> Plan {
         let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let mut plan_id = [0u8; 32];
@@ -2557,6 +2562,7 @@ mod tests {
         verify_renew_signer_accounts(&instruction);
     }
 
+    #[cfg(feature = "platform-admin")]
     fn verify_renew_readonly_accounts(instruction: &Instruction) {
         assert!(!instruction.accounts[0].is_writable); // config
         assert!(!instruction.accounts[2].is_writable); // plan
@@ -2566,6 +2572,7 @@ mod tests {
         assert!(!instruction.accounts[11].is_writable); // token_program
     }
 
+    #[cfg(feature = "platform-admin")]
     fn verify_renew_mutable_accounts(instruction: &Instruction) {
         assert!(instruction.accounts[1].is_writable); // subscription
         assert!(instruction.accounts[4].is_writable); // subscriber_usdc_ata
@@ -2575,6 +2582,7 @@ mod tests {
         assert!(instruction.accounts[8].is_writable); // keeper_usdc_ata
     }
 
+    #[cfg(feature = "platform-admin")]
     fn verify_renew_signer_accounts(instruction: &Instruction) {
         assert!(!instruction.accounts[0].is_signer); // config
         assert!(!instruction.accounts[1].is_signer); // subscription

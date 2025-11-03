@@ -6,27 +6,27 @@
 //! Test coverage:
 //! - Valid trial durations (7, 14, 30 days)
 //! - Invalid trial duration rejection
-//! - Trial field initialization (trial_ends_at, in_trial)
+//! - Trial field initialization (`trial_ends_at`, `in_trial`)
 //! - Trial to paid conversion during renewal
 //! - Trial abuse prevention (one trial per subscriber per plan)
-//! - Event emission (TrialStarted, TrialConverted)
+//! - Event emission (`TrialStarted`, `TrialConverted`)
 //! - No payment during trial period
 //! - Delegate approval still required during trial
 //!
 //! Feature Requirements (Issue #32):
-//! 1. New subscriptions can specify an optional trial_duration_secs (7, 14, or 30 days)
+//! 1. New subscriptions can specify an optional `trial_duration_secs` (7, 14, or 30 days)
 //! 2. During trial, subscription is active but no payment is required
 //! 3. Delegate approval is still validated during trial
-//! 4. First payment occurs at trial_ends_at (during first renewal)
+//! 4. First payment occurs at `trial_ends_at` (during first renewal)
 //! 5. Trials only apply to new subscriptions (not reactivations)
 //! 6. Each subscriber gets exactly one trial per plan
 //!
 //! Implementation Details:
 //! - Valid trial durations: 604800 (7 days), 1209600 (14 days), 2592000 (30 days) seconds
 //! - Trial state tracked via `in_trial: bool` and `trial_ends_at: Option<i64>` fields
-//! - Payment logic skips transfers when `is_trial == true` in start_subscription
+//! - Payment logic skips transfers when `is_trial == true` in `start_subscription`
 //! - Renewal logic clears trial flags after successful payment
-//! - Reactivation rejects trial_duration_secs with TrialAlreadyUsed error
+//! - Reactivation rejects `trial_duration_secs` with `TrialAlreadyUsed` error
 
 use tally_protocol::{
     constants::{TRIAL_DURATION_14_DAYS, TRIAL_DURATION_30_DAYS, TRIAL_DURATION_7_DAYS},
@@ -103,18 +103,17 @@ fn test_trial_duration_validation() {
 
         assert!(
             is_invalid,
-            "Duration {} should be invalid",
-            invalid_duration
+            "Duration {invalid_duration} should be invalid"
         );
     }
 }
 
 /// Test trial subscription field initialization
 ///
-/// When a new subscription is created with trial_duration_secs:
-/// - trial_ends_at = Some(current_time + trial_duration_secs)
-/// - in_trial = true
-/// - next_renewal_ts = trial_ends_at (not current_time + period_secs)
+/// When a new subscription is created with `trial_duration_secs`:
+/// - `trial_ends_at` = `Some(current_time` + `trial_duration_secs`)
+/// - `in_trial` = true
+/// - `next_renewal_ts` = `trial_ends_at` (not `current_time` + `period_secs`)
 /// - active = true (subscription is active during trial)
 #[test]
 fn test_trial_field_initialization() {
@@ -153,10 +152,10 @@ fn test_trial_field_initialization() {
 
 /// Test non-trial subscription field initialization
 ///
-/// When a subscription is created without trial_duration_secs:
-/// - trial_ends_at = None
-/// - in_trial = false
-/// - next_renewal_ts = current_time + period_secs (normal billing)
+/// When a subscription is created without `trial_duration_secs`:
+/// - `trial_ends_at` = None
+/// - `in_trial` = false
+/// - `next_renewal_ts` = `current_time` + `period_secs` (normal billing)
 #[test]
 fn test_non_trial_field_initialization() {
     let current_time: i64 = 1_700_000_000;
@@ -188,10 +187,10 @@ fn test_non_trial_field_initialization() {
 
 /// Test reactivation trial abuse prevention
 ///
-/// When reactivating a subscription, trial_duration_secs must be None or rejected.
+/// When reactivating a subscription, `trial_duration_secs` must be None or rejected.
 /// This prevents users from getting multiple trials by repeatedly canceling and reactivating.
 ///
-/// Logic from start_subscription.rs lines 168-172:
+/// Logic from `start_subscription.rs` lines 168-172:
 /// ```rust
 /// if args.trial_duration_secs.is_some() {
 ///     return Err(SubscriptionError::TrialAlreadyUsed.into());
@@ -216,12 +215,11 @@ fn test_reactivation_trial_prevention() {
 
 /// Test reactivation without trial succeeds
 ///
-/// When reactivating without trial_duration_secs, the reactivation should proceed normally.
-/// Trial fields should be set to None/false (from start_subscription.rs lines 506-508).
+/// When reactivating without `trial_duration_secs`, the reactivation should proceed normally.
+/// Trial fields should be set to None/false (from `start_subscription.rs` lines 506-508).
 #[test]
 fn test_reactivation_without_trial() {
     // Simulate reactivation scenario
-    let _is_reactivation = true;
     let trial_duration_secs: Option<u64> = None;
 
     // Reactivation without trial should be allowed
@@ -248,25 +246,28 @@ fn test_reactivation_without_trial() {
 ///
 /// When a trial subscription is renewed:
 /// 1. Payment is processed normally (no special trial handling in renewal)
-/// 2. in_trial is set to false
-/// 3. trial_ends_at is set to None
-/// 4. TrialConverted event is emitted before Renewed event
+/// 2. `in_trial` is set to false
+/// 3. `trial_ends_at` is set to None
+/// 4. `TrialConverted` event is emitted before Renewed event
 ///
-/// Logic from renew_subscription.rs lines 85-92 and 379-393
+/// Logic from `renew_subscription.rs` lines 85-92 and 379-393
 #[test]
 fn test_trial_conversion_logic() {
     // Simulate subscription state before renewal
     let was_trial = true;
 
     // After successful renewal payment
-    let mut subscription_in_trial = was_trial;
-    let mut subscription_trial_ends_at = Some(1_700_604_800i64);
-
     // Conversion logic from renew_subscription.rs lines 380-383
-    if was_trial {
-        subscription_in_trial = false;
-        subscription_trial_ends_at = None;
-    }
+    let subscription_in_trial = if was_trial {
+        false
+    } else {
+        was_trial
+    };
+    let subscription_trial_ends_at = if was_trial {
+        None
+    } else {
+        Some(1_700_604_800i64)
+    };
 
     // Verify trial flags are cleared
     assert!(
@@ -284,22 +285,25 @@ fn test_trial_conversion_logic() {
 /// When creating a trial subscription, no payment transfers should occur.
 /// Payment logic is wrapped in `if !is_trial { ... }` block.
 ///
-/// Logic from start_subscription.rs lines 334-398
+/// Logic from `start_subscription.rs` lines 334-398
 #[test]
 fn test_trial_payment_skip() {
     // Simulate trial subscription creation
     let is_trial = true;
     let plan_price_usdc = 10_000_000u64; // $10 USDC
 
-    // Payment calculation should be skipped
-    let mut merchant_amount = 0u64;
-    let mut platform_fee = 0u64;
-
-    if !is_trial {
+    // Payment calculation should be skipped for trials
+    let merchant_amount = if is_trial {
+        0u64
+    } else {
         // This block should NOT execute for trials
-        merchant_amount = plan_price_usdc * 98 / 100; // 98% to merchant
-        platform_fee = plan_price_usdc * 2 / 100; // 2% platform fee
-    }
+        plan_price_usdc * 98 / 100 // 98% to merchant
+    };
+    let platform_fee = if is_trial {
+        0u64
+    } else {
+        plan_price_usdc * 2 / 100 // 2% platform fee
+    };
 
     assert_eq!(
         merchant_amount, 0,
@@ -361,8 +365,8 @@ fn test_trial_conversion_payment() {
 ///
 /// Trial duration is independent of plan period:
 /// - A 7-day trial can be used with any plan period (daily, weekly, monthly, yearly)
-/// - next_renewal_ts = trial_ends_at (not affected by plan.period_secs during trial)
-/// - After trial conversion, next_renewal_ts follows plan.period_secs
+/// - `next_renewal_ts` = `trial_ends_at` (not affected by `plan.period_secs` during trial)
+/// - After trial conversion, `next_renewal_ts` follows `plan.period_secs`
 #[test]
 fn test_trial_with_various_plan_periods() {
     let current_time: i64 = 1_700_000_000;

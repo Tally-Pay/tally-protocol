@@ -1,25 +1,25 @@
 //! Unit tests for the `update_config` instruction (Issue #28)
 //!
-//! This test suite validates the update_config feature which enables runtime updates
+//! This test suite validates the `update_config` feature which enables runtime updates
 //! to global configuration parameters without redeploying the program.
 //!
 //! Test coverage:
-//! - Valid parameter updates (keeper_fee_bps, max_withdrawal_amount, max_grace_period_seconds)
-//! - Valid fee bound updates (min_platform_fee_bps, max_platform_fee_bps)
-//! - Valid period and allowance updates (min_period_seconds, default_allowance_periods)
+//! - Valid parameter updates (`keeper_fee_bps`, `max_withdrawal_amount`, `max_grace_period_seconds`)
+//! - Valid fee bound updates (`min_platform_fee_bps`, `max_platform_fee_bps`)
+//! - Valid period and allowance updates (`min_period_seconds`, `default_allowance_periods`)
 //! - Invalid parameter updates (bounds violations, zero values)
 //! - Partial updates (some params None)
 //! - Unauthorized updates (non-platform authority)
-//! - Event emission (ConfigUpdated)
+//! - Event emission (`ConfigUpdated`)
 //! - Keeper fee cap enforcement (max 100 bps = 1%)
 //! - Fee bound validation (min <= max)
 //!
 //! Security Context (Issue #28):
-//! The update_config instruction allows the platform authority to update global configuration
+//! The `update_config` instruction allows the platform authority to update global configuration
 //! parameters at runtime. All changes take effect immediately. The instruction enforces:
-//! 1. Only platform_authority can update config
-//! 2. keeper_fee_bps capped at 100 (1%)
-//! 3. min_platform_fee_bps <= max_platform_fee_bps
+//! 1. Only `platform_authority` can update config
+//! 2. `keeper_fee_bps` capped at 100 (1%)
+//! 3. `min_platform_fee_bps` <= `max_platform_fee_bps`
 //! 4. All values > 0 where applicable
 //! 5. At least one field must be provided for update
 //!
@@ -29,7 +29,7 @@
 use anchor_lang::prelude::*;
 use tally_protocol::errors::SubscriptionError;
 
-/// Test that keeper_fee_bps can be updated with valid value
+/// Test that `keeper_fee_bps` can be updated with valid value
 #[test]
 fn test_update_keeper_fee_valid() {
     let keeper_fee_bps: u16 = 50;
@@ -41,7 +41,7 @@ fn test_update_keeper_fee_valid() {
     );
 }
 
-/// Test that keeper_fee_bps rejects values > 100 bps
+/// Test that `keeper_fee_bps` rejects values > 100 bps
 #[test]
 fn test_update_keeper_fee_exceeds_max() {
     let keeper_fee_bps: u16 = 101;
@@ -55,7 +55,7 @@ fn test_update_keeper_fee_exceeds_max() {
     );
 }
 
-/// Test that keeper_fee_bps accepts boundary value of 100 bps
+/// Test that `keeper_fee_bps` accepts boundary value of 100 bps
 #[test]
 fn test_update_keeper_fee_boundary_max() {
     let keeper_fee_bps: u16 = 100;
@@ -69,7 +69,7 @@ fn test_update_keeper_fee_boundary_max() {
     );
 }
 
-/// Test that keeper_fee_bps accepts boundary value of 0 bps
+/// Test that `keeper_fee_bps` accepts boundary value of 0 bps
 #[test]
 fn test_update_keeper_fee_boundary_min() {
     let keeper_fee_bps: u16 = 0;
@@ -83,7 +83,7 @@ fn test_update_keeper_fee_boundary_min() {
     );
 }
 
-/// Test that max_withdrawal_amount can be updated with valid value
+/// Test that `max_withdrawal_amount` can be updated with valid value
 #[test]
 fn test_update_max_withdrawal_valid() {
     let max_withdrawal: u64 = 1_000_000_000; // 1000 USDC
@@ -95,7 +95,7 @@ fn test_update_max_withdrawal_valid() {
     );
 }
 
-/// Test that max_withdrawal_amount rejects zero value
+/// Test that `max_withdrawal_amount` rejects zero value
 #[test]
 fn test_update_max_withdrawal_zero() {
     let max_withdrawal: u64 = 0;
@@ -109,7 +109,7 @@ fn test_update_max_withdrawal_zero() {
     );
 }
 
-/// Test that max_grace_period_seconds can be updated with valid value
+/// Test that `max_grace_period_seconds` can be updated with valid value
 #[test]
 fn test_update_max_grace_period_valid() {
     let max_grace: u64 = 604_800; // 7 days
@@ -121,7 +121,7 @@ fn test_update_max_grace_period_valid() {
     );
 }
 
-/// Test that max_grace_period_seconds rejects zero value
+/// Test that `max_grace_period_seconds` rejects zero value
 #[test]
 fn test_update_max_grace_period_zero() {
     let max_grace: u64 = 0;
@@ -135,7 +135,7 @@ fn test_update_max_grace_period_zero() {
     );
 }
 
-/// Test that min_period_seconds can be updated with valid value
+/// Test that `min_period_seconds` can be updated with valid value
 #[test]
 fn test_update_min_period_valid() {
     let min_period: u64 = 86_400; // 24 hours
@@ -147,7 +147,7 @@ fn test_update_min_period_valid() {
     );
 }
 
-/// Test that min_period_seconds rejects zero value
+/// Test that `min_period_seconds` rejects zero value
 #[test]
 fn test_update_min_period_zero() {
     let min_period: u64 = 0;
@@ -161,7 +161,7 @@ fn test_update_min_period_zero() {
     );
 }
 
-/// Test that default_allowance_periods can be updated with valid value
+/// Test that `default_allowance_periods` can be updated with valid value
 #[test]
 fn test_update_default_allowance_periods_valid() {
     let allowance_periods: u8 = 3;
@@ -173,7 +173,7 @@ fn test_update_default_allowance_periods_valid() {
     );
 }
 
-/// Test that default_allowance_periods rejects zero value
+/// Test that `default_allowance_periods` rejects zero value
 #[test]
 fn test_update_default_allowance_periods_zero() {
     let allowance_periods: u8 = 0;
@@ -232,7 +232,7 @@ fn test_update_fee_bounds_equal() {
     );
 }
 
-/// Test that updating only min_fee validates against existing max_fee
+/// Test that updating only `min_fee` validates against existing `max_fee`
 #[test]
 fn test_update_min_fee_only_valid() {
     let existing_max_fee: u16 = 1000; // 10%
@@ -247,7 +247,7 @@ fn test_update_min_fee_only_valid() {
     );
 }
 
-/// Test that updating only min_fee fails if it exceeds existing max_fee
+/// Test that updating only `min_fee` fails if it exceeds existing `max_fee`
 #[test]
 fn test_update_min_fee_only_invalid() {
     let existing_max_fee: u16 = 500; // 5%
@@ -262,7 +262,7 @@ fn test_update_min_fee_only_invalid() {
     );
 }
 
-/// Test that updating only max_fee validates against existing min_fee
+/// Test that updating only `max_fee` validates against existing `min_fee`
 #[test]
 fn test_update_max_fee_only_valid() {
     let existing_min_fee: u16 = 100; // 1%
@@ -277,7 +277,7 @@ fn test_update_max_fee_only_valid() {
     );
 }
 
-/// Test that updating only max_fee fails if it's less than existing min_fee
+/// Test that updating only `max_fee` fails if it's less than existing `min_fee`
 #[test]
 fn test_update_max_fee_only_invalid() {
     let existing_min_fee: u16 = 500; // 5%
@@ -468,7 +468,7 @@ fn test_invalid_configuration_error_code() {
     }
 }
 
-/// Test that keeper_fee_bps updates preserve other config fields
+/// Test that `keeper_fee_bps` updates preserve other config fields
 #[test]
 fn test_keeper_fee_update_preserves_other_fields() {
     let original_max_withdrawal: u64 = 500_000_000;
@@ -500,7 +500,7 @@ fn test_config_bump_preserved_during_update() {
     assert_eq!(bump, original_bump, "Bump should be preserved during update");
 }
 
-/// Test that Config platform_authority is preserved during updates
+/// Test that Config `platform_authority` is preserved during updates
 #[test]
 fn test_config_authority_preserved_during_update() {
     let platform_authority = Pubkey::new_unique();
@@ -533,8 +533,7 @@ fn test_realistic_keeper_fee_values() {
         let is_valid = fee <= 100;
         assert!(
             is_valid,
-            "Realistic keeper fee of {} bps should be valid",
-            fee
+            "Realistic keeper fee of {fee} bps should be valid"
         );
     }
 }
@@ -555,8 +554,7 @@ fn test_realistic_withdrawal_amounts() {
         let is_valid = amount > 0;
         assert!(
             is_valid,
-            "Realistic withdrawal amount of {} should be valid",
-            amount
+            "Realistic withdrawal amount of {amount} should be valid"
         );
     }
 }
@@ -577,8 +575,7 @@ fn test_realistic_grace_periods() {
         let is_valid = period > 0;
         assert!(
             is_valid,
-            "Realistic grace period of {} seconds should be valid",
-            period
+            "Realistic grace period of {period} seconds should be valid"
         );
     }
 }

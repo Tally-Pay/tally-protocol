@@ -1,14 +1,14 @@
-//! Unit tests for InvalidConfiguration error in `init_config` and `init_merchant` (I-8)
+//! Unit tests for `InvalidConfiguration` error in `init_config` and `init_merchant` (I-8)
 //!
 //! This test suite validates the I-8 security fix through comprehensive unit tests.
 //! For full integration tests with BPF runtime, use the TypeScript test suite.
 //!
 //! Test coverage:
-//! - min_platform_fee_bps > max_platform_fee_bps validation in init_config
-//! - max_grace_period_seconds == 0 validation in init_config
-//! - platform_fee_bps < min_platform_fee_bps validation in init_merchant
-//! - platform_fee_bps > max_platform_fee_bps validation in init_merchant
-//! - Error code validation (InvalidConfiguration vs InvalidPlan)
+//! - `min_platform_fee_bps` > `max_platform_fee_bps` validation in `init_config`
+//! - `max_grace_period_seconds` == 0 validation in `init_config`
+//! - `platform_fee_bps` < `min_platform_fee_bps` validation in `init_merchant`
+//! - `platform_fee_bps` > `max_platform_fee_bps` validation in `init_merchant`
+//! - Error code validation (`InvalidConfiguration` vs `InvalidPlan`)
 //! - Edge cases with boundary values
 //!
 //! Security Context (I-8):
@@ -23,8 +23,8 @@
 //! 4. `init_merchant.rs:56` - max platform fee validation
 //!
 //! Error Code Details:
-//! - InvalidConfiguration (6027): Global configuration parameters are invalid or inconsistent
-//! - InvalidPlan (6006): Subscription plan configuration is invalid
+//! - `InvalidConfiguration` (6027): Global configuration parameters are invalid or inconsistent
+//! - `InvalidPlan` (6006): Subscription plan configuration is invalid
 //!
 //! The validation ensures:
 //! 1. Configuration parameter constraints are semantically distinct from plan constraints
@@ -32,10 +32,10 @@
 //! 3. Off-chain error handling can distinguish configuration from plan errors
 //! 4. Debugging is improved through accurate error categorization
 
-/// Test that min_platform_fee_bps > max_platform_fee_bps is rejected
+/// Test that `min_platform_fee_bps` > `max_platform_fee_bps` is rejected
 ///
-/// Given configuration arguments where min_platform_fee_bps exceeds max_platform_fee_bps,
-/// the validation should reject this as InvalidConfiguration.
+/// Given configuration arguments where `min_platform_fee_bps` exceeds `max_platform_fee_bps`,
+/// the validation should reject this as `InvalidConfiguration`.
 #[test]
 fn test_init_config_rejects_min_greater_than_max_fee() {
     // Simulate configuration with min > max
@@ -51,9 +51,9 @@ fn test_init_config_rejects_min_greater_than_max_fee() {
     );
 }
 
-/// Test that min_platform_fee_bps == max_platform_fee_bps is accepted
+/// Test that `min_platform_fee_bps` == `max_platform_fee_bps` is accepted
 ///
-/// Given configuration arguments where min_platform_fee_bps equals max_platform_fee_bps,
+/// Given configuration arguments where `min_platform_fee_bps` equals `max_platform_fee_bps`,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_config_accepts_min_equal_to_max_fee() {
@@ -70,9 +70,9 @@ fn test_init_config_accepts_min_equal_to_max_fee() {
     );
 }
 
-/// Test that min_platform_fee_bps < max_platform_fee_bps is accepted
+/// Test that `min_platform_fee_bps` < `max_platform_fee_bps` is accepted
 ///
-/// Given configuration arguments where min_platform_fee_bps is less than max_platform_fee_bps,
+/// Given configuration arguments where `min_platform_fee_bps` is less than `max_platform_fee_bps`,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_config_accepts_min_less_than_max_fee() {
@@ -89,10 +89,10 @@ fn test_init_config_accepts_min_less_than_max_fee() {
     );
 }
 
-/// Test that max_grace_period_seconds == 0 is rejected
+/// Test that `max_grace_period_seconds` == 0 is rejected
 ///
-/// Given configuration arguments where max_grace_period_seconds is zero,
-/// the validation should reject this as InvalidConfiguration.
+/// Given configuration arguments where `max_grace_period_seconds` is zero,
+/// the validation should reject this as `InvalidConfiguration`.
 #[test]
 fn test_init_config_rejects_zero_max_grace_period() {
     // Simulate configuration with zero max grace period
@@ -107,9 +107,9 @@ fn test_init_config_rejects_zero_max_grace_period() {
     );
 }
 
-/// Test that max_grace_period_seconds > 0 is accepted
+/// Test that `max_grace_period_seconds` > 0 is accepted
 ///
-/// Given configuration arguments where max_grace_period_seconds is greater than zero,
+/// Given configuration arguments where `max_grace_period_seconds` is greater than zero,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_config_accepts_positive_max_grace_period() {
@@ -125,10 +125,10 @@ fn test_init_config_accepts_positive_max_grace_period() {
     );
 }
 
-/// Test that platform_fee_bps < min_platform_fee_bps is rejected in init_merchant
+/// Test that `platform_fee_bps` < `min_platform_fee_bps` is rejected in `init_merchant`
 ///
-/// Given merchant initialization arguments where platform_fee_bps is below the config minimum,
-/// the validation should reject this as InvalidConfiguration.
+/// Given merchant initialization arguments where `platform_fee_bps` is below the config minimum,
+/// the validation should reject this as `InvalidConfiguration`.
 #[test]
 fn test_init_merchant_rejects_fee_below_minimum() {
     // Simulate merchant initialization with fee below minimum
@@ -149,10 +149,10 @@ fn test_init_merchant_rejects_fee_below_minimum() {
     assert!(within_maximum, "Fee is within maximum bounds");
 }
 
-/// Test that platform_fee_bps > max_platform_fee_bps is rejected in init_merchant
+/// Test that `platform_fee_bps` > `max_platform_fee_bps` is rejected in `init_merchant`
 ///
-/// Given merchant initialization arguments where platform_fee_bps exceeds the config maximum,
-/// the validation should reject this as InvalidConfiguration.
+/// Given merchant initialization arguments where `platform_fee_bps` exceeds the config maximum,
+/// the validation should reject this as `InvalidConfiguration`.
 #[test]
 fn test_init_merchant_rejects_fee_above_maximum() {
     // Simulate merchant initialization with fee above maximum
@@ -173,9 +173,9 @@ fn test_init_merchant_rejects_fee_above_maximum() {
     assert!(meets_minimum, "Fee meets minimum requirement");
 }
 
-/// Test that platform_fee_bps within config bounds is accepted in init_merchant
+/// Test that `platform_fee_bps` within config bounds is accepted in `init_merchant`
 ///
-/// Given merchant initialization arguments where platform_fee_bps is within min/max bounds,
+/// Given merchant initialization arguments where `platform_fee_bps` is within min/max bounds,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_merchant_accepts_fee_within_bounds() {
@@ -194,9 +194,9 @@ fn test_init_merchant_accepts_fee_within_bounds() {
     );
 }
 
-/// Test boundary case: platform_fee_bps == min_platform_fee_bps in init_merchant
+/// Test boundary case: `platform_fee_bps` == `min_platform_fee_bps` in `init_merchant`
 ///
-/// Given merchant initialization arguments where platform_fee_bps equals the config minimum,
+/// Given merchant initialization arguments where `platform_fee_bps` equals the config minimum,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_merchant_accepts_fee_at_minimum_boundary() {
@@ -215,9 +215,9 @@ fn test_init_merchant_accepts_fee_at_minimum_boundary() {
     );
 }
 
-/// Test boundary case: platform_fee_bps == max_platform_fee_bps in init_merchant
+/// Test boundary case: `platform_fee_bps` == `max_platform_fee_bps` in `init_merchant`
 ///
-/// Given merchant initialization arguments where platform_fee_bps equals the config maximum,
+/// Given merchant initialization arguments where `platform_fee_bps` equals the config maximum,
 /// the validation should accept this as valid.
 #[test]
 fn test_init_merchant_accepts_fee_at_maximum_boundary() {
@@ -236,7 +236,7 @@ fn test_init_merchant_accepts_fee_at_maximum_boundary() {
     );
 }
 
-/// Test extreme values: min_fee = 0, max_fee = 10000 (100% in basis points)
+/// Test extreme values: `min_fee` = 0, `max_fee` = 10000 (100% in basis points)
 ///
 /// Given configuration arguments with valid extreme values (0% to 100%),
 /// the validation should accept this as valid.
@@ -255,7 +255,7 @@ fn test_init_config_accepts_extreme_valid_fee_range() {
     );
 }
 
-/// Test extreme boundary: min_fee = max_fee = 0
+/// Test extreme boundary: `min_fee` = `max_fee` = 0
 ///
 /// Given configuration arguments where both min and max fees are zero,
 /// the validation should accept this as valid (though operationally unusual).
@@ -274,7 +274,7 @@ fn test_init_config_accepts_zero_fee_range() {
     );
 }
 
-/// Test extreme boundary: min_fee = max_fee = 10000 (100%)
+/// Test extreme boundary: `min_fee` = `max_fee` = 10000 (100%)
 ///
 /// Given configuration arguments where both min and max fees are 100%,
 /// the validation should accept this as valid (though operationally unusual).

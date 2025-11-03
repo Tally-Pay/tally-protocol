@@ -74,7 +74,6 @@ fn test_price_update_validation() {
 #[test]
 fn test_period_update_validation() {
     let min_period_seconds = 86400u64; // 1 day minimum
-    let _old_period = 2_592_000u64; // 30 days
     let new_period = 5_184_000u64; // 60 days
 
     // Valid period update
@@ -142,7 +141,6 @@ fn test_grace_period_update_validation() {
 /// Test grace period validation with updated period
 #[test]
 fn test_grace_period_validation_with_updated_period() {
-    let _old_period = 2_592_000u64; // 30 days
     let new_period = 1_296_000u64; // 15 days
     let grace_secs = 518_400u64; // 6 days
 
@@ -164,26 +162,24 @@ fn test_grace_period_validation_with_updated_period() {
 
 /// Test name update validation
 #[test]
+#[allow(clippy::const_is_empty)] // Test intentionally uses const strings to document validation rules
 fn test_name_update_validation() {
+    // Test validates name length requirements for plan updates
     let valid_name = "Premium Plan";
     let empty_name = "";
     let long_name = "This is a very long plan name that exceeds thirty-two bytes maximum";
 
-    // Valid name
-    assert!(!valid_name.is_empty(), "Valid name should not be empty");
-    assert!(
-        valid_name.as_bytes().len() <= 32,
-        "Valid name should fit in 32 bytes"
-    );
+    // Valid name: non-empty and fits in 32 bytes
+    let is_valid_name = !valid_name.is_empty() && valid_name.len() <= 32;
+    assert!(is_valid_name, "Valid name should be non-empty and fit in 32 bytes");
 
     // Invalid: empty name
-    assert!(empty_name.is_empty(), "Empty name should be invalid");
+    let is_empty_invalid = empty_name.is_empty();
+    assert!(is_empty_invalid, "Empty name should be invalid");
 
     // Invalid: exceeds 32 bytes
-    assert!(
-        long_name.as_bytes().len() > 32,
-        "Name exceeding 32 bytes should be invalid"
-    );
+    let is_long_invalid = long_name.len() > 32;
+    assert!(is_long_invalid, "Name exceeding 32 bytes should be invalid");
 }
 
 /// Test string to bytes32 conversion logic
@@ -451,8 +447,6 @@ fn test_event_field_tracking() {
     // Simulate tracking which fields were updated
     let price_updated = true;
     let period_updated = false;
-    let _grace_updated = true;
-    let _name_updated = false;
 
     // Verify old/new values only included when updated
     let old_price = if price_updated { Some(5_000_000u64) } else { None };

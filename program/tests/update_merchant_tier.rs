@@ -19,7 +19,7 @@ use anchor_lang::prelude::*;
 use tally_protocol::errors::SubscriptionError;
 use tally_protocol::state::{Merchant, MerchantTier};
 
-/// Test MerchantTier enum fee mapping
+/// Test `MerchantTier` enum fee mapping
 #[test]
 fn test_merchant_tier_fee_mapping() {
     // Test Free tier
@@ -284,7 +284,7 @@ fn test_tier_change_updates_fee() {
     );
 }
 
-/// Test tier comparison (PartialEq)
+/// Test tier comparison (`PartialEq`)
 #[test]
 fn test_tier_equality() {
     assert_eq!(

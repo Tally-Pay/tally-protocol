@@ -5,8 +5,8 @@
 //! merchant payment risk.
 //!
 //! Test coverage:
-//! - Boundary conditions: grace_secs at 30% (passes), 31% (fails), 29% (passes)
-//! - Config maximum enforcement: grace_secs at max_grace_period_seconds (passes), max + 1 (fails)
+//! - Boundary conditions: `grace_secs` at 30% (passes), 31% (fails), 29% (passes)
+//! - Config maximum enforcement: `grace_secs` at `max_grace_period_seconds` (passes), max + 1 (fails)
 //! - Edge cases: Very short/long subscriptions, zero grace period, minimum period
 //! - Regression tests: Old 100% period behavior fails, 50% period fails
 //! - Security tests: Payment risk reduction, dual validation enforcement
@@ -55,7 +55,7 @@ const ONE_YEAR_SECS: u64 = 31_536_000; // 365 days in seconds
 // Boundary Validation Tests - 30% Period Limit
 // ============================================================================
 
-/// Test that grace_secs at exactly 30% of period_secs passes validation
+/// Test that `grace_secs` at exactly 30% of `period_secs` passes validation
 ///
 /// Validates the boundary condition where grace period is exactly at the 30% limit.
 ///
@@ -74,7 +74,7 @@ fn test_grace_period_at_30_percent_passes() {
     );
 }
 
-/// Test that grace_secs at 31% of period_secs fails validation
+/// Test that `grace_secs` at 31% of `period_secs` fails validation
 ///
 /// Validates that exceeding the 30% limit fails validation.
 ///
@@ -93,7 +93,7 @@ fn test_grace_period_at_31_percent_fails() {
     );
 }
 
-/// Test that grace_secs at 29% of period_secs passes validation
+/// Test that `grace_secs` at 29% of `period_secs` passes validation
 ///
 /// Validates that being under the 30% limit passes validation.
 ///
@@ -112,7 +112,7 @@ fn test_grace_period_at_29_percent_passes() {
     );
 }
 
-/// Test that grace_secs exceeding 30% limit by 1 second fails validation
+/// Test that `grace_secs` exceeding 30% limit by 1 second fails validation
 ///
 /// Validates precision at the boundary condition.
 ///
@@ -132,7 +132,7 @@ fn test_grace_period_exceeds_30_percent_by_one_second_fails() {
     );
 }
 
-/// Test that grace_secs at 15% of period_secs passes validation
+/// Test that `grace_secs` at 15% of `period_secs` passes validation
 ///
 /// Validates a common realistic grace period scenario (half of maximum).
 ///
@@ -524,6 +524,8 @@ fn test_l6_edge_case_period_11_seconds() {
 /// periods ending in 1, regardless of magnitude.
 #[test]
 fn test_l6_edge_case_period_101_seconds() {
+    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
+
     let period_secs = 101; // 101 seconds
     let max_grace = (period_secs * 3) / 10;
 
@@ -552,7 +554,6 @@ fn test_l6_edge_case_period_101_seconds() {
     // Calculate actual rounding difference
     let true_30_percent_float = 101.0 * 0.3; // 30.3
     let rounding_diff = true_30_percent_float - f64::from(max_grace); // 0.3s
-    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
     assert!(
         (rounding_diff - 0.3).abs() < EPSILON,
         "Rounding difference is exactly 0.3s for periods ending in 1"
@@ -573,6 +574,8 @@ fn test_l6_edge_case_period_101_seconds() {
 /// - 0.3s rounding difference is 0.000035% of the grace period
 #[test]
 fn test_l6_edge_case_period_2851201_seconds() {
+    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
+
     let period_secs = 2_851_201_u64; // 2,851,201 seconds (~33 days)
     let max_grace = (period_secs * 3) / 10;
 
@@ -606,7 +609,6 @@ fn test_l6_edge_case_period_2851201_seconds() {
     #[allow(clippy::cast_precision_loss)] // Intentional conversion for percentage calculation
     let rounding_percentage = (rounding_diff / (max_grace as f64)) * 100.0;
 
-    const EPSILON: f64 = 1e-10; // Tolerance for floating point comparison
     assert!(
         (rounding_diff - 0.3).abs() < EPSILON,
         "Rounding difference is still 0.3s even for large periods"
@@ -926,11 +928,11 @@ fn test_config_max_prevents_extreme_cases_with_30_percent() {
 
     // Test 2: 1-year subscription at 30% would be 109 days grace (prevented by config max)
     let annual_period = ONE_YEAR_SECS;
-    let grace_at_30_percent_1y = (annual_period * 3) / 10; // ~109 days
-    let is_valid_1y = grace_at_30_percent_1y <= (annual_period * 3 / 10)
-        && grace_at_30_percent_1y <= max_grace_period_seconds;
+    let annual_grace_at_30_percent = (annual_period * 3) / 10; // ~109 days
+    let annual_grace_is_valid = annual_grace_at_30_percent <= (annual_period * 3 / 10)
+        && annual_grace_at_30_percent <= max_grace_period_seconds;
     assert!(
-        !is_valid_1y,
+        !annual_grace_is_valid,
         "Annual subscription cannot have 109-day grace (capped at 7 days)"
     );
 

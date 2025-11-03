@@ -13,7 +13,7 @@
 //!
 //! Security Context (M-2):
 //! The emergency pause mechanism allows the platform authority to halt all user-facing
-//! operations (start_subscription, renew_subscription, `create_plan`) in case of security
+//! operations (`start_subscription`, `renew_subscription`, `create_plan`) in case of security
 //! incidents, critical bugs, or other emergencies. Admin operations (`admin_withdraw_fees`,
 //! `transfer_authority`, `accept_authority`) are exempt from pause checks to allow emergency
 //! fund recovery.
