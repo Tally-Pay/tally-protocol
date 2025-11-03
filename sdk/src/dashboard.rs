@@ -289,7 +289,11 @@ impl DashboardClient {
                     subscription.next_renewal_ts,
                     current_time,
                 );
-                let total_paid = u64::from(subscription.renewals) * subscription.last_amount;
+                let total_paid = u64::from(subscription.renewals)
+                    .checked_mul(subscription.last_amount)
+                    .ok_or_else(|| {
+                        TallyError::Generic("Revenue calculation overflow".to_string())
+                    })?;
 
                 dashboard_subscriptions.push(DashboardSubscription {
                     subscription,
@@ -330,45 +334,55 @@ impl DashboardClient {
         let current_time = Utc::now().timestamp();
         let month_start = current_time - (30 * 24 * 60 * 60); // 30 days ago
 
-        let mut active_count = 0;
-        let mut inactive_count = 0;
-        let mut total_revenue = 0;
-        let mut monthly_revenue = 0;
-        let mut monthly_new_subs = 0;
-        let mut monthly_canceled_subs = 0;
-        let mut total_duration_secs = 0i64;
-        let mut completed_subscriptions = 0;
+        let mut active_count: u32 = 0;
+        let mut inactive_count: u32 = 0;
+        let mut total_revenue: u64 = 0;
+        let mut monthly_revenue: u64 = 0;
+        let mut monthly_new_subs: u32 = 0;
+        let mut monthly_canceled_subs: u32 = 0;
+        let mut total_duration_secs: i64 = 0;
+        let mut completed_subscriptions: u32 = 0;
 
         for (_sub_address, subscription) in &subscriptions {
             if subscription.active {
-                active_count += 1;
+                active_count = active_count.saturating_add(1);
             } else {
-                inactive_count += 1;
+                inactive_count = inactive_count.saturating_add(1);
 
                 // Calculate duration for completed subscriptions
                 let duration = current_time - subscription.created_ts;
-                total_duration_secs += duration;
-                completed_subscriptions += 1;
+                total_duration_secs = total_duration_secs.saturating_add(duration);
+                completed_subscriptions = completed_subscriptions.saturating_add(1);
             }
 
             // Calculate revenue (renewals * last_amount)
-            let sub_revenue = u64::from(subscription.renewals) * subscription.last_amount;
-            total_revenue += sub_revenue;
+            let sub_revenue = u64::from(subscription.renewals)
+                .checked_mul(subscription.last_amount)
+                .ok_or_else(|| TallyError::Generic("Revenue calculation overflow".to_string()))?;
+            total_revenue = total_revenue
+                .checked_add(sub_revenue)
+                .ok_or_else(|| TallyError::Generic("Total revenue overflow".to_string()))?;
 
             // Monthly statistics
             if subscription.created_ts >= month_start {
-                monthly_new_subs += 1;
-                monthly_revenue += subscription.last_amount;
+                monthly_new_subs = monthly_new_subs.saturating_add(1);
+                monthly_revenue = monthly_revenue
+                    .checked_add(subscription.last_amount)
+                    .ok_or_else(|| {
+                        TallyError::Generic("Monthly revenue overflow".to_string())
+                    })?;
             }
 
             // Count monthly cancellations
             if !subscription.active && subscription.created_ts >= month_start {
-                monthly_canceled_subs += 1;
+                monthly_canceled_subs = monthly_canceled_subs.saturating_add(1);
             }
         }
 
         let average_duration_days = if completed_subscriptions > 0 {
-            (total_duration_secs / i64::from(completed_subscriptions)) as f64 / 86400.0
+            total_duration_secs
+                .checked_div(i64::from(completed_subscriptions))
+                .map_or(0.0, |avg| avg as f64 / 86400.0)
         } else {
             0.0
         };
