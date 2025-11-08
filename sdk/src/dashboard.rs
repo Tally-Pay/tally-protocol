@@ -15,7 +15,6 @@ use crate::{
     events::{ParsedEventWithContext, TallyEvent},
     program_types::{CreatePlanArgs, InitMerchantArgs, Merchant, Plan},
     simple_client::SimpleTallyClient,
-    validation::validate_platform_fee_bps,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Signer;
@@ -119,9 +118,6 @@ impl DashboardClient {
         authority: &T,
         merchant_args: &InitMerchantArgs,
     ) -> Result<(Pubkey, String)> {
-        // Validate platform fee
-        validate_platform_fee_bps(merchant_args.platform_fee_bps)?;
-
         // Check if merchant already exists
         let merchant_pda = self.client.merchant_address(&authority.pubkey());
         if self.client.account_exists(&merchant_pda)? {
@@ -130,12 +126,11 @@ impl DashboardClient {
             )));
         }
 
-        // Create the merchant
+        // Create the merchant (platform fee automatically set to Free tier by program)
         self.client.create_merchant(
             authority,
             &merchant_args.usdc_mint,
             &merchant_args.treasury_ata,
-            merchant_args.platform_fee_bps,
         )
     }
 

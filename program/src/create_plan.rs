@@ -215,14 +215,11 @@ pub fn handler(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
     // Convert and validate name byte length <= 32
     let name_bytes = string_to_bytes32(&args.name)?;
 
-    // Defense-in-depth: Explicitly verify the plan account has not been initialized
-    // While the `init` constraint already prevents duplicate creation, this check
-    // provides an additional safety layer against potential PDA collisions or framework issues
-    let plan_account_info = ctx.accounts.plan.to_account_info();
-    require!(
-        plan_account_info.data_is_empty(),
-        SubscriptionError::PlanAlreadyExists
-    );
+    // REMOVED: Defensive data_is_empty() check
+    // This check is incompatible with Anchor's `init` constraint which writes
+    // an 8-byte discriminator immediately after account creation, causing
+    // data_is_empty() to always return false.
+    // The `init` constraint on line 70 already prevents duplicate account creation.
 
     let plan = &mut ctx.accounts.plan;
     plan.merchant = ctx.accounts.merchant.key();

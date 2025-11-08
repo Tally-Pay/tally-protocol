@@ -50,7 +50,6 @@ pub struct CreateMerchantBuilder {
     payer: Option<Pubkey>,
     usdc_mint: Option<Pubkey>,
     treasury_ata: Option<Pubkey>,
-    platform_fee_bps: Option<u16>,
     program_id: Option<Pubkey>,
 }
 
@@ -510,13 +509,6 @@ impl CreateMerchantBuilder {
         self
     }
 
-    /// Set the platform fee basis points
-    #[must_use]
-    pub const fn platform_fee_bps(mut self, fee_bps: u16) -> Self {
-        self.platform_fee_bps = Some(fee_bps);
-        self
-    }
-
     /// Set the program ID to use
     #[must_use]
     pub const fn program_id(mut self, program_id: Pubkey) -> Self {
@@ -533,7 +525,6 @@ impl CreateMerchantBuilder {
         let authority = self.authority.ok_or("Authority not set")?;
         let usdc_mint = self.usdc_mint.ok_or("USDC mint not set")?;
         let treasury_ata = self.treasury_ata.ok_or("Treasury ATA not set")?;
-        let platform_fee_bps = self.platform_fee_bps.unwrap_or(0);
 
         let program_id = self.program_id.unwrap_or_else(program_id);
 
@@ -555,7 +546,6 @@ impl CreateMerchantBuilder {
         let args = InitMerchantArgs {
             usdc_mint,
             treasury_ata,
-            platform_fee_bps,
         };
 
         let data = {

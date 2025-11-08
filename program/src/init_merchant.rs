@@ -7,7 +7,6 @@ use anchor_spl::token::{spl_token::state::Account as TokenAccount, spl_token::st
 pub struct InitMerchantArgs {
     pub usdc_mint: Pubkey,
     pub treasury_ata: Pubkey,
-    pub platform_fee_bps: u16,
 }
 
 #[derive(Accounts)]
@@ -46,13 +45,18 @@ pub struct InitMerchant<'info> {
 }
 
 pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()> {
-    // Validate platform fee is within acceptable range using config
+    // New merchants default to Free tier with its associated platform fee
+    // Only platform authority can upgrade merchants to Pro/Enterprise tiers via update_merchant_tier
+    let default_tier = crate::state::MerchantTier::Free;
+    let platform_fee_bps = default_tier.fee_bps();
+
+    // Validate that the default Free tier fee is within config bounds
     require!(
-        args.platform_fee_bps >= ctx.accounts.config.min_platform_fee_bps,
+        platform_fee_bps >= ctx.accounts.config.min_platform_fee_bps,
         crate::errors::SubscriptionError::InvalidConfiguration
     );
     require!(
-        args.platform_fee_bps <= ctx.accounts.config.max_platform_fee_bps,
+        platform_fee_bps <= ctx.accounts.config.max_platform_fee_bps,
         crate::errors::SubscriptionError::InvalidConfiguration
     );
 
@@ -123,8 +127,8 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     merchant.authority = ctx.accounts.authority.key();
     merchant.usdc_mint = args.usdc_mint;
     merchant.treasury_ata = args.treasury_ata;
-    merchant.platform_fee_bps = args.platform_fee_bps;
-    merchant.tier = crate::state::MerchantTier::Free; // Default to Free tier
+    merchant.platform_fee_bps = platform_fee_bps;
+    merchant.tier = default_tier;
     merchant.bump = ctx.bumps.merchant;
 
     // Get current timestamp for event
@@ -136,7 +140,7 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
         authority: ctx.accounts.authority.key(),
         usdc_mint: args.usdc_mint,
         treasury_ata: args.treasury_ata,
-        platform_fee_bps: args.platform_fee_bps,
+        platform_fee_bps,
         timestamp: clock.unix_timestamp,
     });
 

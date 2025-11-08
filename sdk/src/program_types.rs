@@ -131,8 +131,6 @@ pub struct InitMerchantArgs {
     pub usdc_mint: Pubkey,
     /// Treasury ATA for receiving merchant fees
     pub treasury_ata: Pubkey,
-    /// Platform fee in basis points (0-1000)
-    pub platform_fee_bps: u16,
 }
 
 /// Arguments for creating a subscription plan

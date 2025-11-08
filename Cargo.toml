@@ -44,7 +44,18 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "tim
 tracing = "0.1"
 
 [profile.release]
+# Safety: Keep overflow checks for production Solana programs
 overflow-checks = true
+
+# Size optimization: Optimize for minimum binary size
+opt-level = "z"          # Optimize for size instead of speed
+lto = "fat"              # Full link-time optimization across all crates
+codegen-units = 1        # Single codegen unit for maximum optimization
+strip = "symbols"        # Strip debug symbols from binary
+
+# Additional size optimizations
+panic = "abort"          # Abort on panic (smaller than unwind, safe for Solana BPF)
+incremental = false      # Disable incremental compilation for smaller output
 
 [workspace.lints.rust]
 # Forbid unsafe code across entire workspace

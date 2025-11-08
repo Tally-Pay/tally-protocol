@@ -395,11 +395,7 @@ impl SimpleTallyClient {
         authority: &T,
         usdc_mint: &Pubkey,
         treasury_ata: &Pubkey,
-        platform_fee_bps: u16,
     ) -> Result<(Pubkey, String)> {
-        // Validate parameters
-        crate::validation::validate_platform_fee_bps(platform_fee_bps)?;
-
         // Check if merchant already exists
         let merchant_pda = self.merchant_address(&authority.pubkey());
         if self.account_exists(&merchant_pda)? {
@@ -409,11 +405,11 @@ impl SimpleTallyClient {
         }
 
         // Build instruction using transaction builder with this client's program ID
+        // Platform fee is automatically set to Free tier (2.0%) by the program
         let instruction = crate::transaction_builder::create_merchant()
             .authority(authority.pubkey())
             .usdc_mint(*usdc_mint)
             .treasury_ata(*treasury_ata)
-            .platform_fee_bps(platform_fee_bps)
             .program_id(self.program_id)
             .build_instruction()?;
 
@@ -445,12 +441,8 @@ impl SimpleTallyClient {
         authority: &T,
         usdc_mint: &Pubkey,
         treasury_ata: &Pubkey,
-        platform_fee_bps: u16,
     ) -> Result<(Pubkey, String, bool)> {
         use anchor_client::solana_sdk::transaction::Transaction;
-
-        // Validate parameters
-        crate::validation::validate_platform_fee_bps(platform_fee_bps)?;
 
         // Check if merchant already exists
         let merchant_pda = self.merchant_address(&authority.pubkey());
@@ -499,11 +491,11 @@ impl SimpleTallyClient {
         }
 
         // Always add the create merchant instruction
+        // Platform fee is automatically set to Free tier (2.0%) by the program
         let create_merchant_ix = crate::transaction_builder::create_merchant()
             .authority(authority.pubkey())
             .usdc_mint(*usdc_mint)
             .treasury_ata(*treasury_ata)
-            .platform_fee_bps(platform_fee_bps)
             .program_id(self.program_id)
             .build_instruction()?;
         instructions.push(create_merchant_ix);
