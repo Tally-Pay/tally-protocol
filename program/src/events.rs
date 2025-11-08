@@ -226,30 +226,31 @@ pub struct FeesWithdrawn {
 /// Event emitted when a delegate mismatch is detected during subscription renewal
 ///
 /// This warning event alerts off-chain systems and users when the token account's
-/// current delegate does not match the expected merchant-specific delegate PDA.
+/// current delegate does not match the expected global protocol delegate PDA.
 ///
-/// **Root Cause**: SPL Token accounts support only ONE delegate at a time. When users
-/// have subscriptions with multiple merchants, starting or canceling a subscription
-/// with one merchant will overwrite or revoke the delegate for ALL other merchants.
-///
-/// This addresses audit finding M-3, documenting the fundamental architectural limitation
-/// of SPL Token's single-delegate design. This is NOT a bug that can be fixed without
-/// migrating to Token-2022 or implementing a global delegate architecture.
+/// **Global Delegate Architecture**: This protocol uses a single global delegate PDA
+/// shared by all merchants and subscriptions. The global delegate enables users to
+/// subscribe to multiple merchants using the same token account without delegate conflicts.
 ///
 /// **Scenarios that trigger this event:**
-/// 1. User subscribes to Merchant A, then Merchant B → A's delegate is overwritten
-/// 2. User cancels subscription with Merchant B → All delegates are revoked
-/// 3. User manually revokes delegate → All merchant subscriptions become non-functional
+/// 1. User manually revoked the global delegate → All subscriptions on this account stop renewing
+/// 2. User approved a different program's delegate → Token account now delegated elsewhere
+/// 3. Delegate was never approved → Subscription was created without proper delegate setup
+/// 4. User is using the token account for other programs → Delegate overwritten by another protocol
 ///
 /// Off-chain systems should monitor this event to:
 /// - Alert users that their subscription is non-functional due to delegate mismatch
-/// - Recommend reactivating the subscription (resets delegate correctly)
-/// - Suggest using per-merchant token accounts as a workaround
-/// - Display clear warnings about SPL Token single-delegate limitation
-/// - Reference `docs/MULTI_MERCHANT_LIMITATION.md` for detailed explanation
+/// - Recommend re-approving the global delegate to restore all subscriptions
+/// - Guide users to reactivate affected subscriptions
+/// - Display clear information about the global delegate requirement
+/// - Track delegate revocation patterns for user support
 ///
-/// **Important**: This subscription will NOT renew until the user reactivates it,
-/// which will reset the delegate approval correctly.
+/// **Recovery**: The user needs to re-approve the global protocol delegate on their token
+/// account, then reactivate any affected subscriptions. Once the global delegate is approved,
+/// ALL merchant subscriptions will be able to renew again.
+///
+/// **Important**: This subscription will NOT renew until the delegate is corrected and the
+/// subscription is reactivated.
 #[event]
 pub struct DelegateMismatchWarning {
     /// The merchant who owns the subscription plan
@@ -258,9 +259,9 @@ pub struct DelegateMismatchWarning {
     pub plan: Pubkey,
     /// The subscriber whose token account has incorrect delegate
     pub subscriber: Pubkey,
-    /// The expected delegate PDA for this merchant
+    /// The expected global protocol delegate PDA
     pub expected_delegate: Pubkey,
-    /// The actual delegate currently set on the token account (may be None or different merchant)
+    /// The actual delegate currently set on the token account (may be None or from another program)
     pub actual_delegate: Option<Pubkey>,
 }
 

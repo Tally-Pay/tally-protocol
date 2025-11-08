@@ -64,7 +64,7 @@ pub struct RenewSubscription<'info> {
     // Program PDA that acts as delegate
     /// CHECK: PDA derived from program, validated in handler
     #[account(
-        seeds = [b"delegate", merchant.key().as_ref()],
+        seeds = [b"delegate"],
         bump
     )]
     pub program_delegate: UncheckedAccount<'info>,
@@ -222,26 +222,27 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
 
     // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
     let (expected_delegate_pda, _expected_bump) =
-        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+        Pubkey::find_program_address(&[b"delegate"], ctx.program_id);
     require!(
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
         SubscriptionError::BadSeeds
     );
 
-    // Detect delegate mismatch: SPL Token limitation (M-3)
+    // Detect delegate mismatch: Global delegate validation
     //
-    // SPL Token accounts support only ONE delegate at a time. When users have subscriptions
-    // with multiple merchants, starting or canceling a subscription with one merchant will
-    // overwrite or revoke the delegate for ALL other merchants.
-    //
-    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug. It cannot be
-    // fixed without migrating to Token-2022 with transfer hooks or implementing a global
-    // delegate architecture. See docs/MULTI_MERCHANT_LIMITATION.md for full details.
+    // This protocol uses a single global delegate PDA for all merchants and subscriptions.
+    // The global delegate enables users to subscribe to multiple merchants without delegate
+    // conflicts (SPL Token limitation of one delegate per account).
     //
     // Detection logic:
-    // - Check if the token account's current delegate matches our expected merchant delegate
+    // - Check if the token account's current delegate matches our expected global delegate
     // - If mismatch detected, emit DelegateMismatchWarning event before failing
     // - This provides off-chain systems with actionable information about why renewal failed
+    //
+    // Possible causes of delegate mismatch:
+    // - User revoked the delegate (intentional cancellation)
+    // - User approved a different program's delegate (using account for other purposes)
+    // - Token account delegate was never approved (should not happen for active subscriptions)
     let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
 
     // Safe delegate validation without unwrap - use direct comparison
@@ -296,9 +297,8 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         .ok_or(SubscriptionError::ArithmeticError)?;
 
     // Prepare delegate signer seeds
-    let merchant_key = merchant.key();
     let delegate_bump = ctx.bumps.program_delegate;
-    let delegate_seeds: &[&[&[u8]]] = &[&[b"delegate", merchant_key.as_ref(), &[delegate_bump]]];
+    let delegate_seeds: &[&[&[u8]]] = &[&[b"delegate", &[delegate_bump]]];
 
     // Get USDC mint decimals from the mint account
     let usdc_decimals = usdc_mint_data.decimals;

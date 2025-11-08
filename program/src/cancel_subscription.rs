@@ -106,7 +106,7 @@ pub struct CancelSubscription<'info> {
     /// Program PDA that acts as delegate - used to validate delegate identity before revocation
     /// CHECK: PDA derived from program, validated in handler
     #[account(
-        seeds = [b"delegate", merchant.key().as_ref()],
+        seeds = [b"delegate"],
         bump
     )]
     pub program_delegate: UncheckedAccount<'info>,
@@ -135,7 +135,7 @@ pub fn handler(ctx: Context<CancelSubscription>, _args: CancelSubscriptionArgs) 
 
     // Validate program delegate PDA derivation to ensure correct delegate account
     let (expected_delegate_pda, _expected_bump) =
-        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+        Pubkey::find_program_address(&[b"delegate"], ctx.program_id);
     require!(
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
         SubscriptionError::BadSeeds
@@ -143,21 +143,24 @@ pub fn handler(ctx: Context<CancelSubscription>, _args: CancelSubscriptionArgs) 
 
     // Revoke delegate approval to prevent further renewals
     //
-    // IMPORTANT - SPL Token Single-Delegate Limitation (M-3):
+    // GLOBAL DELEGATE REVOCATION:
     //
-    // SPL Token accounts support only ONE delegate at a time. This means:
-    // 1. Revoking the delegate here affects ALL subscriptions that use this token account
-    // 2. If the user has subscriptions with multiple merchants, this revocation will
-    //    make ALL of those subscriptions non-functional, not just this one
-    // 3. Other merchants' subscriptions will appear active but cannot renew
+    // This protocol uses a single global delegate PDA for all merchants and subscriptions.
+    // When a user revokes the delegate, it affects ALL subscriptions using this token account,
+    // not just the subscription being canceled.
     //
-    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug.
-    // See docs/MULTI_MERCHANT_LIMITATION.md for:
-    // - Detailed explanation of the limitation
-    // - Workarounds (per-merchant token accounts)
-    // - Future migration paths (Token-2022, global delegate)
+    // Revocation behavior:
+    // 1. Revoking the global delegate here affects ALL subscriptions on this token account
+    // 2. All merchants' subscriptions using this account will stop renewing
+    // 3. User must re-approve the global delegate to reactivate any subscriptions
     //
-    // We only revoke if the current delegate matches our program's delegate PDA.
+    // This is intentional behavior that provides users control over their subscription spending.
+    // Users can:
+    // - Cancel individual subscriptions without revoking delegate (subscription.active = false)
+    // - Revoke delegate to stop ALL subscriptions on this account at once
+    // - Re-approve delegate later to reactivate subscriptions
+    //
+    // We only revoke if the current delegate matches our program's global delegate PDA.
     // This prevents revoking unrelated delegations to other programs.
     if let Some(current_delegate) = Option::<Pubkey>::from(subscriber_ata_data.delegate) {
         if current_delegate == expected_delegate_pda {

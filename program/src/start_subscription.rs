@@ -130,7 +130,7 @@ pub struct StartSubscription<'info> {
     // Program PDA that acts as delegate
     /// CHECK: PDA derived from program, validated in handler
     #[account(
-        seeds = [b"delegate", merchant.key().as_ref()],
+        seeds = [b"delegate"],
         bump
     )]
     pub program_delegate: UncheckedAccount<'info>,
@@ -293,7 +293,7 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
     let (expected_delegate_pda, _expected_bump) =
-        Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
+        Pubkey::find_program_address(&[b"delegate"], ctx.program_id);
     require!(
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
         SubscriptionError::BadSeeds
@@ -301,25 +301,25 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Validate delegate is our program PDA
     //
-    // IMPORTANT - SPL Token Single-Delegate Limitation (M-3):
+    // GLOBAL DELEGATE ARCHITECTURE:
     //
-    // SPL Token accounts support only ONE delegate at a time. Approving this merchant's
-    // delegate will OVERWRITE any existing delegate approval on this token account.
+    // This protocol uses a single global delegate PDA for all merchants and subscriptions.
+    // SPL Token accounts support only ONE delegate at a time, but because all merchants
+    // share the same global delegate, users can subscribe to MULTIPLE merchants using
+    // the same token account without delegate conflicts.
     //
-    // This means:
-    // 1. If the user has an active subscription with Merchant A using this token account
-    // 2. And approves a subscription with Merchant B (this instruction)
-    // 3. Merchant A's delegate is OVERWRITTEN and their subscription becomes non-functional
+    // Security model:
+    // - The global delegate PDA has no private key (only the program can sign with it)
+    // - Program validation enforces that only valid subscriptions can be renewed
+    // - Each subscription is bound to a specific plan via PDA derivation
+    // - Merchants cannot renew each other's subscriptions (different subscription PDAs)
+    // - Transfer amounts are validated against plan.price_usdc
     //
-    // This is a FUNDAMENTAL ARCHITECTURAL LIMITATION of SPL Token, not a bug.
-    // See docs/MULTI_MERCHANT_LIMITATION.md for:
-    // - Detailed explanation of the limitation
-    // - Workarounds (per-merchant token accounts - RECOMMENDED)
-    // - Future migration paths (Token-2022, global delegate)
-    //
-    // Users should either:
-    // - Use separate token accounts for each merchant (recommended)
-    // - Only subscribe to one merchant at a time per token account
+    // Benefits:
+    // - Users can subscribe to multiple merchants with one token account
+    // - Enables budget compartmentalization (dedicated subscription wallets)
+    // - Supports hierarchical payment structures (company → departments → employees)
+    // - Simplifies allowance management across multiple merchants
     let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
     if actual_delegate != Some(expected_delegate_pda) {
         return Err(SubscriptionError::Unauthorized.into());
@@ -347,10 +347,9 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
             .ok_or(SubscriptionError::ArithmeticError)?;
 
         // Prepare delegate signer seeds
-        let merchant_key = merchant.key();
         let delegate_bump = ctx.bumps.program_delegate;
         let delegate_seeds: &[&[&[u8]]] =
-            &[&[b"delegate", merchant_key.as_ref(), &[delegate_bump]]];
+            &[&[b"delegate", &[delegate_bump]]];
 
         // Get USDC mint decimals from the mint account
         let usdc_decimals = usdc_mint_data.decimals;
