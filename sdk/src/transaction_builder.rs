@@ -286,7 +286,7 @@ impl StartSubscriptionBuilder {
         let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
         let subscription_pda =
             pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
-        let delegate_pda = pda::delegate_address_with_program_id(&merchant_pda, &program_id);
+        let delegate_pda = pda::delegate_address_with_program_id(&program_id);
         let subscriber_ata = get_associated_token_address_with_program(
             &subscriber,
             &merchant.usdc_mint,
@@ -1007,7 +1007,7 @@ impl RenewSubscriptionBuilder {
         let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
         let subscription_pda =
             pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
-        let delegate_pda = pda::delegate_address_with_program_id(&merchant_pda, &program_id);
+        let delegate_pda = pda::delegate_address_with_program_id(&program_id);
         let subscriber_ata = get_associated_token_address_with_program(
             &subscriber,
             &merchant.usdc_mint,

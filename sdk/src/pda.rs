@@ -309,57 +309,60 @@ pub fn config_address_with_program_id(program_id: &Pubkey) -> Pubkey {
     config_with_program_id(program_id).0
 }
 
-/// Compute the Delegate PDA
+/// Compute the global Delegate PDA
 ///
-/// # Arguments
-/// * `merchant` - The merchant PDA pubkey
+/// The protocol uses a single global delegate shared by all merchants,
+/// enabling users to subscribe to multiple merchants with one token account.
 ///
 /// # Returns
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
-/// * `Err(TallyError)` - If PDA computation fails
-pub fn delegate(merchant: &Pubkey) -> Result<(Pubkey, u8)> {
+///
+/// # Errors
+/// Returns an error if the program ID cannot be parsed or PDA computation fails
+pub fn delegate() -> Result<(Pubkey, u8)> {
     let program_id = program_id_string().parse()?;
-    Ok(delegate_with_program_id(merchant, &program_id))
+    Ok(delegate_with_program_id(&program_id))
 }
 
-/// Compute the Delegate PDA address only (without bump)
+/// Compute the global Delegate PDA address only (without bump)
 ///
-/// # Arguments
-/// * `merchant` - The merchant PDA pubkey
+/// The protocol uses a single global delegate shared by all merchants.
 ///
 /// # Returns
 /// * `Ok(Pubkey)` - The delegate PDA address
 /// * `Err(TallyError)` - If PDA computation fails
-pub fn delegate_address(merchant: &Pubkey) -> Result<Pubkey> {
+pub fn delegate_address() -> Result<Pubkey> {
     let program_id = program_id_string().parse()?;
-    Ok(delegate_address_with_program_id(merchant, &program_id))
+    Ok(delegate_address_with_program_id(&program_id))
 }
 
-/// Compute the Delegate PDA with custom program ID
+/// Compute the global Delegate PDA with custom program ID
+///
+/// The protocol uses a single global delegate shared by all merchants.
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `(Pubkey, u8)` - The PDA address and bump seed
 #[must_use]
-pub fn delegate_with_program_id(merchant: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"delegate", merchant.as_ref()];
+pub fn delegate_with_program_id(program_id: &Pubkey) -> (Pubkey, u8) {
+    let seeds = &[b"delegate" as &[u8]];
     Pubkey::find_program_address(seeds, program_id)
 }
 
-/// Compute the Delegate PDA address only (without bump) with custom program ID
+/// Compute the global Delegate PDA address only (without bump) with custom program ID
+///
+/// The protocol uses a single global delegate shared by all merchants.
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `Pubkey` - The delegate PDA address
 #[must_use]
-pub fn delegate_address_with_program_id(merchant: &Pubkey, program_id: &Pubkey) -> Pubkey {
-    delegate_with_program_id(merchant, program_id).0
+pub fn delegate_address_with_program_id(program_id: &Pubkey) -> Pubkey {
+    delegate_with_program_id(program_id).0
 }
 
 #[cfg(test)]
@@ -496,22 +499,20 @@ mod tests {
 
     #[test]
     fn test_delegate_pda() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-
-        let (delegate_pda, _bump) = delegate(&merchant).unwrap();
+        let (delegate_pda, _bump) = delegate().unwrap();
 
         // Should be deterministic
-        let (delegate_pda2, _) = delegate(&merchant).unwrap();
+        let (delegate_pda2, _) = delegate().unwrap();
         assert_eq!(delegate_pda, delegate_pda2);
 
         // Test address-only function
-        let delegate_addr = delegate_address(&merchant).unwrap();
+        let delegate_addr = delegate_address().unwrap();
         assert_eq!(delegate_pda, delegate_addr);
 
-        // Different merchants should produce different delegate PDAs
-        let merchant2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let (delegate_pda3, _) = delegate(&merchant2).unwrap();
-        assert_ne!(delegate_pda, delegate_pda3);
+        // Global delegate: same PDA regardless of merchant
+        // This is intentional - all merchants share the same delegate
+        let (delegate_pda3, _) = delegate().unwrap();
+        assert_eq!(delegate_pda, delegate_pda3);
     }
 
     #[test]
