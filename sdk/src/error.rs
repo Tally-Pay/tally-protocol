@@ -7,13 +7,13 @@
 //!
 //! The SDK automatically maps specific program error codes to detailed error variants:
 //!
-//! - **6012**: `InvalidSubscriberTokenAccount` - Invalid subscriber USDC token account
-//! - **6013**: `InvalidMerchantTreasuryAccount` - Invalid merchant treasury account
+//! - **6012**: `InvalidPayerTokenAccount` - Invalid payer USDC token account
+//! - **6013**: `InvalidPayeeTreasuryAccount` - Invalid payee treasury account
 //! - **6014**: `InvalidPlatformTreasuryAccount` - Invalid platform treasury account
 //! - **6015**: `InvalidUsdcMint` - Invalid USDC mint account
-//! - **6016**: `MerchantNotFound` - Merchant account not found or invalid
-//! - **6017**: `PlanNotFound` - Subscription plan not found or invalid
-//! - **6018**: `SubscriptionNotFound` - Subscription not found or invalid
+//! - **6016**: `PayeeNotFound` - Payee account not found or invalid
+//! - **6017**: `PaymentTermsNotFound` - `PaymentAgreement` `payment_terms` not found or invalid
+//! - **6018**: `PaymentAgreementNotFound` - `PaymentAgreement` not found or invalid
 //! - **6019**: `ConfigNotFound` - Global configuration account not found
 //!
 //! # Example
@@ -27,13 +27,13 @@
 //!     let some_address = Pubkey::default();
 //!
 //!     // When a transaction fails, you get specific error information:
-//!     match client.get_merchant(&some_address) {
-//!         Ok(merchant) => println!("Found merchant: {:?}", merchant),
-//!         Err(TallyError::MerchantNotFound) => {
-//!             println!("Merchant account not found - ensure it's properly initialized");
+//!     match client.get_payee(&some_address) {
+//!         Ok(payee) => println!("Found payee: {:?}", payee),
+//!         Err(TallyError::PayeeNotFound) => {
+//!             println!("Payee account not found - ensure it's properly initialized");
 //!         }
-//!         Err(TallyError::InvalidSubscriberTokenAccount) => {
-//!             println!("Invalid subscriber token account provided");
+//!         Err(TallyError::InvalidPayerTokenAccount) => {
+//!             println!("Invalid payer token account provided");
 //!         }
 //!         Err(other_error) => {
 //!             println!("Other error: {}", other_error);
@@ -98,9 +98,9 @@ pub enum TallyError {
     #[error("Insufficient funds: required {required}, available {available}")]
     InsufficientFunds { required: u64, available: u64 },
 
-    /// Invalid subscription state
-    #[error("Invalid subscription state: {0}")]
-    InvalidSubscriptionState(String),
+    /// Invalid payment agreement state
+    #[error("Invalid payment agreement state: {0}")]
+    InvalidPaymentAgreementState(String),
 
     /// Token program detection failed
     #[error("Failed to detect token program for mint: {mint}")]
@@ -111,13 +111,13 @@ pub enum TallyError {
     RpcError(String),
 
     // Specific program error variants (maps to Anchor error codes 6012-6019)
-    /// Invalid subscriber token account (program error 6012)
-    #[error("Invalid subscriber token account. Ensure the account is a valid USDC token account owned by the subscriber.")]
-    InvalidSubscriberTokenAccount,
+    /// Invalid payer token account (program error 6012)
+    #[error("Invalid payer token account. Ensure the account is a valid USDC token account owned by the payer.")]
+    InvalidPayerTokenAccount,
 
-    /// Invalid merchant treasury token account (program error 6013)
-    #[error("Invalid merchant treasury token account. Ensure the account is a valid USDC token account.")]
-    InvalidMerchantTreasuryAccount,
+    /// Invalid payee treasury token account (program error 6013)
+    #[error("Invalid payee treasury token account. Ensure the account is a valid USDC token account.")]
+    InvalidPayeeTreasuryAccount,
 
     /// Invalid platform treasury token account (program error 6014)
     #[error("Invalid platform treasury token account. Ensure the account is a valid USDC token account.")]
@@ -127,19 +127,19 @@ pub enum TallyError {
     #[error("Invalid USDC mint account. Ensure the account is a valid token mint account.")]
     InvalidUsdcMint,
 
-    /// Merchant account not found or invalid (program error 6016)
+    /// Payee account not found or invalid (program error 6016)
     #[error(
-        "Merchant account not found or invalid. Ensure the merchant has been properly initialized."
+        "Payee account not found or invalid. Ensure the payee has been properly initialized."
     )]
-    MerchantNotFound,
+    PayeeNotFound,
 
-    /// Subscription plan not found or invalid (program error 6017)
-    #[error("Subscription plan not found or invalid. Ensure the plan exists and belongs to the specified merchant.")]
-    PlanNotFound,
+    /// `PaymentTerms` not found or invalid (program error 6017)
+    #[error("PaymentTerms not found or invalid. Ensure the payment terms exist and belong to the specified payee.")]
+    PaymentTermsNotFound,
 
-    /// Subscription not found or invalid (program error 6018)
-    #[error("Subscription not found or invalid. Ensure the subscription exists for this plan and subscriber.")]
-    SubscriptionNotFound,
+    /// `PaymentAgreement` not found or invalid (program error 6018)
+    #[error("PaymentAgreement not found or invalid. Ensure the payment agreement exists for these payment terms and payer.")]
+    PaymentAgreementNotFound,
 
     /// Global configuration account not found or invalid (program error 6019)
     #[error("Global configuration account not found or invalid. Ensure the program has been properly initialized.")]
@@ -205,13 +205,13 @@ impl TallyError {
                 // Map specific error codes to our custom variants
                 // Anchor assigns error codes starting from 6000 for custom errors
                 match anchor_err.error_code_number {
-                    6012 => Self::InvalidSubscriberTokenAccount,
-                    6013 => Self::InvalidMerchantTreasuryAccount,
+                    6012 => Self::InvalidPayerTokenAccount,
+                    6013 => Self::InvalidPayeeTreasuryAccount,
                     6014 => Self::InvalidPlatformTreasuryAccount,
                     6015 => Self::InvalidUsdcMint,
-                    6016 => Self::MerchantNotFound,
-                    6017 => Self::PlanNotFound,
-                    6018 => Self::SubscriptionNotFound,
+                    6016 => Self::PayeeNotFound,
+                    6017 => Self::PaymentTermsNotFound,
+                    6018 => Self::PaymentAgreementNotFound,
                     6019 => Self::ConfigNotFound,
                     // For any other error codes, fall back to the generic Anchor error
                     _ => Self::Anchor(anchor_error),
@@ -242,13 +242,13 @@ impl TallyError {
             {
                 // Map specific program error codes
                 match error_code {
-                    6012 => return Self::InvalidSubscriberTokenAccount,
-                    6013 => return Self::InvalidMerchantTreasuryAccount,
+                    6012 => return Self::InvalidPayerTokenAccount,
+                    6013 => return Self::InvalidPayeeTreasuryAccount,
                     6014 => return Self::InvalidPlatformTreasuryAccount,
                     6015 => return Self::InvalidUsdcMint,
-                    6016 => return Self::MerchantNotFound,
-                    6017 => return Self::PlanNotFound,
-                    6018 => return Self::SubscriptionNotFound,
+                    6016 => return Self::PayeeNotFound,
+                    6017 => return Self::PaymentTermsNotFound,
+                    6018 => return Self::PaymentAgreementNotFound,
                     6019 => return Self::ConfigNotFound,
                     _ => {} // Fall through to generic handling
                 }

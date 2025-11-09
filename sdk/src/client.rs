@@ -1,4 +1,4 @@
-//! Tally client for interacting with the subscription program
+//! Tally client for interacting with the payment agreement program
 
 use crate::{
     error::{Result, TallyError},
@@ -129,18 +129,18 @@ impl TallyClient {
         &self.rpc_client
     }
 
-    /// Fetch and deserialize a Merchant account
+    /// Fetch and deserialize a Payee account
     ///
     /// # Arguments
-    /// * `address` - The merchant account address
+    /// * `address` - The payee account address
     ///
     /// # Returns
-    /// * `Ok(Merchant)` - The merchant account data
+    /// * `Ok(Payee)` - The payee account data
     /// * `Err(TallyError)` - If fetching or parsing fails
-    pub async fn fetch_merchant(&self, address: &Pubkey) -> Result<Merchant> {
+    pub async fn fetch_payee(&self, address: &Pubkey) -> Result<Payee> {
         let account = self.rpc_client
             .get_account_with_commitment(address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch merchant account: {e}")))?
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payee account: {e}")))?
             .value
             .ok_or_else(|| TallyError::AccountNotFound(address.to_string()))?;
 
@@ -156,28 +156,28 @@ impl TallyClient {
             return Err(TallyError::Generic("Account data too short".to_string()));
         }
 
-        let expected_discriminator = Merchant::DISCRIMINATOR;
+        let expected_discriminator = Payee::DISCRIMINATOR;
         if &account.data[..8] != expected_discriminator {
-            return Err(TallyError::Generic("Invalid merchant account discriminator".to_string()));
+            return Err(TallyError::Generic("Invalid payee account discriminator".to_string()));
         }
 
         // Deserialize account data
-        Merchant::try_deserialize(&mut &account.data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize merchant: {e}")))
+        Payee::try_deserialize(&mut &account.data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payee: {e}")))
     }
 
-    /// Fetch and deserialize a Plan account
+    /// Fetch and deserialize a PaymentTerms account
     ///
     /// # Arguments
-    /// * `address` - The plan account address
+    /// * `address` - The payment terms account address
     ///
     /// # Returns
-    /// * `Ok(Plan)` - The plan account data
+    /// * `Ok(PaymentTerms)` - The payment terms account data
     /// * `Err(TallyError)` - If fetching or parsing fails
-    pub async fn fetch_plan(&self, address: &Pubkey) -> Result<Plan> {
+    pub async fn fetch_payment_terms(&self, address: &Pubkey) -> Result<PaymentTerms> {
         let account = self.rpc_client
             .get_account_with_commitment(address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch plan account: {e}")))?
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment terms account: {e}")))?
             .value
             .ok_or_else(|| TallyError::AccountNotFound(address.to_string()))?;
 
@@ -193,28 +193,28 @@ impl TallyClient {
             return Err(TallyError::Generic("Account data too short".to_string()));
         }
 
-        let expected_discriminator = Plan::DISCRIMINATOR;
+        let expected_discriminator = PaymentTerms::DISCRIMINATOR;
         if &account.data[..8] != expected_discriminator {
-            return Err(TallyError::Generic("Invalid plan account discriminator".to_string()));
+            return Err(TallyError::Generic("Invalid payment terms account discriminator".to_string()));
         }
 
         // Deserialize account data
-        Plan::try_deserialize(&mut &account.data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize plan: {e}")))
+        PaymentTerms::try_deserialize(&mut &account.data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payment terms: {e}")))
     }
 
-    /// Fetch and deserialize a Subscription account
+    /// Fetch and deserialize a PaymentAgreement account
     ///
     /// # Arguments
-    /// * `address` - The subscription account address
+    /// * `address` - The payment agreement account address
     ///
     /// # Returns
-    /// * `Ok(Subscription)` - The subscription account data
+    /// * `Ok(PaymentAgreement)` - The payment agreement account data
     /// * `Err(TallyError)` - If fetching or parsing fails
-    pub async fn fetch_subscription(&self, address: &Pubkey) -> Result<Subscription> {
+    pub async fn fetch_payment_agreement(&self, address: &Pubkey) -> Result<PaymentAgreement> {
         let account = self.rpc_client
             .get_account_with_commitment(address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch subscription account: {e}")))?
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment agreement account: {e}")))?
             .value
             .ok_or_else(|| TallyError::AccountNotFound(address.to_string()))?;
 
@@ -230,102 +230,102 @@ impl TallyClient {
             return Err(TallyError::Generic("Account data too short".to_string()));
         }
 
-        let expected_discriminator = Subscription::DISCRIMINATOR;
+        let expected_discriminator = PaymentAgreement::DISCRIMINATOR;
         if &account.data[..8] != expected_discriminator {
-            return Err(TallyError::Generic("Invalid subscription account discriminator".to_string()));
+            return Err(TallyError::Generic("Invalid payment agreement account discriminator".to_string()));
         }
 
         // Deserialize account data
-        Subscription::try_deserialize(&mut &account.data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize subscription: {e}")))
+        PaymentAgreement::try_deserialize(&mut &account.data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payment agreement: {e}")))
     }
 
-    /// Get all merchants (this is a potentially expensive operation)
+    /// Get all payees (this is a potentially expensive operation)
     ///
     /// # Returns
-    /// * `Ok(Vec<(Pubkey, Merchant)>)` - List of merchant addresses and data
+    /// * `Ok(Vec<(Pubkey, Payee)>)` - List of payee addresses and data
     /// * `Err(TallyError)` - If fetching fails
-    pub async fn get_all_merchants(&self) -> Result<Vec<(Pubkey, Merchant)>> {
+    pub async fn get_all_payees(&self) -> Result<Vec<(Pubkey, Payee)>> {
         let accounts = self.rpc_client
             .get_program_accounts(&self.program_id())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch merchants: {e}")))?;
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payees: {e}")))?;
 
-        let mut merchants = Vec::new();
+        let mut payees = Vec::new();
         for (pubkey, account) in accounts {
-            // Check if account has the correct discriminator for Merchant
+            // Check if account has the correct discriminator for Payee
             if account.data.len() >= 8 {
                 let discriminator = &account.data[..8];
-                if discriminator == Merchant::DISCRIMINATOR {
-                    if let Ok(merchant) = Merchant::try_deserialize(&mut &account.data[8..]) {
-                        merchants.push((pubkey, merchant));
+                if discriminator == Payee::DISCRIMINATOR {
+                    if let Ok(payee) = Payee::try_deserialize(&mut &account.data[8..]) {
+                        payees.push((pubkey, payee));
                     }
                 }
             }
         }
 
-        Ok(merchants)
+        Ok(payees)
     }
 
-    /// Get all plans for a specific merchant
+    /// Get all payment terms for a specific payee
     ///
     /// # Arguments
-    /// * `merchant_address` - The merchant PDA
+    /// * `payee_address` - The payee PDA
     ///
     /// # Returns
-    /// * `Ok(Vec<(Pubkey, Plan)>)` - List of plan addresses and data
+    /// * `Ok(Vec<(Pubkey, PaymentTerms)>)` - List of payment terms addresses and data
     /// * `Err(TallyError)` - If fetching fails
-    pub async fn get_merchant_plans(&self, merchant_address: &Pubkey) -> Result<Vec<(Pubkey, Plan)>> {
+    pub async fn get_payee_payment_terms(&self, payee_address: &Pubkey) -> Result<Vec<(Pubkey, PaymentTerms)>> {
         let accounts = self.rpc_client
             .get_program_accounts(&self.program_id())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch plans: {e}")))?;
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment terms: {e}")))?;
 
-        let mut plans = Vec::new();
+        let mut payment_terms = Vec::new();
         for (pubkey, account) in accounts {
-            // Check if account has the correct discriminator for Plan
+            // Check if account has the correct discriminator for PaymentTerms
             if account.data.len() >= 8 {
                 let discriminator = &account.data[..8];
-                if discriminator == Plan::DISCRIMINATOR {
-                    if let Ok(plan) = Plan::try_deserialize(&mut &account.data[8..]) {
-                        if plan.merchant == *merchant_address {
-                            plans.push((pubkey, plan));
+                if discriminator == PaymentTerms::DISCRIMINATOR {
+                    if let Ok(terms) = PaymentTerms::try_deserialize(&mut &account.data[8..]) {
+                        if terms.payee == *payee_address {
+                            payment_terms.push((pubkey, terms));
                         }
                     }
                 }
             }
         }
 
-        Ok(plans)
+        Ok(payment_terms)
     }
 
-    /// Get all subscriptions for a specific plan
+    /// Get all payment agreements for specific payment terms
     ///
     /// # Arguments
-    /// * `plan_address` - The plan PDA
+    /// * `payment_terms_address` - The payment terms PDA
     ///
     /// # Returns
-    /// * `Ok(Vec<(Pubkey, Subscription)>)` - List of subscription addresses and data
+    /// * `Ok(Vec<(Pubkey, PaymentAgreement)>)` - List of payment agreement addresses and data
     /// * `Err(TallyError)` - If fetching fails
-    pub async fn get_plan_subscriptions(&self, plan_address: &Pubkey) -> Result<Vec<(Pubkey, Subscription)>> {
+    pub async fn get_payment_terms_agreements(&self, payment_terms_address: &Pubkey) -> Result<Vec<(Pubkey, PaymentAgreement)>> {
         let accounts = self.rpc_client
             .get_program_accounts(&self.program_id())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch subscriptions: {e}")))?;
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment agreements: {e}")))?;
 
-        let mut subscriptions = Vec::new();
+        let mut agreements = Vec::new();
         for (pubkey, account) in accounts {
-            // Check if account has the correct discriminator for Subscription
+            // Check if account has the correct discriminator for PaymentAgreement
             if account.data.len() >= 8 {
                 let discriminator = &account.data[..8];
-                if discriminator == Subscription::DISCRIMINATOR {
-                    if let Ok(subscription) = Subscription::try_deserialize(&mut &account.data[8..]) {
-                        if subscription.plan == *plan_address {
-                            subscriptions.push((pubkey, subscription));
+                if discriminator == PaymentAgreement::DISCRIMINATOR {
+                    if let Ok(agreement) = PaymentAgreement::try_deserialize(&mut &account.data[8..]) {
+                        if agreement.payment_terms == *payment_terms_address {
+                            agreements.push((pubkey, agreement));
                         }
                     }
                 }
             }
         }
 
-        Ok(subscriptions)
+        Ok(agreements)
     }
 }
 

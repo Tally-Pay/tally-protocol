@@ -1,4 +1,4 @@
-//! Dashboard client for merchant management and analytics
+//! Dashboard client for payee management and analytics
 
 #![forbid(unsafe_code)]
 #![allow(clippy::arithmetic_side_effects)] // Safe for business logic calculations
@@ -8,12 +8,12 @@
 
 use crate::{
     dashboard_types::{
-        DashboardEvent, DashboardEventType, DashboardSubscription, EventStream, Overview,
-        PlanAnalytics,
+        DashboardAgreement, DashboardEvent, DashboardEventType, EventStream, Overview,
+        PaymentTermsAnalytics,
     },
     error::{Result, TallyError},
     events::{ParsedEventWithContext, TallyEvent},
-    program_types::{CreatePlanArgs, InitMerchantArgs, Merchant, Plan},
+    program_types::{CreatePaymentTermsArgs, InitPayeeArgs, Payee, PaymentTerms},
     simple_client::SimpleTallyClient,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
@@ -52,15 +52,15 @@ pub struct EventStats {
     pub success_rate: f64,
     /// Revenue generated in period (in USDC microlamports)
     pub revenue: u64,
-    /// Number of unique subscribers
-    pub unique_subscribers: u32,
+    /// Number of unique payers
+    pub unique_payers: u32,
     /// Period these statistics cover
     pub period: Period,
 }
 
-/// Dashboard client for merchant management and analytics
+/// Dashboard client for payee management and analytics
 ///
-/// Provides high-level methods for dashboard operations including merchant provisioning,
+/// Provides high-level methods for dashboard operations including payee provisioning,
 /// live data fetching, and real-time event monitoring.
 pub struct DashboardClient {
     /// Underlying simple client for blockchain operations
@@ -96,113 +96,113 @@ impl DashboardClient {
     }
 
     // ========================================
-    // Merchant Provisioning Methods
+    // Payee Provisioning Methods
     // ========================================
 
-    /// Provision a new merchant account
+    /// Provision a new payee account
     ///
-    /// This is a high-level method that checks if the merchant already exists
-    /// and creates it if needed. Returns the merchant PDA and transaction signature.
+    /// This is a high-level method that checks if the payee already exists
+    /// and creates it if needed. Returns the payee PDA and transaction signature.
     ///
     /// # Arguments
-    /// * `authority` - The merchant's authority keypair
-    /// * `merchant_args` - Merchant initialization arguments
+    /// * `authority` - The payee's authority keypair
+    /// * `payee_args` - Payee initialization arguments
     ///
     /// # Returns
-    /// * `Ok((Pubkey, String))` - Merchant PDA and transaction signature
+    /// * `Ok((Pubkey, String))` - Payee PDA and transaction signature
     ///
     /// # Errors
-    /// Returns an error if merchant creation fails or arguments are invalid
-    pub fn provision_merchant<T: Signer>(
+    /// Returns an error if payee creation fails or arguments are invalid
+    pub fn provision_payee<T: Signer>(
         &self,
         authority: &T,
-        merchant_args: &InitMerchantArgs,
+        payee_args: &InitPayeeArgs,
     ) -> Result<(Pubkey, String)> {
-        // Check if merchant already exists
-        let merchant_pda = self.client.merchant_address(&authority.pubkey());
-        if self.client.account_exists(&merchant_pda)? {
+        // Check if payee already exists
+        let payee_pda = self.client.payee_address(&authority.pubkey());
+        if self.client.account_exists(&payee_pda)? {
             return Err(TallyError::Generic(format!(
-                "Merchant account already exists at address: {merchant_pda}"
+                "Payee account already exists at address: {payee_pda}"
             )));
         }
 
-        // Create the merchant (platform fee automatically set to Free tier by program)
-        self.client.create_merchant(
+        // Create the payee (platform fee automatically set to Free tier by program)
+        self.client.init_payee(
             authority,
-            &merchant_args.usdc_mint,
-            &merchant_args.treasury_ata,
+            &payee_args.usdc_mint,
+            &payee_args.treasury_ata,
         )
     }
 
-    /// Get existing merchant or return None if not found
+    /// Get existing payee or return None if not found
     ///
     /// # Arguments
-    /// * `authority` - The merchant's authority pubkey
+    /// * `authority` - The payee's authority pubkey
     ///
     /// # Returns
-    /// * `Ok(Some((Pubkey, Merchant)))` - Merchant PDA and data if found
-    /// * `Ok(None)` - If merchant doesn't exist
+    /// * `Ok(Some((Pubkey, Payee)))` - Payee PDA and data if found
+    /// * `Ok(None)` - If payee doesn't exist
     ///
     /// # Errors
     /// Returns an error if RPC calls fail
-    pub fn get_merchant(&self, authority: &Pubkey) -> Result<Option<(Pubkey, Merchant)>> {
-        let merchant_pda = self.client.merchant_address(authority);
+    pub fn get_payee(&self, authority: &Pubkey) -> Result<Option<(Pubkey, Payee)>> {
+        let payee_pda = self.client.payee_address(authority);
 
         self.client
-            .get_merchant(&merchant_pda)?
-            .map_or_else(|| Ok(None), |merchant| Ok(Some((merchant_pda, merchant))))
+            .get_payee(&payee_pda)?
+            .map_or_else(|| Ok(None), |payee| Ok(Some((payee_pda, payee))))
     }
 
-    /// Create a new subscription plan for a merchant
+    /// Create new payment terms for a payee
     ///
     /// # Arguments
-    /// * `authority` - The merchant's authority keypair
-    /// * `plan_args` - Plan creation arguments
+    /// * `authority` - The payee's authority keypair
+    /// * `payment_terms_args` - Payment terms creation arguments
     ///
     /// # Returns
-    /// * `Ok((Pubkey, String))` - Plan PDA and transaction signature
+    /// * `Ok((Pubkey, String))` - Payment terms PDA and transaction signature
     ///
     /// # Errors
-    /// Returns an error if plan creation fails or arguments are invalid
-    pub fn create_plan<T: Signer>(
+    /// Returns an error if payment terms creation fails or arguments are invalid
+    pub fn create_payment_terms<T: Signer>(
         &self,
         authority: &T,
-        plan_args: CreatePlanArgs,
+        payment_terms_args: CreatePaymentTermsArgs,
     ) -> Result<(Pubkey, String)> {
-        // Delegate to the underlying client's create_plan method
-        self.client.create_plan(authority, plan_args)
+        // Delegate to the underlying client's create_payment_terms method
+        self.client.create_payment_terms(authority, payment_terms_args)
     }
 
     // ========================================
     // Live Data Fetching Methods
     // ========================================
 
-    /// Get comprehensive overview statistics for a merchant
+    /// Get comprehensive overview statistics for a payee
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
     /// * `Ok(Overview)` - Overview statistics
     ///
     /// # Errors
-    /// Returns an error if the merchant doesn't exist or data fetching fails
-    pub fn get_merchant_overview(&self, merchant: &Pubkey) -> Result<Overview> {
-        // Get merchant data
-        let merchant_data = self.client.get_merchant(merchant)?.ok_or_else(|| {
-            TallyError::AccountNotFound(format!("Merchant not found: {merchant}"))
+    /// Returns an error if the payee doesn't exist or data fetching fails
+    pub fn get_payee_overview(&self, payee: &Pubkey) -> Result<Overview> {
+        // Get payee data
+        let payee_data = self.client.get_payee(payee)?.ok_or_else(|| {
+            TallyError::AccountNotFound(format!("Payee not found: {payee}"))
         })?;
 
-        // Get all plans for this merchant
-        let plans = self.client.list_plans(merchant)?;
-        let total_plans = u32::try_from(plans.len())
-            .map_err(|_| TallyError::Generic("Too many plans for merchant".to_string()))?;
+        // Get all payment terms for this payee
+        let payment_terms_list = self.client.list_payment_terms(payee)?;
+        let total_payment_terms = u32::try_from(payment_terms_list.len())
+            .map_err(|_| TallyError::Generic("Too many payment terms for payee".to_string()))?;
 
-        // Collect all subscription data across all plans
-        let mut all_subscriptions = Vec::new();
-        for (plan_address, _plan) in &plans {
-            let subs = self.client.list_subscriptions(plan_address)?;
-            all_subscriptions.extend(subs);
+        // Collect all payment agreement data across all payment terms
+        let mut all_agreements = Vec::new();
+        for (payment_terms_address, _payment_terms) in &payment_terms_list {
+            let agreements = self.client.list_payment_agreements(payment_terms_address)?;
+            all_agreements.extend(agreements);
         }
 
         // Calculate statistics
@@ -213,88 +213,88 @@ impl DashboardClient {
         let mut inactive_count = 0u32;
         let mut total_revenue = 0u64;
         let mut monthly_revenue = 0u64;
-        let mut monthly_new_subs = 0u32;
-        let mut monthly_canceled_subs = 0u32;
+        let mut monthly_new_agreements = 0u32;
+        let mut monthly_paused_agreements = 0u32;
 
-        for (_sub_address, subscription) in &all_subscriptions {
-            if subscription.active {
+        for (_agreement_address, payment_agreement) in &all_agreements {
+            if payment_agreement.active {
                 active_count = active_count.saturating_add(1);
             } else {
                 inactive_count = inactive_count.saturating_add(1);
             }
 
-            // Calculate revenue (renewals * last_amount)
-            let sub_revenue =
-                u64::from(subscription.renewals).saturating_mul(subscription.last_amount);
-            total_revenue = total_revenue.saturating_add(sub_revenue);
+            // Calculate revenue (payment_count * last_amount)
+            let agreement_revenue =
+                u64::from(payment_agreement.payment_count).saturating_mul(payment_agreement.last_amount);
+            total_revenue = total_revenue.saturating_add(agreement_revenue);
 
             // Monthly statistics (approximate)
-            if subscription.created_ts >= month_start {
-                monthly_new_subs = monthly_new_subs.saturating_add(1);
-                monthly_revenue = monthly_revenue.saturating_add(subscription.last_amount);
+            if payment_agreement.created_ts >= month_start {
+                monthly_new_agreements = monthly_new_agreements.saturating_add(1);
+                monthly_revenue = monthly_revenue.saturating_add(payment_agreement.last_amount);
             }
 
-            // Count cancellations (inactive subscriptions created this month)
-            if !subscription.active && subscription.created_ts >= month_start {
-                monthly_canceled_subs = monthly_canceled_subs.saturating_add(1);
+            // Count paused agreements (inactive agreements created this month)
+            if !payment_agreement.active && payment_agreement.created_ts >= month_start {
+                monthly_paused_agreements = monthly_paused_agreements.saturating_add(1);
             }
         }
 
-        let average_revenue_per_user = if all_subscriptions.is_empty() {
+        let average_revenue_per_payer = if all_agreements.is_empty() {
             0
         } else {
-            total_revenue / u64::try_from(all_subscriptions.len()).unwrap_or(1)
+            total_revenue / u64::try_from(all_agreements.len()).unwrap_or(1)
         };
 
         Ok(Overview {
             total_revenue,
-            active_subscriptions: active_count,
-            inactive_subscriptions: inactive_count,
-            total_plans,
+            active_agreements: active_count,
+            inactive_agreements: inactive_count,
+            total_payment_terms,
             monthly_revenue,
-            monthly_new_subscriptions: monthly_new_subs,
-            monthly_canceled_subscriptions: monthly_canceled_subs,
-            average_revenue_per_user,
-            merchant_authority: merchant_data.authority,
-            usdc_mint: merchant_data.usdc_mint,
+            monthly_new_agreements,
+            monthly_paused_agreements,
+            average_revenue_per_payer,
+            payee_authority: payee_data.authority,
+            usdc_mint: payee_data.usdc_mint,
         })
     }
 
-    /// Get all active subscriptions for a merchant with enhanced information
+    /// Get all active payment agreements for a payee with enhanced information
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok(Vec<DashboardSubscription>)` - List of enhanced subscription data
+    /// * `Ok(Vec<DashboardAgreement>)` - List of enhanced payment agreement data
     ///
     /// # Errors
     /// Returns an error if data fetching fails
-    pub fn get_live_subscriptions(&self, merchant: &Pubkey) -> Result<Vec<DashboardSubscription>> {
-        let plans = self.client.list_plans(merchant)?;
-        let mut dashboard_subscriptions = Vec::new();
+    pub fn get_live_agreements(&self, payee: &Pubkey) -> Result<Vec<DashboardAgreement>> {
+        let payment_terms_list = self.client.list_payment_terms(payee)?;
+        let mut dashboard_agreements = Vec::new();
         let current_time = Utc::now().timestamp();
 
-        for (plan_address, plan) in plans {
-            let subscriptions = self.client.list_subscriptions(&plan_address)?;
+        for (payment_terms_address, payment_terms) in payment_terms_list {
+            let agreements = self.client.list_payment_agreements(&payment_terms_address)?;
 
-            for (sub_address, subscription) in subscriptions {
-                let status = DashboardSubscription::calculate_status(&subscription, current_time);
-                let days_until_renewal = DashboardSubscription::calculate_days_until_renewal(
-                    subscription.next_renewal_ts,
+            for (agreement_address, payment_agreement) in agreements {
+                let status = DashboardAgreement::calculate_status(&payment_agreement, current_time);
+                let days_until_renewal = DashboardAgreement::calculate_days_until_renewal(
+                    payment_agreement.next_payment_ts,
                     current_time,
                 );
-                let total_paid = u64::from(subscription.renewals)
-                    .checked_mul(subscription.last_amount)
+                let total_paid = u64::from(payment_agreement.payment_count)
+                    .checked_mul(payment_agreement.last_amount)
                     .ok_or_else(|| {
                         TallyError::Generic("Revenue calculation overflow".to_string())
                     })?;
 
-                dashboard_subscriptions.push(DashboardSubscription {
-                    subscription,
-                    address: sub_address,
-                    plan: plan.clone(),
-                    plan_address,
+                dashboard_agreements.push(DashboardAgreement {
+                    payment_agreement,
+                    address: agreement_address,
+                    payment_terms: payment_terms.clone(),
+                    payment_terms_address,
                     status,
                     days_until_renewal,
                     total_paid,
@@ -302,28 +302,28 @@ impl DashboardClient {
             }
         }
 
-        Ok(dashboard_subscriptions)
+        Ok(dashboard_agreements)
     }
 
-    /// Get analytics for a specific plan
+    /// Get analytics for specific payment terms
     ///
     /// # Arguments
-    /// * `plan` - The plan PDA address
+    /// * `payment_terms` - The payment terms PDA address
     ///
     /// # Returns
-    /// * `Ok(PlanAnalytics)` - Plan analytics data
+    /// * `Ok(PaymentTermsAnalytics)` - Payment terms analytics data
     ///
     /// # Errors
-    /// Returns an error if the plan doesn't exist or data fetching fails
-    pub fn get_plan_analytics(&self, plan: &Pubkey) -> Result<PlanAnalytics> {
-        // Get plan data
-        let plan_data = self
+    /// Returns an error if the payment terms don't exist or data fetching fails
+    pub fn get_payment_terms_analytics(&self, payment_terms: &Pubkey) -> Result<PaymentTermsAnalytics> {
+        // Get payment terms data
+        let payment_terms_data = self
             .client
-            .get_plan(plan)?
-            .ok_or_else(|| TallyError::AccountNotFound(format!("Plan not found: {plan}")))?;
+            .get_payment_terms(payment_terms)?
+            .ok_or_else(|| TallyError::AccountNotFound(format!("Payment terms not found: {payment_terms}")))?;
 
-        // Get all subscriptions for this plan
-        let subscriptions = self.client.list_subscriptions(plan)?;
+        // Get all payment agreements for these payment terms
+        let agreements = self.client.list_payment_agreements(payment_terms)?;
 
         // Calculate statistics
         let current_time = Utc::now().timestamp();
@@ -333,100 +333,100 @@ impl DashboardClient {
         let mut inactive_count: u32 = 0;
         let mut total_revenue: u64 = 0;
         let mut monthly_revenue: u64 = 0;
-        let mut monthly_new_subs: u32 = 0;
-        let mut monthly_canceled_subs: u32 = 0;
+        let mut monthly_new_agreements: u32 = 0;
+        let mut monthly_paused_agreements: u32 = 0;
         let mut total_duration_secs: i64 = 0;
-        let mut completed_subscriptions: u32 = 0;
+        let mut completed_agreements: u32 = 0;
 
-        for (_sub_address, subscription) in &subscriptions {
-            if subscription.active {
+        for (_agreement_address, payment_agreement) in &agreements {
+            if payment_agreement.active {
                 active_count = active_count.saturating_add(1);
             } else {
                 inactive_count = inactive_count.saturating_add(1);
 
-                // Calculate duration for completed subscriptions
-                let duration = current_time - subscription.created_ts;
+                // Calculate duration for completed agreements
+                let duration = current_time - payment_agreement.created_ts;
                 total_duration_secs = total_duration_secs.saturating_add(duration);
-                completed_subscriptions = completed_subscriptions.saturating_add(1);
+                completed_agreements = completed_agreements.saturating_add(1);
             }
 
-            // Calculate revenue (renewals * last_amount)
-            let sub_revenue = u64::from(subscription.renewals)
-                .checked_mul(subscription.last_amount)
+            // Calculate revenue (payment_count * last_amount)
+            let agreement_revenue = u64::from(payment_agreement.payment_count)
+                .checked_mul(payment_agreement.last_amount)
                 .ok_or_else(|| TallyError::Generic("Revenue calculation overflow".to_string()))?;
             total_revenue = total_revenue
-                .checked_add(sub_revenue)
+                .checked_add(agreement_revenue)
                 .ok_or_else(|| TallyError::Generic("Total revenue overflow".to_string()))?;
 
             // Monthly statistics
-            if subscription.created_ts >= month_start {
-                monthly_new_subs = monthly_new_subs.saturating_add(1);
+            if payment_agreement.created_ts >= month_start {
+                monthly_new_agreements = monthly_new_agreements.saturating_add(1);
                 monthly_revenue = monthly_revenue
-                    .checked_add(subscription.last_amount)
+                    .checked_add(payment_agreement.last_amount)
                     .ok_or_else(|| {
                         TallyError::Generic("Monthly revenue overflow".to_string())
                     })?;
             }
 
-            // Count monthly cancellations
-            if !subscription.active && subscription.created_ts >= month_start {
-                monthly_canceled_subs = monthly_canceled_subs.saturating_add(1);
+            // Count monthly paused agreements
+            if !payment_agreement.active && payment_agreement.created_ts >= month_start {
+                monthly_paused_agreements = monthly_paused_agreements.saturating_add(1);
             }
         }
 
-        let average_duration_days = if completed_subscriptions > 0 {
+        let average_duration_days = if completed_agreements > 0 {
             total_duration_secs
-                .checked_div(i64::from(completed_subscriptions))
+                .checked_div(i64::from(completed_agreements))
                 .map_or(0.0, |avg| avg as f64 / 86400.0)
         } else {
             0.0
         };
 
-        Ok(PlanAnalytics {
-            plan: plan_data,
-            plan_address: *plan,
+        Ok(PaymentTermsAnalytics {
+            payment_terms: payment_terms_data,
+            payment_terms_address: *payment_terms,
             active_count,
             inactive_count,
             total_revenue,
             monthly_revenue,
-            monthly_new_subscriptions: monthly_new_subs,
-            monthly_canceled_subscriptions: monthly_canceled_subs,
+            monthly_new_agreements,
+            monthly_paused_agreements,
             average_duration_days,
             conversion_rate: None, // Would need additional data to calculate
         })
     }
 
-    /// List all plans for a merchant with basic information
+    /// List all payment terms for a payee with basic information
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok(Vec<(Pubkey, Plan)>)` - List of plan addresses and data
+    /// * `Ok(Vec<(Pubkey, PaymentTerms)>)` - List of payment terms addresses and data
     ///
     /// # Errors
     /// Returns an error if data fetching fails
-    pub fn list_merchant_plans(&self, merchant: &Pubkey) -> Result<Vec<(Pubkey, Plan)>> {
-        self.client.list_plans(merchant)
+    pub fn list_payee_payment_terms(&self, payee: &Pubkey) -> Result<Vec<(Pubkey, PaymentTerms)>> {
+        self.client.list_payment_terms(payee)
     }
 
-    /// Get plan analytics for all plans of a merchant
+    /// Get payment terms analytics for all payment terms of a payee
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok(Vec<PlanAnalytics>)` - List of analytics for all plans
+    /// * `Ok(Vec<PaymentTermsAnalytics>)` - List of analytics for all payment terms
     ///
     /// # Errors
     /// Returns an error if data fetching fails
-    pub fn get_all_plan_analytics(&self, merchant: &Pubkey) -> Result<Vec<PlanAnalytics>> {
-        let plans = self.client.list_plans(merchant)?;
+    pub fn get_all_payment_terms_analytics(&self, payee: &Pubkey) -> Result<Vec<PaymentTermsAnalytics>> {
+        let payment_terms_list = self.client.list_payment_terms(payee)?;
         let mut analytics = Vec::new();
 
-        for (plan_address, _plan) in plans {
-            let plan_analytics = self.get_plan_analytics(&plan_address)?;
-            analytics.push(plan_analytics);
+        for (payment_terms_address, _payment_terms) in payment_terms_list {
+            let payment_terms_analytics = self.get_payment_terms_analytics(&payment_terms_address)?;
+            analytics.push(payment_terms_analytics);
         }
 
         Ok(analytics)
@@ -436,43 +436,43 @@ impl DashboardClient {
     // Event Monitoring Methods
     // ========================================
 
-    /// Subscribe to real-time events for a merchant
+    /// Subscribe to real-time events for a payee
     ///
     /// This method sets up event monitoring and returns an `EventStream` that can be
-    /// used to track real-time changes to the subscription system.
+    /// used to track real-time changes to the payment agreement system.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address to monitor
+    /// * `payee` - The payee PDA address to monitor
     ///
     /// # Returns
     /// * `Ok(EventStream)` - Event stream for real-time monitoring
     ///
     /// # Errors
     /// Returns an error if event monitoring setup fails
-    pub fn subscribe_to_events(&self, merchant: &Pubkey) -> Result<EventStream> {
+    pub fn subscribe_to_events(&self, payee: &Pubkey) -> Result<EventStream> {
         // For now, return a basic event stream
         // In a full implementation, this would set up WebSocket connections
         // to monitor blockchain events in real-time
         let mut stream = EventStream::new();
         stream.start();
 
-        // Add merchant validation
-        if !self.client.account_exists(merchant)? {
+        // Add payee validation
+        if !self.client.account_exists(payee)? {
             return Err(TallyError::AccountNotFound(format!(
-                "Merchant not found: {merchant}"
+                "Payee not found: {payee}"
             )));
         }
 
         Ok(stream)
     }
 
-    /// Get event history for a merchant from blockchain
+    /// Get event history for a payee from blockchain
     ///
     /// This method queries blockchain transaction logs to retrieve historical events
-    /// for the specified merchant.
+    /// for the specified payee.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     /// * `limit` - Maximum number of events to return
     ///
     /// # Returns
@@ -482,7 +482,7 @@ impl DashboardClient {
     /// Returns an error if blockchain queries fail or event parsing fails
     pub const fn get_event_history(
         &self,
-        _merchant: &Pubkey,
+        _payee: &Pubkey,
         _limit: usize,
     ) -> Result<Vec<ParsedEventWithContext>> {
         // For now, return empty events to satisfy the interface
@@ -491,10 +491,10 @@ impl DashboardClient {
         // 2. Parse program logs from those transactions
         // 3. Convert parsed events to ParsedEvent format
 
-        // For testing purposes, we'll skip merchant validation
-        // if !self.client.account_exists(merchant)? {
+        // For testing purposes, we'll skip payee validation
+        // if !self.client.account_exists(payee)? {
         //     return Err(TallyError::AccountNotFound(format!(
-        //         "Merchant not found: {merchant}"
+        //         "Payee not found: {payee}"
         //     )));
         // }
 
@@ -503,13 +503,13 @@ impl DashboardClient {
         Ok(vec![])
     }
 
-    /// Get recent events with transaction context for a merchant
+    /// Get recent events with transaction context for a payee
     ///
     /// This is a high-level method that provides the parsed events with context
     /// that the tally-actions project needs for analytics and dashboard display.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     /// * `limit` - Maximum number of events to return
     ///
     /// # Returns
@@ -519,17 +519,17 @@ impl DashboardClient {
     /// Returns an error if RPC queries fail or event parsing fails
     pub const fn get_recent_events_with_context(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEventWithContext>> {
         // For now, delegate to get_event_history
         // In a full implementation, this would:
-        // 1. Get transaction signatures for merchant's program accounts
+        // 1. Get transaction signatures for payee's program accounts
         // 2. Batch fetch transaction details with metadata
         // 3. Parse events from logs and add transaction context
         // 4. Sort by most recent first
 
-        self.get_event_history(merchant, limit)
+        self.get_event_history(payee, limit)
     }
 
     /// Get events by date range with transaction context
@@ -538,7 +538,7 @@ impl DashboardClient {
     /// for analytics and reporting.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     /// * `from` - Start date (inclusive)
     /// * `to` - End date (inclusive)
     ///
@@ -549,18 +549,18 @@ impl DashboardClient {
     /// Returns an error if RPC queries fail or slot conversion fails
     pub fn get_events_by_date_range_with_context(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> Result<Vec<ParsedEventWithContext>> {
         // For now, get recent events and filter by timestamp
         // In a full implementation, this would:
         // 1. Convert dates to approximate slots for efficient filtering
-        // 2. Get merchant signatures within slot range
+        // 2. Get payee signatures within slot range
         // 3. Parse events and filter by actual block time
         // 4. Sort by block time
 
-        let events = self.get_event_history(merchant, 5000)?;
+        let events = self.get_event_history(payee, 5000)?;
         let from_timestamp = from.timestamp();
         let to_timestamp = to.timestamp();
 
@@ -595,44 +595,44 @@ impl DashboardClient {
             .collect()
     }
 
-    /// Validate merchant and get basic info
+    /// Validate payee and get basic info
     ///
-    /// Helper method for the actions project to validate merchant existence
-    /// and get basic merchant information in one call.
+    /// Helper method for the actions project to validate payee existence
+    /// and get basic payee information in one call.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok(Some(Merchant))` - Merchant data if found
-    /// * `Ok(None)` - If merchant doesn't exist
+    /// * `Ok(Some(Payee))` - Payee data if found
+    /// * `Ok(None)` - If payee doesn't exist
     ///
     /// # Errors
     /// Returns an error if RPC call fails
-    pub fn validate_and_get_merchant(&self, merchant: &Pubkey) -> Result<Option<Merchant>> {
-        self.client.get_merchant(merchant)
+    pub fn validate_and_get_payee(&self, payee: &Pubkey) -> Result<Option<Payee>> {
+        self.client.get_payee(payee)
     }
 
-    /// Get cached analytics for a merchant
+    /// Get cached analytics for a payee
     ///
     /// This method provides analytics data that can be cached by the actions project
     /// for better performance in dashboard endpoints.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok((Overview, Vec<PlanAnalytics>))` - Overview and plan analytics
+    /// * `Ok((Overview, Vec<PaymentTermsAnalytics>))` - Overview and payment terms analytics
     ///
     /// # Errors
-    /// Returns an error if merchant doesn't exist or data fetching fails
+    /// Returns an error if payee doesn't exist or data fetching fails
     pub fn get_cached_analytics(
         &self,
-        merchant: &Pubkey,
-    ) -> Result<(Overview, Vec<PlanAnalytics>)> {
-        let overview = self.get_merchant_overview(merchant)?;
-        let plan_analytics = self.get_all_plan_analytics(merchant)?;
-        Ok((overview, plan_analytics))
+        payee: &Pubkey,
+    ) -> Result<(Overview, Vec<PaymentTermsAnalytics>)> {
+        let overview = self.get_payee_overview(payee)?;
+        let payment_terms_analytics = self.get_all_payment_terms_analytics(payee)?;
+        Ok((overview, payment_terms_analytics))
     }
 
     /// Poll for recent events manually
@@ -641,7 +641,7 @@ impl DashboardClient {
     /// for applications that prefer polling-based updates.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     /// * `since_timestamp` - Only return events after this timestamp
     ///
     /// # Returns
@@ -651,11 +651,11 @@ impl DashboardClient {
     /// Returns an error if event fetching fails
     pub fn poll_recent_events(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         since_timestamp: i64,
     ) -> Result<Vec<DashboardEvent>> {
         // Get recent events from blockchain
-        let parsed_events = self.get_event_history(merchant, 1000)?;
+        let parsed_events = self.get_event_history(payee, 1000)?;
 
         // Convert to DashboardEvents and filter by timestamp
         let dashboard_events: Vec<DashboardEvent> = parsed_events
@@ -677,7 +677,7 @@ impl DashboardClient {
     /// Get event statistics for a time period
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     /// * `period` - Time period for statistics
     ///
     /// # Returns
@@ -685,11 +685,11 @@ impl DashboardClient {
     ///
     /// # Errors
     /// Returns an error if data fetching fails
-    pub fn get_event_statistics(&self, merchant: &Pubkey, period: Period) -> Result<EventStats> {
+    pub fn get_event_statistics(&self, payee: &Pubkey, period: Period) -> Result<EventStats> {
         // For now, use the same approach for all periods - get recent events and filter
         let since_timestamp = Self::period_to_timestamp(period);
         let events = self
-            .get_event_history(merchant, 5000)? // Get more events for better statistics
+            .get_event_history(payee, 5000)? // Get more events for better statistics
             .into_iter()
             .filter(|event| {
                 event
@@ -702,7 +702,7 @@ impl DashboardClient {
         let mut event_counts = HashMap::new();
         let mut total_revenue = 0u64;
         let mut successful_events = 0u32;
-        let mut unique_subscribers = std::collections::HashSet::new();
+        let mut unique_payers = std::collections::HashSet::new();
 
         for parsed_event in &events {
             // Count event types
@@ -714,25 +714,25 @@ impl DashboardClient {
                 successful_events += 1;
             }
 
-            // Calculate revenue and track subscribers
+            // Calculate revenue and track payers
             match &parsed_event.event {
-                TallyEvent::Subscribed(event) => {
+                TallyEvent::PaymentAgreementStarted(event) => {
                     total_revenue = total_revenue.saturating_add(event.amount);
-                    unique_subscribers.insert(event.subscriber);
+                    unique_payers.insert(event.payer);
                 }
-                TallyEvent::SubscriptionReactivated(event) => {
+                TallyEvent::PaymentAgreementResumed(event) => {
                     total_revenue = total_revenue.saturating_add(event.amount);
-                    unique_subscribers.insert(event.subscriber);
+                    unique_payers.insert(event.payer);
                 }
-                TallyEvent::Renewed(event) => {
+                TallyEvent::PaymentExecuted(event) => {
                     total_revenue = total_revenue.saturating_add(event.amount);
-                    unique_subscribers.insert(event.subscriber);
+                    unique_payers.insert(event.payer);
                 }
-                TallyEvent::Canceled(event) => {
-                    unique_subscribers.insert(event.subscriber);
+                TallyEvent::PaymentAgreementPaused(event) => {
+                    unique_payers.insert(event.payer);
                 }
                 TallyEvent::PaymentFailed(event) => {
-                    unique_subscribers.insert(event.subscriber);
+                    unique_payers.insert(event.payer);
                 }
                 // Ignore other event types for analytics
                 _ => {}
@@ -751,7 +751,7 @@ impl DashboardClient {
             total_events,
             success_rate,
             revenue: total_revenue,
-            unique_subscribers: unique_subscribers.len() as u32,
+            unique_payers: unique_payers.len() as u32,
             period,
         })
     }
@@ -762,29 +762,29 @@ impl DashboardClient {
     /// the necessary components for real-time event monitoring.
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address to monitor
+    /// * `payee` - The payee PDA address to monitor
     ///
     /// # Returns
-    /// * `Ok(EventStream)` - Event stream configured for the merchant
+    /// * `Ok(EventStream)` - Event stream configured for the payee
     ///
     /// # Errors
     /// Returns an error if stream setup fails
-    pub fn subscribe_to_live_events(&self, _merchant: &Pubkey) -> Result<EventStream> {
-        // For testing purposes, we'll skip merchant validation
-        // if !self.client.account_exists(merchant)? {
+    pub fn subscribe_to_live_events(&self, _payee: &Pubkey) -> Result<EventStream> {
+        // For testing purposes, we'll skip payee validation
+        // if !self.client.account_exists(payee)? {
         //     return Err(TallyError::AccountNotFound(format!(
-        //         "Merchant not found: {merchant}"
+        //         "Payee not found: {payee}"
         //     )));
         // }
 
-        // Create event stream configured for this merchant
+        // Create event stream configured for this payee
         let stream = EventStream::new();
 
         // In a full implementation, this would:
         // 1. Set up WebSocket connection to Solana RPC
-        // 2. Subscribe to program logs for the merchant's accounts
+        // 2. Subscribe to program logs for the payee's accounts
         // 3. Connect to Socket.IO server for real-time broadcasting
-        // 4. Set up event parsing and filtering for the merchant
+        // 4. Set up event parsing and filtering for the payee
 
         // For now, return a configured stream that can be enhanced later
         // Note: Stream starts inactive - consumer can call start() when ready
@@ -796,32 +796,32 @@ impl DashboardClient {
     // Utility Methods
     // ========================================
 
-    /// Validate if a merchant exists
+    /// Validate if a payee exists
     ///
     /// # Arguments
-    /// * `merchant` - The merchant PDA address
+    /// * `payee` - The payee PDA address
     ///
     /// # Returns
-    /// * `Ok(bool)` - True if merchant exists
+    /// * `Ok(bool)` - True if payee exists
     ///
     /// # Errors
     /// Returns an error if RPC call fails
-    pub fn merchant_exists(&self, merchant: &Pubkey) -> Result<bool> {
-        self.client.account_exists(merchant)
+    pub fn payee_exists(&self, payee: &Pubkey) -> Result<bool> {
+        self.client.account_exists(payee)
     }
 
-    /// Validate if a plan exists
+    /// Validate if payment terms exist
     ///
     /// # Arguments
-    /// * `plan` - The plan PDA address
+    /// * `payment_terms` - The payment terms PDA address
     ///
     /// # Returns
-    /// * `Ok(bool)` - True if plan exists
+    /// * `Ok(bool)` - True if payment terms exist
     ///
     /// # Errors
     /// Returns an error if RPC call fails
-    pub fn plan_exists(&self, plan: &Pubkey) -> Result<bool> {
-        self.client.account_exists(plan)
+    pub fn payment_terms_exist(&self, payment_terms: &Pubkey) -> Result<bool> {
+        self.client.account_exists(payment_terms)
     }
 
     /// Convert Period to Unix timestamp
@@ -840,16 +840,16 @@ impl DashboardClient {
     /// Get event type name as string for dashboard compatibility
     fn get_event_type_name(event: &TallyEvent) -> String {
         match event {
-            TallyEvent::Subscribed(_) => "SubscriptionStarted".to_string(),
-            TallyEvent::SubscriptionReactivated(_) => "SubscriptionReactivated".to_string(),
-            TallyEvent::Renewed(_) => "SubscriptionRenewed".to_string(),
-            TallyEvent::Canceled(_) => "SubscriptionCanceled".to_string(),
-            TallyEvent::SubscriptionClosed(_) => "SubscriptionClosed".to_string(),
+            TallyEvent::PaymentAgreementStarted(_) => "AgreementStarted".to_string(),
+            TallyEvent::PaymentAgreementResumed(_) => "PaymentAgreementResumed".to_string(),
+            TallyEvent::PaymentExecuted(_) => "PaymentExecuted".to_string(),
+            TallyEvent::PaymentAgreementPaused(_) => "AgreementPaused".to_string(),
+            TallyEvent::PaymentAgreementClosed(_) => "PaymentAgreementClosed".to_string(),
             TallyEvent::PaymentFailed(_) => "PaymentFailed".to_string(),
-            TallyEvent::PlanStatusChanged(_) => "PlanStatusChanged".to_string(),
+            TallyEvent::PaymentTermsStatusChanged(_) => "PaymentTermsStatusChanged".to_string(),
             TallyEvent::ConfigInitialized(_) => "ConfigInitialized".to_string(),
-            TallyEvent::MerchantInitialized(_) => "MerchantInitialized".to_string(),
-            TallyEvent::PlanCreated(_) => "PlanCreated".to_string(),
+            TallyEvent::PayeeInitialized(_) => "PayeeInitialized".to_string(),
+            TallyEvent::PaymentTermsCreated(_) => "PaymentTermsCreated".to_string(),
             TallyEvent::ProgramPaused(_) => "ProgramPaused".to_string(),
             TallyEvent::ProgramUnpaused(_) => "ProgramUnpaused".to_string(),
             TallyEvent::LowAllowanceWarning(_) => "LowAllowanceWarning".to_string(),
@@ -857,9 +857,7 @@ impl DashboardClient {
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning".to_string(),
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated".to_string(),
             TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded".to_string(),
-            TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated".to_string(),
-            TallyEvent::TrialStarted(_) => "TrialStarted".to_string(),
-            TallyEvent::TrialConverted(_) => "TrialConverted".to_string(),
+            TallyEvent::PaymentTermsUpdated(_) => "PaymentTermsTermsUpdated".to_string(),
         }
     }
 
@@ -867,39 +865,39 @@ impl DashboardClient {
     fn convert_parsed_event_to_dashboard_event(
         parsed_event: &ParsedEventWithContext,
     ) -> DashboardEvent {
-        let (event_type, plan_address, subscription_address, subscriber, amount) =
+        let (event_type, payment_terms_address, agreement_address, payer, amount) =
             match &parsed_event.event {
-                TallyEvent::Subscribed(event) => (
-                    DashboardEventType::SubscriptionStarted,
-                    Some(event.plan),
-                    None, // We don't have subscription address in the event
-                    Some(event.subscriber),
+                TallyEvent::PaymentAgreementStarted(event) => (
+                    DashboardEventType::AgreementStarted,
+                    Some(event.payment_terms),
+                    None, // We don't have agreement address in the event
+                    Some(event.payer),
                     Some(event.amount),
                 ),
-                TallyEvent::Renewed(event) => (
-                    DashboardEventType::SubscriptionRenewed,
-                    Some(event.plan),
+                TallyEvent::PaymentExecuted(event) => (
+                    DashboardEventType::PaymentExecuted,
+                    Some(event.payment_terms),
                     None,
-                    Some(event.subscriber),
+                    Some(event.payer),
                     Some(event.amount),
                 ),
-                TallyEvent::Canceled(event) => (
-                    DashboardEventType::SubscriptionCanceled,
-                    Some(event.plan),
+                TallyEvent::PaymentAgreementPaused(event) => (
+                    DashboardEventType::AgreementPaused,
+                    Some(event.payment_terms),
                     None,
-                    Some(event.subscriber),
+                    Some(event.payer),
                     None,
                 ),
                 TallyEvent::PaymentFailed(event) => (
                     DashboardEventType::PaymentFailed,
-                    Some(event.plan),
+                    Some(event.payment_terms),
                     None,
-                    Some(event.subscriber),
+                    Some(event.payer),
                     None,
                 ),
                 // Handle all other event types with default values
                 _ => (
-                    DashboardEventType::SubscriptionStarted, // Default type
+                    DashboardEventType::AgreementStarted, // Default type
                     None,
                     None,
                     None,
@@ -920,9 +918,9 @@ impl DashboardClient {
 
         DashboardEvent {
             event_type,
-            plan_address,
-            subscription_address,
-            subscriber,
+            payment_terms_address,
+            agreement_address,
+            payer,
             amount,
             transaction_signature: Some(parsed_event.signature.to_string()),
             timestamp: parsed_event
@@ -945,7 +943,7 @@ impl DashboardClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::program_types::InitMerchantArgs;
+    use crate::program_types::InitPayeeArgs;
     use anchor_client::solana_sdk::signature::{Keypair, Signer};
 
     #[test]
@@ -965,19 +963,19 @@ mod tests {
     }
 
     #[test]
-    fn test_merchant_args_validation() {
+    fn test_payee_args_validation() {
         let client = DashboardClient::new("http://localhost:8899").unwrap();
         let authority = Keypair::new();
 
-        // Test valid merchant initialization args
-        let valid_args = InitMerchantArgs {
+        // Test valid payee initialization args
+        let valid_args = InitPayeeArgs {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
         };
 
         // In the refactored program, platform fee is set globally in Config
-        // This test now just verifies the merchant args are properly formed
-        let _result = client.provision_merchant(&authority, &valid_args);
+        // This test now just verifies the payee args are properly formed
+        let _result = client.provision_payee(&authority, &valid_args);
     }
 
     #[test]
@@ -986,21 +984,21 @@ mod tests {
 
         let overview = Overview {
             total_revenue: 1_000_000_000, // 1,000 USDC
-            active_subscriptions: 80,
-            inactive_subscriptions: 20,
-            total_plans: 5,
+            active_agreements: 80,
+            inactive_agreements: 20,
+            total_payment_terms: 5,
             monthly_revenue: 100_000_000, // 100 USDC
-            monthly_new_subscriptions: 10,
-            monthly_canceled_subscriptions: 5,
-            average_revenue_per_user: 10_000_000, // 10 USDC
-            merchant_authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            monthly_new_agreements: 10,
+            monthly_paused_agreements: 5,
+            average_revenue_per_payer: 10_000_000, // 10 USDC
+            payee_authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
         };
 
         // Use epsilon comparison for float values
         assert!((overview.total_revenue_formatted() - 1000.0).abs() < f64::EPSILON);
         assert!((overview.monthly_revenue_formatted() - 100.0).abs() < f64::EPSILON);
-        assert!((overview.average_revenue_per_user_formatted() - 10.0).abs() < f64::EPSILON);
+        assert!((overview.average_revenue_per_payer_formatted() - 10.0).abs() < f64::EPSILON);
         assert!((overview.churn_rate() - 20.0).abs() < f64::EPSILON); // 20 out of 100 = 20%
     }
 
@@ -1010,13 +1008,13 @@ mod tests {
         use std::collections::HashMap;
 
         let mut metadata = HashMap::new();
-        metadata.insert("plan_name".to_string(), "Premium Plan".to_string());
+        metadata.insert("payment_terms_name".to_string(), "Premium Payment Terms".to_string());
 
         let event = DashboardEvent {
-            event_type: DashboardEventType::SubscriptionStarted,
-            plan_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
-            subscription_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
-            subscriber: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
+            event_type: DashboardEventType::AgreementStarted,
+            payment_terms_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
+            agreement_address: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
+            payer: Some(Pubkey::from(Keypair::new().pubkey().to_bytes())),
             amount: Some(5_000_000), // 5 USDC
             transaction_signature: Some("test_sig_123".to_string()),
             timestamp: chrono::Utc::now().timestamp(),
@@ -1025,14 +1023,14 @@ mod tests {
 
         assert_eq!(event.amount_formatted(), Some(5.0));
         assert!(event.affects_revenue());
-        assert!(event.affects_subscription_count());
+        assert!(event.affects_agreement_count());
 
         // Test different event types
         let payment_failed_event = DashboardEvent {
             event_type: DashboardEventType::PaymentFailed,
-            plan_address: None,
-            subscription_address: None,
-            subscriber: None,
+            payment_terms_address: None,
+            agreement_address: None,
+            payer: None,
             amount: None,
             transaction_signature: None,
             timestamp: chrono::Utc::now().timestamp(),
@@ -1040,7 +1038,7 @@ mod tests {
         };
 
         assert!(!payment_failed_event.affects_revenue());
-        assert!(!payment_failed_event.affects_subscription_count());
+        assert!(!payment_failed_event.affects_agreement_count());
     }
 
     #[test]
@@ -1056,10 +1054,10 @@ mod tests {
 
         // Add events to test buffer overflow
         let event1 = DashboardEvent {
-            event_type: DashboardEventType::SubscriptionStarted,
-            plan_address: None,
-            subscription_address: None,
-            subscriber: None,
+            event_type: DashboardEventType::AgreementStarted,
+            payment_terms_address: None,
+            agreement_address: None,
+            payer: None,
             amount: None,
             transaction_signature: None,
             timestamp: chrono::Utc::now().timestamp() - 3600,
@@ -1067,10 +1065,10 @@ mod tests {
         };
 
         let event2 = DashboardEvent {
-            event_type: DashboardEventType::SubscriptionRenewed,
-            plan_address: None,
-            subscription_address: None,
-            subscriber: None,
+            event_type: DashboardEventType::PaymentExecuted,
+            payment_terms_address: None,
+            agreement_address: None,
+            payer: None,
             amount: None,
             transaction_signature: None,
             timestamp: chrono::Utc::now().timestamp() - 1800,
@@ -1079,9 +1077,9 @@ mod tests {
 
         let event3 = DashboardEvent {
             event_type: DashboardEventType::PaymentFailed,
-            plan_address: None,
-            subscription_address: None,
-            subscriber: None,
+            payment_terms_address: None,
+            agreement_address: None,
+            payer: None,
             amount: None,
             transaction_signature: None,
             timestamp: chrono::Utc::now().timestamp(),
@@ -1140,8 +1138,8 @@ mod tests {
         use std::collections::HashMap;
 
         let mut event_counts = HashMap::new();
-        event_counts.insert("SubscriptionStarted".to_string(), 10);
-        event_counts.insert("SubscriptionRenewed".to_string(), 50);
+        event_counts.insert("AgreementStarted".to_string(), 10);
+        event_counts.insert("PaymentExecuted".to_string(), 50);
         event_counts.insert("PaymentFailed".to_string(), 2);
 
         let stats = EventStats {
@@ -1149,19 +1147,19 @@ mod tests {
             total_events: 62,
             success_rate: 96.77,  // (60 successful / 62 total) * 100
             revenue: 300_000_000, // 300 USDC in micro-lamports
-            unique_subscribers: 25,
+            unique_payers: 25,
             period: Period::Month,
         };
 
         assert_eq!(stats.total_events, 62);
         assert!((stats.success_rate - 96.77).abs() < 0.01);
         assert_eq!(stats.revenue, 300_000_000);
-        assert_eq!(stats.unique_subscribers, 25);
+        assert_eq!(stats.unique_payers, 25);
         assert_eq!(stats.period, Period::Month);
 
         // Test event counts
-        assert_eq!(stats.event_counts.get("SubscriptionStarted"), Some(&10));
-        assert_eq!(stats.event_counts.get("SubscriptionRenewed"), Some(&50));
+        assert_eq!(stats.event_counts.get("AgreementStarted"), Some(&10));
+        assert_eq!(stats.event_counts.get("PaymentExecuted"), Some(&50));
         assert_eq!(stats.event_counts.get("PaymentFailed"), Some(&2));
 
         // Test PartialEq but not Eq (due to f64)
@@ -1170,7 +1168,7 @@ mod tests {
             total_events: 62,
             success_rate: 96.77,
             revenue: 300_000_000,
-            unique_subscribers: 25,
+            unique_payers: 25,
             period: Period::Month,
         };
         assert_eq!(stats, stats2);
@@ -1206,49 +1204,49 @@ mod tests {
 
     #[test]
     fn test_get_event_type_name() {
-        use crate::events::{Canceled, PaymentFailed, Renewed, Subscribed, TallyEvent};
+        use crate::events::{PaymentFailed, PaymentAgreementStarted, PaymentExecuted, PaymentAgreementPaused, TallyEvent};
 
         // Create mock events to test event type name extraction
-        let subscribed_event = TallyEvent::Subscribed(Subscribed {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+        let payment_agreement_started_event = TallyEvent::PaymentAgreementStarted(PaymentAgreementStarted {
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payer: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             amount: 5_000_000,
         });
 
-        let renewed_event = TallyEvent::Renewed(Renewed {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+        let payment_executed_event = TallyEvent::PaymentExecuted(PaymentExecuted {
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payer: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             amount: 5_000_000,
             keeper: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             keeper_fee: 25_000,
         });
 
-        let canceled_event = TallyEvent::Canceled(Canceled {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+        let payment_agreement_paused_event = TallyEvent::PaymentAgreementPaused(PaymentAgreementPaused {
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payer: Pubkey::from(Keypair::new().pubkey().to_bytes()),
         });
 
         let payment_failed_event = TallyEvent::PaymentFailed(PaymentFailed {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payer: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             reason: "Insufficient allowance".to_string(),
         });
 
         assert_eq!(
-            DashboardClient::get_event_type_name(&subscribed_event),
-            "SubscriptionStarted"
+            DashboardClient::get_event_type_name(&payment_agreement_started_event),
+            "AgreementStarted"
         );
         assert_eq!(
-            DashboardClient::get_event_type_name(&renewed_event),
-            "SubscriptionRenewed"
+            DashboardClient::get_event_type_name(&payment_executed_event),
+            "PaymentExecuted"
         );
         assert_eq!(
-            DashboardClient::get_event_type_name(&canceled_event),
-            "SubscriptionCanceled"
+            DashboardClient::get_event_type_name(&payment_agreement_paused_event),
+            "AgreementPaused"
         );
         assert_eq!(
             DashboardClient::get_event_type_name(&payment_failed_event),
@@ -1258,25 +1256,25 @@ mod tests {
 
     #[test]
     fn test_convert_parsed_event_to_dashboard_event() {
-        use crate::events::{PaymentFailed, Subscribed, TallyEvent};
+        use crate::events::{PaymentFailed, PaymentAgreementStarted, TallyEvent};
         use anchor_client::solana_sdk::signature::Signature;
         use std::str::FromStr;
 
-        // Create a mock ParsedEventWithContext with SubscribedEvent
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let _subscription = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        // Create a mock ParsedEventWithContext with PaymentAgreementStartedEventEvent
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let _agreement = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let timestamp = chrono::Utc::now().timestamp();
 
-        let subscribed_event = TallyEvent::Subscribed(Subscribed {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan,
-            subscriber,
+        let payment_agreement_started_event = TallyEvent::PaymentAgreementStarted(PaymentAgreementStarted {
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: payment_terms,
+            payer,
             amount: 10_000_000, // 10 USDC
         });
 
         let parsed_event = ParsedEventWithContext {
-            event: subscribed_event,
+            event: payment_agreement_started_event,
             signature: Signature::from_str("5VfYmGBjvxKjKjuxV7XFQTdLX2L5VVXJGVCbNH1ZyHUJKpYzKtXs1sVs5VKjKjKjKjKjKjKjKjKjKjKjKjKjKjKj").unwrap(),
             slot: 12345,
             block_time: Some(timestamp),
@@ -1289,11 +1287,11 @@ mod tests {
 
         assert_eq!(
             dashboard_event.event_type,
-            DashboardEventType::SubscriptionStarted
+            DashboardEventType::AgreementStarted
         );
-        assert_eq!(dashboard_event.plan_address, Some(plan));
-        assert_eq!(dashboard_event.subscription_address, None); // Subscribed events don't have subscription address
-        assert_eq!(dashboard_event.subscriber, Some(subscriber));
+        assert_eq!(dashboard_event.payment_terms_address, Some(payment_terms));
+        assert_eq!(dashboard_event.agreement_address, None); // PaymentAgreementStarted events don't have payment agreement address
+        assert_eq!(dashboard_event.payer, Some(payer));
         assert_eq!(dashboard_event.amount, Some(10_000_000));
         assert_eq!(dashboard_event.timestamp, timestamp);
         assert!(dashboard_event.transaction_signature.is_some());
@@ -1310,9 +1308,9 @@ mod tests {
 
         // Test PaymentFailed event with failure reason metadata
         let payment_failed_event = TallyEvent::PaymentFailed(PaymentFailed {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan,
-            subscriber,
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: payment_terms,
+            payer,
             reason: "Insufficient allowance".to_string(),
         });
 

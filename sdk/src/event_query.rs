@@ -117,7 +117,7 @@ impl CacheEntry {
 /// Query parameters for event retrieval
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct QueryKey {
-    merchant: Pubkey,
+    payee: Pubkey,
     query_type: QueryType,
     limit: usize,
     from_slot: Option<u64>,
@@ -128,7 +128,7 @@ struct QueryKey {
 enum QueryType {
     Recent,
     DateRange,
-    MerchantEvents,
+    PayeeEvents,
 }
 
 /// RPC client for querying historical Tally program events
@@ -204,11 +204,11 @@ impl EventQueryClient {
         Self::new(config)
     }
 
-    /// Get recent events for a merchant
+    /// Get recent events for a payee
     ///
     /// # Arguments
     ///
-    /// * `merchant` - Merchant public key
+    /// * `payee` - Payee public key
     /// * `limit` - Maximum number of events to return
     ///
     /// # Returns
@@ -220,14 +220,14 @@ impl EventQueryClient {
     /// Returns error if RPC queries fail or event parsing fails
     pub async fn get_recent_events(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
         let start_time = Instant::now();
-        let query_key = Self::build_query_key(merchant, QueryType::Recent, limit, None, None);
+        let query_key = Self::build_query_key(payee, QueryType::Recent, limit, None, None);
 
         // Check cache and return early if hit
-        if let Some(cached) = self.try_get_cached_events(&query_key, merchant) {
+        if let Some(cached) = self.try_get_cached_events(&query_key, payee) {
             return Ok(cached);
         }
 
@@ -235,32 +235,32 @@ impl EventQueryClient {
             service = "tally-sdk",
             component = "event_query_client",
             event = "query_recent_events",
-            merchant = %merchant,
+            payee = %payee,
             limit = limit,
-            "Querying recent events for merchant"
+            "Querying recent events for payee"
         );
 
         // Fetch and process events
-        let sorted_events = self.fetch_and_sort_events(merchant, limit).await?;
+        let sorted_events = self.fetch_and_sort_events(payee, limit).await?;
 
         // Store results in cache
         self.try_cache_events(query_key, &sorted_events);
 
-        Self::log_query_success(merchant, &sorted_events, start_time);
+        Self::log_query_success(payee, &sorted_events, start_time);
 
         Ok(sorted_events)
     }
 
     /// Build a query key for cache operations
     const fn build_query_key(
-        merchant: &Pubkey,
+        payee: &Pubkey,
         query_type: QueryType,
         limit: usize,
         from_slot: Option<u64>,
         to_slot: Option<u64>,
     ) -> QueryKey {
         QueryKey {
-            merchant: *merchant,
+            payee: *payee,
             query_type,
             limit,
             from_slot,
@@ -272,7 +272,7 @@ impl EventQueryClient {
     fn try_get_cached_events(
         &self,
         query_key: &QueryKey,
-        merchant: &Pubkey,
+        payee: &Pubkey,
     ) -> Option<Vec<ParsedEvent>> {
         if !self.config.enable_cache {
             return None;
@@ -283,7 +283,7 @@ impl EventQueryClient {
                 service = "tally-sdk",
                 component = "event_query_client",
                 event = "cache_hit",
-                merchant = %merchant,
+                payee = %payee,
                 cached_event_count = cached_events.len(),
                 "Returning cached recent events"
             );
@@ -296,10 +296,10 @@ impl EventQueryClient {
     /// Fetch signatures, parse events, and sort by most recent first
     async fn fetch_and_sort_events(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
-        let signatures = self.get_merchant_signatures(merchant, limit).await?;
+        let signatures = self.get_payee_signatures(payee, limit).await?;
         let events = self.parse_events_from_signatures(&signatures).await?;
         Ok(Self::sort_and_limit_events(events, limit))
     }
@@ -319,23 +319,23 @@ impl EventQueryClient {
     }
 
     /// Log successful query completion with metrics
-    fn log_query_success(merchant: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
+    fn log_query_success(payee: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
             event = "recent_events_retrieved",
-            merchant = %merchant,
+            payee = %payee,
             event_count = events.len(),
             duration_ms = start_time.elapsed().as_millis(),
             "Successfully retrieved recent events"
         );
     }
 
-    /// Get events for a merchant within a date range
+    /// Get events for a payee within a date range
     ///
     /// # Arguments
     ///
-    /// * `merchant` - Merchant public key
+    /// * `payee` - Payee public key
     /// * `from` - Start date (inclusive)
     /// * `to` - End date (inclusive)
     ///
@@ -348,7 +348,7 @@ impl EventQueryClient {
     /// Returns error if RPC queries fail or slot conversion fails
     pub async fn get_events_by_date_range(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         from: DateTime<Utc>,
         to: DateTime<Utc>,
     ) -> Result<Vec<ParsedEvent>> {
@@ -358,7 +358,7 @@ impl EventQueryClient {
             service = "tally-sdk",
             component = "event_query_client",
             event = "query_events_by_date_range",
-            merchant = %merchant,
+            payee = %payee,
             from = %from,
             to = %to,
             "Querying events by date range"
@@ -367,27 +367,27 @@ impl EventQueryClient {
         // Convert dates to slots and build query key
         let (from_slot, to_slot) = self.convert_date_range_to_slots(from, to)?;
         let query_key = Self::build_date_range_query_key(
-            merchant,
+            payee,
             from_slot,
             to_slot,
             self.config.max_events_per_query,
         );
 
         // Check cache and return early if hit
-        if let Some(cached) = self.try_get_cached_date_range_events(&query_key, merchant) {
+        if let Some(cached) = self.try_get_cached_date_range_events(&query_key, payee) {
             return Ok(cached);
         }
 
         // Fetch, filter, and sort events
         let sorted_events = self
-            .fetch_filter_and_sort_events_by_date(merchant, from, to, from_slot, to_slot)
+            .fetch_filter_and_sort_events_by_date(payee, from, to, from_slot, to_slot)
             .await?;
 
         // Store results in cache
         self.try_cache_events(query_key.clone(), &sorted_events);
 
         Self::log_date_range_query_success(
-            merchant,
+            payee,
             &sorted_events,
             from_slot,
             to_slot,
@@ -410,13 +410,13 @@ impl EventQueryClient {
 
     /// Build query key for date range queries
     const fn build_date_range_query_key(
-        merchant: &Pubkey,
+        payee: &Pubkey,
         from_slot: u64,
         to_slot: u64,
         limit: usize,
     ) -> QueryKey {
         QueryKey {
-            merchant: *merchant,
+            payee: *payee,
             query_type: QueryType::DateRange,
             limit,
             from_slot: Some(from_slot),
@@ -428,7 +428,7 @@ impl EventQueryClient {
     fn try_get_cached_date_range_events(
         &self,
         query_key: &QueryKey,
-        merchant: &Pubkey,
+        payee: &Pubkey,
     ) -> Option<Vec<ParsedEvent>> {
         if !self.config.enable_cache {
             return None;
@@ -439,7 +439,7 @@ impl EventQueryClient {
                 service = "tally-sdk",
                 component = "event_query_client",
                 event = "cache_hit",
-                merchant = %merchant,
+                payee = %payee,
                 cached_event_count = cached_events.len(),
                 "Returning cached date range events"
             );
@@ -452,14 +452,14 @@ impl EventQueryClient {
     /// Fetch signatures, parse, filter by date, and sort events
     async fn fetch_filter_and_sort_events_by_date(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         from: DateTime<Utc>,
         to: DateTime<Utc>,
         from_slot: u64,
         to_slot: u64,
     ) -> Result<Vec<ParsedEvent>> {
         let signatures = self
-            .get_merchant_signatures_in_slot_range(merchant, from_slot, to_slot)
+            .get_payee_signatures_in_slot_range(payee, from_slot, to_slot)
             .await?;
         let events = self.parse_events_from_signatures(&signatures).await?;
         let filtered_events = Self::filter_events_by_date_range(events, from, to);
@@ -494,7 +494,7 @@ impl EventQueryClient {
 
     /// Log successful date range query completion with metrics
     fn log_date_range_query_success(
-        merchant: &Pubkey,
+        payee: &Pubkey,
         events: &[ParsedEvent],
         from_slot: u64,
         to_slot: u64,
@@ -504,7 +504,7 @@ impl EventQueryClient {
             service = "tally-sdk",
             component = "event_query_client",
             event = "date_range_events_retrieved",
-            merchant = %merchant,
+            payee = %payee,
             event_count = events.len(),
             from_slot = from_slot,
             to_slot = to_slot,
@@ -513,71 +513,71 @@ impl EventQueryClient {
         );
     }
 
-    /// Get all events for a merchant (up to configured limit)
+    /// Get all events for a payee (up to configured limit)
     ///
     /// # Arguments
     ///
-    /// * `merchant` - Merchant public key
+    /// * `payee` - Payee public key
     /// * `limit` - Maximum number of events to return
     ///
     /// # Returns
     ///
-    /// Vector of parsed events for the merchant
+    /// Vector of parsed events for the payee
     ///
     /// # Errors
     ///
     /// Returns error if RPC queries fail
-    pub async fn get_merchant_events(
+    pub async fn get_payee_events(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
         let start_time = Instant::now();
-        let query_key = Self::build_merchant_events_query_key(merchant, limit);
+        let query_key = Self::build_payee_events_query_key(payee, limit);
 
         // Check cache and return early if hit
-        if let Some(cached) = self.try_get_cached_merchant_events(&query_key, merchant) {
+        if let Some(cached) = self.try_get_cached_payee_events(&query_key, payee) {
             return Ok(cached);
         }
 
         debug!(
             service = "tally-sdk",
             component = "event_query_client",
-            event = "query_merchant_events",
-            merchant = %merchant,
+            event = "query_payee_events",
+            payee = %payee,
             limit = limit,
-            "Querying all events for merchant"
+            "Querying all events for payee"
         );
 
         // Fetch, parse, and sort events
         let sorted_events = self
-            .fetch_parse_and_sort_merchant_events(merchant, limit)
+            .fetch_parse_and_sort_payee_events(payee, limit)
             .await?;
 
         // Store results in cache
         self.try_cache_events(query_key, &sorted_events);
 
-        Self::log_merchant_events_success(merchant, &sorted_events, start_time);
+        Self::log_payee_events_success(payee, &sorted_events, start_time);
 
         Ok(sorted_events)
     }
 
-    /// Build query key for merchant events queries
-    const fn build_merchant_events_query_key(merchant: &Pubkey, limit: usize) -> QueryKey {
+    /// Build query key for payee events queries
+    const fn build_payee_events_query_key(payee: &Pubkey, limit: usize) -> QueryKey {
         QueryKey {
-            merchant: *merchant,
-            query_type: QueryType::MerchantEvents,
+            payee: *payee,
+            query_type: QueryType::PayeeEvents,
             limit,
             from_slot: None,
             to_slot: None,
         }
     }
 
-    /// Try to get cached merchant events, returning Some if cache hit
-    fn try_get_cached_merchant_events(
+    /// Try to get cached payee events, returning Some if cache hit
+    fn try_get_cached_payee_events(
         &self,
         query_key: &QueryKey,
-        merchant: &Pubkey,
+        payee: &Pubkey,
     ) -> Option<Vec<ParsedEvent>> {
         if !self.config.enable_cache {
             return None;
@@ -588,9 +588,9 @@ impl EventQueryClient {
                 service = "tally-sdk",
                 component = "event_query_client",
                 event = "cache_hit",
-                merchant = %merchant,
+                payee = %payee,
                 cached_event_count = cached_events.len(),
-                "Returning cached merchant events"
+                "Returning cached payee events"
             );
             return Some(cached_events);
         }
@@ -598,16 +598,16 @@ impl EventQueryClient {
         None
     }
 
-    /// Fetch signatures, parse events, and sort for merchant
-    async fn fetch_parse_and_sort_merchant_events(
+    /// Fetch signatures, parse events, and sort for payee
+    async fn fetch_parse_and_sort_payee_events(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<ParsedEvent>> {
         // Get more signatures to ensure we have enough events (2x buffer with overflow protection)
         let signature_limit = limit.saturating_mul(2);
         let signatures = self
-            .get_merchant_signatures(merchant, signature_limit)
+            .get_payee_signatures(payee, signature_limit)
             .await?;
 
         // Parse events from transactions
@@ -617,76 +617,76 @@ impl EventQueryClient {
         Ok(Self::sort_and_limit_events(events, limit))
     }
 
-    /// Log successful merchant events query completion with metrics
-    fn log_merchant_events_success(merchant: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
+    /// Log successful payee events query completion with metrics
+    fn log_payee_events_success(payee: &Pubkey, events: &[ParsedEvent], start_time: Instant) {
         info!(
             service = "tally-sdk",
             component = "event_query_client",
-            event = "merchant_events_retrieved",
-            merchant = %merchant,
+            event = "payee_events_retrieved",
+            payee = %payee,
             event_count = events.len(),
             duration_ms = start_time.elapsed().as_millis(),
-            "Successfully retrieved merchant events"
+            "Successfully retrieved payee events"
         );
     }
 
-    /// Get transaction signatures for merchant's program accounts
+    /// Get transaction signatures for payee's program accounts
     #[allow(clippy::unused_async)] // May need async for future enhanced RPC operations
-    async fn get_merchant_signatures(
+    async fn get_payee_signatures(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         limit: usize,
     ) -> Result<Vec<Signature>> {
-        // Get merchant account signatures
-        let merchant_signatures = self
+        // Get payee account signatures
+        let payee_signatures = self
             .sdk_client
             .get_confirmed_signatures_for_address(
-                merchant,
+                payee,
                 Some(GetConfirmedSignaturesForAddress2Config {
                     limit: Some(limit.min(1000)), // Solana RPC limit
                     commitment: Some(self.config.commitment),
                     ..Default::default()
                 }),
             )
-            .map_err(|e| TallyError::RpcError(format!("Failed to get merchant signatures: {e}")))?;
+            .map_err(|e| TallyError::RpcError(format!("Failed to get payee signatures: {e}")))?;
 
         let mut signatures = HashSet::new();
-        for sig_info in merchant_signatures {
+        for sig_info in payee_signatures {
             if let Ok(signature) = Signature::from_str(&sig_info.signature) {
                 signatures.insert(signature);
             }
         }
 
-        // Get plans for this merchant and their signatures
-        let plans = self.get_merchant_plans(merchant)?;
-        for plan_address in &plans {
-            let plan_signatures = self
+        // Get payment terms for this payee and their signatures
+        let payment_terms_list = self.get_payee_payment_terms(payee)?;
+        for payment_terms_address in &payment_terms_list {
+            let payment_terms_signatures = self
                 .sdk_client
                 .get_confirmed_signatures_for_address(
-                    plan_address,
+                    payment_terms_address,
                     Some(GetConfirmedSignaturesForAddress2Config {
                         limit: Some(limit.min(1000)),
                         commitment: Some(self.config.commitment),
                         ..Default::default()
                     }),
                 )
-                .map_err(|e| TallyError::RpcError(format!("Failed to get plan signatures: {e}")))?;
+                .map_err(|e| TallyError::RpcError(format!("Failed to get payment terms signatures: {e}")))?;
 
-            for sig_info in plan_signatures {
+            for sig_info in payment_terms_signatures {
                 if let Ok(signature) = Signature::from_str(&sig_info.signature) {
                     signatures.insert(signature);
                 }
             }
         }
 
-        // Get subscriptions for merchant plans and their signatures
-        for plan_address in &plans {
-            let subscriptions = self.get_plan_subscriptions(plan_address)?;
-            for subscription_address in subscriptions {
-                let sub_signatures = self
+        // Get payment agreements for payee's payment terms and their signatures
+        for payment_terms_address in &payment_terms_list {
+            let agreements = self.get_payment_terms_agreements(payment_terms_address)?;
+            for agreement_address in agreements {
+                let agreement_signatures = self
                     .sdk_client
                     .get_confirmed_signatures_for_address(
-                        &subscription_address,
+                        &agreement_address,
                         Some(GetConfirmedSignaturesForAddress2Config {
                             limit: Some(limit.min(1000)),
                             commitment: Some(self.config.commitment),
@@ -694,10 +694,10 @@ impl EventQueryClient {
                         }),
                     )
                     .map_err(|e| {
-                        TallyError::RpcError(format!("Failed to get subscription signatures: {e}"))
+                        TallyError::RpcError(format!("Failed to get payment agreement signatures: {e}"))
                     })?;
 
-                for sig_info in sub_signatures {
+                for sig_info in agreement_signatures {
                     if let Ok(signature) = Signature::from_str(&sig_info.signature) {
                         signatures.insert(signature);
                     }
@@ -711,26 +711,26 @@ impl EventQueryClient {
             service = "tally-sdk",
             component = "event_query_client",
             event = "signatures_collected",
-            merchant = %merchant,
+            payee = %payee,
             signature_count = result.len(),
-            plan_count = plans.len(),
-            "Collected transaction signatures for merchant"
+            payment_terms_count = payment_terms_list.len(),
+            "Collected transaction signatures for payee"
         );
 
         Ok(result)
     }
 
-    /// Get transaction signatures for merchant within a slot range
-    async fn get_merchant_signatures_in_slot_range(
+    /// Get transaction signatures for payee within a slot range
+    async fn get_payee_signatures_in_slot_range(
         &self,
-        merchant: &Pubkey,
+        payee: &Pubkey,
         _from_slot: u64,
         _to_slot: u64,
     ) -> Result<Vec<Signature>> {
         // Get signatures with 2x buffer, using saturating multiplication to prevent overflow
         let signature_limit = self.config.max_events_per_query.saturating_mul(2);
         let signatures = self
-            .get_merchant_signatures(merchant, signature_limit)
+            .get_payee_signatures(payee, signature_limit)
             .await?;
 
         // We would need to fetch transaction details to filter by slot, which is expensive
@@ -831,14 +831,14 @@ impl EventQueryClient {
         );
     }
 
-    /// Get plan addresses for a merchant using getProgramAccounts
-    fn get_merchant_plans(&self, merchant: &Pubkey) -> Result<Vec<Pubkey>> {
+    /// Get payment terms addresses for a payee using getProgramAccounts
+    fn get_payee_payment_terms(&self, payee: &Pubkey) -> Result<Vec<Pubkey>> {
         let config = RpcProgramAccountsConfig {
             filters: Some(vec![
-                // Filter by merchant field in Plan account (first 32 bytes after discriminator)
+                // Filter by payee field in PaymentTerms account (first 32 bytes after discriminator)
                 RpcFilterType::Memcmp(Memcmp::new(
                     8, // Skip 8-byte Anchor discriminator
-                    MemcmpEncodedBytes::Base58(merchant.to_string()),
+                    MemcmpEncodedBytes::Base58(payee.to_string()),
                 )),
             ]),
             account_config: RpcAccountInfoConfig {
@@ -854,30 +854,30 @@ impl EventQueryClient {
             .sdk_client
             .rpc()
             .get_program_accounts_with_config(&self.program_id, config)
-            .map_err(|e| TallyError::RpcError(format!("Failed to get merchant plans: {e}")))?;
+            .map_err(|e| TallyError::RpcError(format!("Failed to get payee payment terms: {e}")))?;
 
-        let plan_addresses: Vec<Pubkey> = accounts.into_iter().map(|(pubkey, _)| pubkey).collect();
+        let payment_terms_addresses: Vec<Pubkey> = accounts.into_iter().map(|(pubkey, _)| pubkey).collect();
 
         debug!(
             service = "tally-sdk",
             component = "event_query_client",
-            event = "merchant_plans_retrieved",
-            merchant = %merchant,
-            plan_count = plan_addresses.len(),
-            "Retrieved plan addresses for merchant"
+            event = "payee_payment_terms_retrieved",
+            payee = %payee,
+            payment_terms_count = payment_terms_addresses.len(),
+            "Retrieved payment terms addresses for payee"
         );
 
-        Ok(plan_addresses)
+        Ok(payment_terms_addresses)
     }
 
-    /// Get subscription addresses for a plan using getProgramAccounts
-    fn get_plan_subscriptions(&self, plan: &Pubkey) -> Result<Vec<Pubkey>> {
+    /// Get payment agreement addresses for payment terms using getProgramAccounts
+    fn get_payment_terms_agreements(&self, payment_terms: &Pubkey) -> Result<Vec<Pubkey>> {
         let config = RpcProgramAccountsConfig {
             filters: Some(vec![
-                // Filter by plan field in Subscription account (first 32 bytes after discriminator)
+                // Filter by payment_terms field in PaymentAgreement account (first 32 bytes after discriminator)
                 RpcFilterType::Memcmp(Memcmp::new(
                     8, // Skip 8-byte Anchor discriminator
-                    MemcmpEncodedBytes::Base58(plan.to_string()),
+                    MemcmpEncodedBytes::Base58(payment_terms.to_string()),
                 )),
             ]),
             account_config: RpcAccountInfoConfig {
@@ -893,21 +893,21 @@ impl EventQueryClient {
             .sdk_client
             .rpc()
             .get_program_accounts_with_config(&self.program_id, config)
-            .map_err(|e| TallyError::RpcError(format!("Failed to get plan subscriptions: {e}")))?;
+            .map_err(|e| TallyError::RpcError(format!("Failed to get payment terms agreements: {e}")))?;
 
-        let subscription_addresses: Vec<Pubkey> =
+        let agreement_addresses: Vec<Pubkey> =
             accounts.into_iter().map(|(pubkey, _)| pubkey).collect();
 
         trace!(
             service = "tally-sdk",
             component = "event_query_client",
-            event = "plan_subscriptions_retrieved",
-            plan = %plan,
-            subscription_count = subscription_addresses.len(),
-            "Retrieved subscription addresses for plan"
+            event = "payment_terms_agreements_retrieved",
+            payment_terms = %payment_terms,
+            agreement_count = agreement_addresses.len(),
+            "Retrieved payment agreement addresses for payment terms"
         );
 
-        Ok(subscription_addresses)
+        Ok(agreement_addresses)
     }
 
     /// Convert Unix timestamp to approximate slot number
@@ -1066,10 +1066,10 @@ mod tests {
 
     #[test]
     fn test_query_key_equality() {
-        let merchant = Pubkey::new_unique();
+        let payee = Pubkey::new_unique();
 
         let key1 = QueryKey {
-            merchant,
+            payee,
             query_type: QueryType::Recent,
             limit: 100,
             from_slot: None,
@@ -1077,7 +1077,7 @@ mod tests {
         };
 
         let key2 = QueryKey {
-            merchant,
+            payee,
             query_type: QueryType::Recent,
             limit: 100,
             from_slot: None,
@@ -1087,8 +1087,8 @@ mod tests {
         assert_eq!(key1, key2);
 
         let key3 = QueryKey {
-            merchant,
-            query_type: QueryType::MerchantEvents,
+            payee,
+            query_type: QueryType::PayeeEvents,
             limit: 100,
             from_slot: None,
             to_slot: None,
@@ -1148,7 +1148,7 @@ mod tests {
         let client = EventQueryClient::new(config).unwrap();
 
         let key = QueryKey {
-            merchant: Pubkey::new_unique(),
+            payee: Pubkey::new_unique(),
             query_type: QueryType::Recent,
             limit: 100,
             from_slot: None,

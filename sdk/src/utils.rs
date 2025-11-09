@@ -171,27 +171,27 @@ pub fn format_duration(seconds: u64) -> String {
     }
 }
 
-/// Calculate subscription renewal timestamp
+/// Calculate payment agreement next payment timestamp
 ///
 /// # Arguments
-/// * `start_timestamp` - Subscription start time (Unix timestamp)
-/// * `period_seconds` - Subscription period in seconds
-/// * `periods_elapsed` - Number of periods that have elapsed
+/// * `start_timestamp` - Payment agreement start time (Unix timestamp)
+/// * `period_seconds` - Payment period in seconds
+/// * `periods_elapsed` - Number of payment periods that have elapsed
 ///
 /// # Returns
-/// Next renewal timestamp
+/// Next payment timestamp
 ///
 /// # Examples
 /// ```
-/// use tally_sdk::utils::calculate_next_renewal;
+/// use tally_sdk::utils::calculate_next_payment;
 ///
 /// // Starting at Unix timestamp 1000, with 30-day periods (2592000 seconds)
-/// // After 0 periods elapsed, next renewal should be at 1000 + 2592000 = 2593000
-/// let next = calculate_next_renewal(1000, 2592000, 0);
+/// // After 0 periods elapsed, next payment should be at 1000 + 2592000 = 2593000
+/// let next = calculate_next_payment(1000, 2592000, 0);
 /// assert_eq!(next, 2593000);
 /// ```
 #[must_use]
-pub fn calculate_next_renewal(
+pub fn calculate_next_payment(
     start_timestamp: i64,
     period_seconds: u64,
     periods_elapsed: u32,
@@ -204,41 +204,41 @@ pub fn calculate_next_renewal(
     )
 }
 
-/// Check if subscription is due for renewal
+/// Check if payment agreement is due for payment
 ///
-/// A subscription is due for renewal if the current time is past the renewal
+/// A payment agreement is due if the current time is past the payment
 /// time but still within the grace period.
 ///
 /// # Arguments
-/// * `next_renewal_timestamp` - Next renewal time (Unix timestamp)
+/// * `next_payment_timestamp` - Next payment time (Unix timestamp)
 /// * `grace_period_seconds` - Grace period in seconds
 ///
 /// # Returns
-/// True if due for renewal (including grace period)
+/// True if due for payment (including grace period)
 #[must_use]
-pub fn is_renewal_due(next_renewal_timestamp: i64, grace_period_seconds: u64) -> bool {
+pub fn is_payment_due(next_payment_timestamp: i64, grace_period_seconds: u64) -> bool {
     let current_timestamp = chrono::Utc::now().timestamp();
     let grace_end =
-        next_renewal_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
-    current_timestamp >= next_renewal_timestamp && current_timestamp <= grace_end
+        next_payment_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
+    current_timestamp >= next_payment_timestamp && current_timestamp <= grace_end
 }
 
-/// Check if subscription is overdue (past grace period)
+/// Check if payment agreement is overdue (past grace period)
 ///
-/// A subscription is overdue if the current time is past both the renewal
+/// A payment agreement is overdue if the current time is past both the payment
 /// time and the grace period.
 ///
 /// # Arguments
-/// * `next_renewal_timestamp` - Next renewal time (Unix timestamp)
+/// * `next_payment_timestamp` - Next payment time (Unix timestamp)
 /// * `grace_period_seconds` - Grace period in seconds
 ///
 /// # Returns
 /// True if overdue (past grace period)
 #[must_use]
-pub fn is_subscription_overdue(next_renewal_timestamp: i64, grace_period_seconds: u64) -> bool {
+pub fn is_agreement_overdue(next_payment_timestamp: i64, grace_period_seconds: u64) -> bool {
     let current_timestamp = chrono::Utc::now().timestamp();
     let grace_end =
-        next_renewal_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
+        next_payment_timestamp.saturating_add(grace_period_seconds.try_into().unwrap_or(i64::MAX));
     current_timestamp > grace_end
 }
 
@@ -300,48 +300,48 @@ mod tests {
     }
 
     #[test]
-    fn test_calculate_next_renewal() {
+    fn test_calculate_next_payment() {
         let start = 1000_i64;
         let period = 2_592_000_u64; // 30 days in seconds
 
-        // First renewal (0 periods elapsed)
+        // First payment (0 periods elapsed)
         assert_eq!(
-            calculate_next_renewal(start, period, 0),
+            calculate_next_payment(start, period, 0),
             start + i64::try_from(period).unwrap()
         );
 
-        // Second renewal (1 period elapsed)
+        // Second payment (1 period elapsed)
         assert_eq!(
-            calculate_next_renewal(start, period, 1),
+            calculate_next_payment(start, period, 1),
             start + i64::try_from(2 * period).unwrap()
         );
     }
 
     #[test]
-    fn test_is_renewal_due() {
+    fn test_is_payment_due() {
         let now = chrono::Utc::now().timestamp();
         let grace_period = 86400; // 1 day
 
         // Past due but within grace period
-        let past_renewal = now - 3600; // 1 hour ago
-        assert!(is_renewal_due(past_renewal, grace_period));
+        let past_payment = now - 3600; // 1 hour ago
+        assert!(is_payment_due(past_payment, grace_period));
 
-        // Future renewal
-        let future_renewal = now + 3600; // 1 hour from now
-        assert!(!is_renewal_due(future_renewal, grace_period));
+        // Future payment
+        let future_payment = now + 3600; // 1 hour from now
+        assert!(!is_payment_due(future_payment, grace_period));
     }
 
     #[test]
-    fn test_is_subscription_overdue() {
+    fn test_is_agreement_overdue() {
         let now = chrono::Utc::now().timestamp();
         let grace_period = 86400; // 1 day
 
         // Way past due (beyond grace period)
-        let way_past_renewal = now - (2 * 86400); // 2 days ago
-        assert!(is_subscription_overdue(way_past_renewal, grace_period));
+        let way_past_payment = now - (2 * 86400); // 2 days ago
+        assert!(is_agreement_overdue(way_past_payment, grace_period));
 
         // Within grace period
-        let recent_past_renewal = now - 3600; // 1 hour ago
-        assert!(!is_subscription_overdue(recent_past_renewal, grace_period));
+        let recent_past_payment = now - 3600; // 1 hour ago
+        assert!(!is_agreement_overdue(recent_past_payment, grace_period));
     }
 }

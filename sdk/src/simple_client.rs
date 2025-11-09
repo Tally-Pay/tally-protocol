@@ -3,7 +3,7 @@
 use crate::{
     error::{Result, TallyError},
     program_id_string,
-    program_types::{Merchant, Plan, Subscription},
+    program_types::{Payee, PaymentTerms, PaymentAgreement},
 };
 use anchor_client::solana_account_decoder::UiAccountEncoding;
 use anchor_client::solana_client::rpc_client::GetConfirmedSignaturesForAddress2Config;
@@ -77,9 +77,9 @@ impl SimpleTallyClient {
         self.program_id
     }
 
-    /// Compute merchant PDA using this client's program ID
-    pub fn merchant_address(&self, authority: &Pubkey) -> Pubkey {
-        crate::pda::merchant_address_with_program_id(authority, &self.program_id)
+    /// Compute payee PDA using this client's program ID
+    pub fn payee_address(&self, authority: &Pubkey) -> Pubkey {
+        crate::pda::payee_address_with_program_id(authority, &self.program_id)
     }
 
     /// Get the RPC client
@@ -119,15 +119,15 @@ impl SimpleTallyClient {
         }
     }
 
-    /// Get merchant account data
+    /// Get payee account data
     ///
     /// # Errors
     /// Returns an error if the account doesn't exist or can't be deserialized
-    pub fn get_merchant(&self, merchant_address: &Pubkey) -> Result<Option<Merchant>> {
+    pub fn get_payee(&self, payee_address: &Pubkey) -> Result<Option<Payee>> {
         let account_data = match self
             .rpc_client
-            .get_account_with_commitment(merchant_address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch merchant account: {e}")))?
+            .get_account_with_commitment(payee_address, CommitmentConfig::confirmed())
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payee account: {e}")))?
             .value
         {
             Some(account) => account.data,
@@ -136,25 +136,25 @@ impl SimpleTallyClient {
 
         if account_data.len() < 8 {
             return Err(TallyError::Generic(
-                "Invalid merchant account data".to_string(),
+                "Invalid payee account data".to_string(),
             ));
         }
 
-        let merchant = Merchant::try_from_slice(&account_data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize merchant: {e}")))?;
+        let payee = Payee::try_from_slice(&account_data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payee: {e}")))?;
 
-        Ok(Some(merchant))
+        Ok(Some(payee))
     }
 
-    /// Get plan account data
+    /// Get payment terms account data
     ///
     /// # Errors
     /// Returns an error if the account doesn't exist or can't be deserialized
-    pub fn get_plan(&self, plan_address: &Pubkey) -> Result<Option<Plan>> {
+    pub fn get_payment_terms(&self, payment_terms_address: &Pubkey) -> Result<Option<PaymentTerms>> {
         let account_data = match self
             .rpc_client
-            .get_account_with_commitment(plan_address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch plan account: {e}")))?
+            .get_account_with_commitment(payment_terms_address, CommitmentConfig::confirmed())
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment terms account: {e}")))?
             .value
         {
             Some(account) => account.data,
@@ -162,13 +162,13 @@ impl SimpleTallyClient {
         };
 
         if account_data.len() < 8 {
-            return Err(TallyError::Generic("Invalid plan account data".to_string()));
+            return Err(TallyError::Generic("Invalid payment terms account data".to_string()));
         }
 
-        let plan = Plan::try_from_slice(&account_data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize plan: {e}")))?;
+        let payment_terms = PaymentTerms::try_from_slice(&account_data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payment terms: {e}")))?;
 
-        Ok(Some(plan))
+        Ok(Some(payment_terms))
     }
 
     /// Get config account data
@@ -198,15 +198,15 @@ impl SimpleTallyClient {
         Ok(Some(config))
     }
 
-    /// Get subscription account data
+    /// Get payment agreement account data
     ///
     /// # Errors
     /// Returns an error if the account doesn't exist or can't be deserialized
-    pub fn get_subscription(&self, subscription_address: &Pubkey) -> Result<Option<Subscription>> {
+    pub fn get_payment_agreement(&self, payment_agreement_address: &Pubkey) -> Result<Option<PaymentAgreement>> {
         let account_data = match self
             .rpc_client
-            .get_account_with_commitment(subscription_address, CommitmentConfig::confirmed())
-            .map_err(|e| TallyError::Generic(format!("Failed to fetch subscription account: {e}")))?
+            .get_account_with_commitment(payment_agreement_address, CommitmentConfig::confirmed())
+            .map_err(|e| TallyError::Generic(format!("Failed to fetch payment agreement account: {e}")))?
             .value
         {
             Some(account) => account.data,
@@ -215,29 +215,29 @@ impl SimpleTallyClient {
 
         if account_data.len() < 8 {
             return Err(TallyError::Generic(
-                "Invalid subscription account data".to_string(),
+                "Invalid payment agreement account data".to_string(),
             ));
         }
 
-        let subscription = Subscription::try_from_slice(&account_data[8..])
-            .map_err(|e| TallyError::Generic(format!("Failed to deserialize subscription: {e}")))?;
+        let payment_agreement = PaymentAgreement::try_from_slice(&account_data[8..])
+            .map_err(|e| TallyError::Generic(format!("Failed to deserialize payment agreement: {e}")))?;
 
-        Ok(Some(subscription))
+        Ok(Some(payment_agreement))
     }
 
-    /// List all plans for a merchant
+    /// List all payment terms for a payee
     ///
     /// # Errors
     /// Returns an error if the RPC query fails or accounts can't be deserialized
-    pub fn list_plans(&self, merchant_address: &Pubkey) -> Result<Vec<(Pubkey, Plan)>> {
-        // Create filter to match merchant field in Plan account data
-        // Plan account layout: 8 bytes discriminator + Plan struct
-        // Plan struct: merchant (32 bytes) at offset 8
+    pub fn list_payment_terms(&self, payee_address: &Pubkey) -> Result<Vec<(Pubkey, PaymentTerms)>> {
+        // Create filter to match payee field in PaymentTerms account data
+        // PaymentTerms account layout: 8 bytes discriminator + PaymentTerms struct
+        // PaymentTerms struct: payee (32 bytes) at offset 8
         let filters = vec![
-            RpcFilterType::DataSize(129), // Filter by Plan account size
+            RpcFilterType::DataSize(129), // Filter by PaymentTerms account size
             RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 8,
-                merchant_address.to_bytes().to_vec(),
+                payee_address.to_bytes().to_vec(),
             )),
         ];
 
@@ -253,37 +253,37 @@ impl SimpleTallyClient {
             sort_results: None,
         };
 
-        let plan_accounts = self
+        let payment_terms_accounts = self
             .rpc_client
             .get_program_accounts_with_config(&self.program_id, config)
-            .map_err(|e| TallyError::Generic(format!("Failed to query plan accounts: {e}")))?;
+            .map_err(|e| TallyError::Generic(format!("Failed to query payment terms accounts: {e}")))?;
 
-        let mut plans = Vec::new();
-        for (pubkey, account) in plan_accounts {
+        let mut payment_terms_list = Vec::new();
+        for (pubkey, account) in payment_terms_accounts {
             if account.data.len() < 8 {
                 continue;
             }
 
-            if let Ok(plan) = Plan::try_from_slice(&account.data[8..]) {
-                plans.push((pubkey, plan));
+            if let Ok(payment_terms) = PaymentTerms::try_from_slice(&account.data[8..]) {
+                payment_terms_list.push((pubkey, payment_terms));
             }
             // Skip invalid accounts
         }
 
-        Ok(plans)
+        Ok(payment_terms_list)
     }
 
-    /// List all subscriptions for a plan
+    /// List all payment agreements for payment terms
     ///
     /// # Errors
     /// Returns an error if the RPC query fails or accounts can't be deserialized
-    pub fn list_subscriptions(&self, plan_address: &Pubkey) -> Result<Vec<(Pubkey, Subscription)>> {
-        // Create filter to match plan field in Subscription account data
-        // Subscription account layout: 8 bytes discriminator + Subscription struct
-        // Subscription struct: plan (32 bytes) at offset 8
+    pub fn list_payment_agreements(&self, payment_terms_address: &Pubkey) -> Result<Vec<(Pubkey, PaymentAgreement)>> {
+        // Create filter to match payment_terms field in PaymentAgreement account data
+        // PaymentAgreement account layout: 8 bytes discriminator + PaymentAgreement struct
+        // PaymentAgreement struct: payment_terms (32 bytes) at offset 8
         let filters = vec![
-            RpcFilterType::DataSize(105), // Filter by Subscription account size (8 + 32 + 32 + 8 + 8 + 8 + 8 + 1)
-            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(8, plan_address.to_bytes().to_vec())),
+            RpcFilterType::DataSize(105), // Filter by PaymentAgreement account size (8 + 32 + 32 + 8 + 8 + 8 + 8 + 1)
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(8, payment_terms_address.to_bytes().to_vec())),
         ];
 
         let config = RpcProgramAccountsConfig {
@@ -298,26 +298,26 @@ impl SimpleTallyClient {
             sort_results: None,
         };
 
-        let subscription_accounts = self
+        let payment_agreement_accounts = self
             .rpc_client
             .get_program_accounts_with_config(&self.program_id, config)
             .map_err(|e| {
-                TallyError::Generic(format!("Failed to query subscription accounts: {e}"))
+                TallyError::Generic(format!("Failed to query payment agreement accounts: {e}"))
             })?;
 
-        let mut subscriptions = Vec::new();
-        for (pubkey, account) in subscription_accounts {
+        let mut payment_agreements = Vec::new();
+        for (pubkey, account) in payment_agreement_accounts {
             if account.data.len() < 8 {
                 continue;
             }
 
-            if let Ok(subscription) = Subscription::try_from_slice(&account.data[8..]) {
-                subscriptions.push((pubkey, subscription));
+            if let Ok(payment_agreement) = PaymentAgreement::try_from_slice(&account.data[8..]) {
+                payment_agreements.push((pubkey, payment_agreement));
             }
             // Skip invalid accounts
         }
 
-        Ok(subscriptions)
+        Ok(payment_agreements)
     }
 
     /// Submit and confirm a transaction
@@ -386,27 +386,27 @@ impl SimpleTallyClient {
             .map_err(|e| TallyError::Generic(format!("Failed to get latest blockhash: {e}")))
     }
 
-    /// High-level method to create a merchant account
+    /// High-level method to create a payee account
     ///
     /// # Errors
-    /// Returns an error if merchant creation fails
-    pub fn create_merchant<T: Signer>(
+    /// Returns an error if payee creation fails
+    pub fn init_payee<T: Signer>(
         &self,
         authority: &T,
         usdc_mint: &Pubkey,
         treasury_ata: &Pubkey,
     ) -> Result<(Pubkey, String)> {
-        // Check if merchant already exists
-        let merchant_pda = self.merchant_address(&authority.pubkey());
-        if self.account_exists(&merchant_pda)? {
+        // Check if payee already exists
+        let payee_pda = self.payee_address(&authority.pubkey());
+        if self.account_exists(&payee_pda)? {
             return Err(TallyError::Generic(format!(
-                "Merchant account already exists at address: {merchant_pda}"
+                "Payee account already exists at address: {payee_pda}"
             )));
         }
 
         // Build instruction using transaction builder with this client's program ID
         // Platform fee is automatically set to Free tier (2.0%) by the program
-        let instruction = crate::transaction_builder::create_merchant()
+        let instruction = crate::transaction_builder::init_payee()
             .authority(authority.pubkey())
             .usdc_mint(*usdc_mint)
             .treasury_ata(*treasury_ata)
@@ -415,28 +415,27 @@ impl SimpleTallyClient {
 
         let signature = self.submit_instruction(instruction, &[authority])?;
 
-        Ok((merchant_pda, signature))
+        Ok((payee_pda, signature))
     }
 
-    /// High-level method to initialize merchant with treasury management
+    /// High-level method to initialize payee with treasury management
     ///
     /// This method handles both cases:
-    /// - Treasury ATA exists + Merchant missing → Create merchant only
-    /// - Treasury ATA missing + Merchant missing → Create both ATA and merchant
+    /// - Treasury ATA exists + Payee missing → Create payee only
+    /// - Treasury ATA missing + Payee missing → Create both ATA and payee
     ///
     /// # Arguments
-    /// * `authority` - The wallet that will own the merchant account and treasury ATA
+    /// * `authority` - The wallet that will own the payee account and treasury ATA
     /// * `usdc_mint` - The USDC mint address
     /// * `treasury_ata` - The expected treasury ATA address
-    /// * `platform_fee_bps` - Platform fee in basis points
     ///
     /// # Returns
-    /// * `Ok((merchant_pda, signature, created_ata))` - The merchant PDA, transaction signature, and whether ATA was created
-    /// * `Err(TallyError)` - If merchant already exists or other validation/execution failures
+    /// * `Ok((payee_pda, signature, created_ata))` - The payee PDA, transaction signature, and whether ATA was created
+    /// * `Err(TallyError)` - If payee already exists or other validation/execution failures
     ///
     /// # Errors
-    /// Returns an error if merchant already exists, validation fails, or transaction execution fails
-    pub fn initialize_merchant_with_treasury<T: Signer>(
+    /// Returns an error if payee already exists, validation fails, or transaction execution fails
+    pub fn init_payee_with_treasury<T: Signer>(
         &self,
         authority: &T,
         usdc_mint: &Pubkey,
@@ -444,11 +443,11 @@ impl SimpleTallyClient {
     ) -> Result<(Pubkey, String, bool)> {
         use anchor_client::solana_sdk::transaction::Transaction;
 
-        // Check if merchant already exists
-        let merchant_pda = self.merchant_address(&authority.pubkey());
-        if self.account_exists(&merchant_pda)? {
+        // Check if payee already exists
+        let payee_pda = self.payee_address(&authority.pubkey());
+        if self.account_exists(&payee_pda)? {
             return Err(TallyError::Generic(format!(
-                "Merchant account already exists at address: {merchant_pda}"
+                "Payee account already exists at address: {payee_pda}"
             )));
         }
 
@@ -490,72 +489,70 @@ impl SimpleTallyClient {
             instructions.push(create_ata_ix);
         }
 
-        // Always add the create merchant instruction
+        // Always add the create payee instruction
         // Platform fee is automatically set to Free tier (2.0%) by the program
-        let create_merchant_ix = crate::transaction_builder::create_merchant()
+        let create_payee_ix = crate::transaction_builder::init_payee()
             .authority(authority.pubkey())
             .usdc_mint(*usdc_mint)
             .treasury_ata(*treasury_ata)
             .program_id(self.program_id)
             .build_instruction()?;
-        instructions.push(create_merchant_ix);
+        instructions.push(create_payee_ix);
 
         // Submit transaction with all instructions
         let mut transaction = Transaction::new_with_payer(&instructions, Some(&authority.pubkey()));
         let signature = self.submit_transaction(&mut transaction, &[authority])?;
 
-        Ok((merchant_pda, signature, created_ata))
+        Ok((payee_pda, signature, created_ata))
     }
 
-    /// High-level method to create a subscription plan
+    /// High-level method to create payment terms
     ///
     /// # Errors
-    /// Returns an error if plan creation fails
-    pub fn create_plan<T: Signer>(
+    /// Returns an error if payment terms creation fails
+    pub fn create_payment_terms<T: Signer>(
         &self,
         authority: &T,
-        plan_args: crate::program_types::CreatePlanArgs,
+        payment_terms_args: crate::program_types::CreatePaymentTermsArgs,
     ) -> Result<(Pubkey, String)> {
-        use crate::transaction_builder::create_plan;
+        use crate::transaction_builder::create_payment_terms;
 
-        // Validate plan parameters - ensure values can be safely cast to i64
-        let period_i64 = i64::try_from(plan_args.period_secs)
+        // Validate payment terms parameters - ensure values can be safely cast to i64
+        let period_i64 = i64::try_from(payment_terms_args.period_secs)
             .map_err(|_| TallyError::Generic("Period seconds too large".to_string()))?;
-        let grace_i64 = i64::try_from(plan_args.grace_secs)
-            .map_err(|_| TallyError::Generic("Grace seconds too large".to_string()))?;
 
-        crate::validation::validate_plan_parameters(plan_args.price_usdc, period_i64, grace_i64)?;
+        crate::validation::validate_payment_terms_parameters(payment_terms_args.amount_usdc, period_i64)?;
 
-        // Validate merchant exists
-        let merchant_pda = self.merchant_address(&authority.pubkey());
-        if !self.account_exists(&merchant_pda)? {
+        // Validate payee exists
+        let payee_pda = self.payee_address(&authority.pubkey());
+        if !self.account_exists(&payee_pda)? {
             return Err(TallyError::Generic(format!(
-                "Merchant account does not exist at address: {merchant_pda}"
+                "Payee account does not exist at address: {payee_pda}"
             )));
         }
 
-        // Check if plan already exists
-        let plan_pda = crate::pda::plan_address_with_program_id(
-            &merchant_pda,
-            &plan_args.plan_id_bytes,
+        // Check if payment terms already exist
+        let payment_terms_pda = crate::pda::payment_terms_address_with_program_id(
+            &payee_pda,
+            &payment_terms_args.terms_id_bytes,
             &self.program_id,
         );
-        if self.account_exists(&plan_pda)? {
+        if self.account_exists(&payment_terms_pda)? {
             return Err(TallyError::Generic(format!(
-                "Plan already exists at address: {plan_pda}"
+                "PaymentTerms already exists at address: {payment_terms_pda}"
             )));
         }
 
-        let instruction = create_plan()
+        let instruction = create_payment_terms()
             .authority(authority.pubkey())
             .payer(authority.pubkey())
-            .plan_args(plan_args)
+            .payment_terms_args(payment_terms_args)
             .program_id(self.program_id)
             .build_instruction()?;
 
         let signature = self.submit_instruction(instruction, &[authority])?;
 
-        Ok((plan_pda, signature))
+        Ok((payment_terms_pda, signature))
     }
 
     /// High-level method to withdraw platform fees

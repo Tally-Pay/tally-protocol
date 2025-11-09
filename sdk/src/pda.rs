@@ -3,265 +3,265 @@
 use crate::{error::Result, program_id_string};
 use anchor_client::solana_sdk::pubkey::Pubkey;
 
-/// Compute the Merchant PDA
+/// Compute the Payee PDA
 ///
 /// # Arguments
-/// * `authority` - The merchant's authority pubkey
+/// * `authority` - The payee's authority pubkey
 ///
 /// # Returns
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 ///
 /// # Errors
 /// Returns an error if the program ID cannot be parsed or PDA computation fails
-pub fn merchant(authority: &Pubkey) -> Result<(Pubkey, u8)> {
+pub fn payee(authority: &Pubkey) -> Result<(Pubkey, u8)> {
     let program_id = program_id_string().parse()?;
-    Ok(merchant_with_program_id(authority, &program_id))
+    Ok(payee_with_program_id(authority, &program_id))
 }
 
-/// Compute the Merchant PDA address only (without bump)
+/// Compute the Payee PDA address only (without bump)
 ///
 /// # Arguments
-/// * `authority` - The merchant's authority pubkey
+/// * `authority` - The payee's authority pubkey
 ///
 /// # Returns
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
-pub fn merchant_address(authority: &Pubkey) -> Result<Pubkey> {
+pub fn payee_address(authority: &Pubkey) -> Result<Pubkey> {
     let program_id = program_id_string().parse()?;
-    Ok(merchant_address_with_program_id(authority, &program_id))
+    Ok(payee_address_with_program_id(authority, &program_id))
 }
 
-/// Compute the Merchant PDA with custom program ID
+/// Compute the Payee PDA with custom program ID
 ///
 /// # Arguments
-/// * `authority` - The merchant's authority pubkey
-/// * `program_id` - The program ID to use for PDA computation
-///
-/// # Returns
-/// * `Ok((Pubkey, u8))` - The PDA address and bump seed
-#[must_use]
-pub fn merchant_with_program_id(authority: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
-    let seeds = &[b"merchant", authority.as_ref()];
-    Pubkey::find_program_address(seeds, program_id)
-}
-
-/// Compute the Merchant PDA address only (without bump) with custom program ID
-///
-/// # Arguments
-/// * `authority` - The merchant's authority pubkey
-/// * `program_id` - The program ID to use for PDA computation
-///
-/// # Returns
-/// * `Pubkey` - The PDA address
-#[must_use]
-pub fn merchant_address_with_program_id(authority: &Pubkey, program_id: &Pubkey) -> Pubkey {
-    merchant_with_program_id(authority, program_id).0
-}
-
-/// Compute the Plan PDA
-///
-/// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as bytes (uses raw bytes to match Anchor constraint)
-///
-/// # Returns
-/// * `Ok((Pubkey, u8))` - The PDA address and bump seed
-/// * `Err(TallyError)` - If PDA computation fails
-pub fn plan(merchant: &Pubkey, plan_id: &[u8]) -> Result<(Pubkey, u8)> {
-    let program_id = program_id_string().parse()?;
-    Ok(plan_with_program_id(merchant, plan_id, &program_id))
-}
-
-/// Compute the Plan PDA address only (without bump)
-///
-/// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as bytes
-///
-/// # Returns
-/// * `Ok(Pubkey)` - The PDA address
-/// * `Err(TallyError)` - If PDA computation fails
-pub fn plan_address(merchant: &Pubkey, plan_id: &[u8]) -> Result<Pubkey> {
-    let program_id = program_id_string().parse()?;
-    Ok(plan_address_with_program_id(merchant, plan_id, &program_id))
-}
-
-/// Compute the Plan PDA with custom program ID
-///
-/// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as bytes
+/// * `authority` - The payee's authority pubkey
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `(Pubkey, u8)` - The PDA address and bump seed
 #[must_use]
-pub fn plan_with_program_id(
-    merchant: &Pubkey,
-    plan_id: &[u8],
-    program_id: &Pubkey,
-) -> (Pubkey, u8) {
-    let seeds = &[b"plan", merchant.as_ref(), plan_id];
+pub fn payee_with_program_id(authority: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
+    let seeds = &[b"payee", authority.as_ref()];
     Pubkey::find_program_address(seeds, program_id)
 }
 
-/// Compute the Plan PDA address only (without bump) with custom program ID
+/// Compute the Payee PDA address only (without bump) with custom program ID
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as bytes
+/// * `authority` - The payee's authority pubkey
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `Pubkey` - The PDA address
 #[must_use]
-pub fn plan_address_with_program_id(
-    merchant: &Pubkey,
-    plan_id: &[u8],
-    program_id: &Pubkey,
-) -> Pubkey {
-    plan_with_program_id(merchant, plan_id, program_id).0
+pub fn payee_address_with_program_id(authority: &Pubkey, program_id: &Pubkey) -> Pubkey {
+    payee_with_program_id(authority, program_id).0
 }
 
-/// Compute the Plan PDA from string identifier
+/// Compute the `PaymentTerms` PDA
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as string
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as bytes
 ///
 /// # Returns
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
-pub fn plan_from_string(merchant: &Pubkey, plan_id: &str) -> Result<(Pubkey, u8)> {
+pub fn payment_terms(payee: &Pubkey, terms_id: &[u8]) -> Result<(Pubkey, u8)> {
     let program_id = program_id_string().parse()?;
-    Ok(plan_from_string_with_program_id(
-        merchant,
-        plan_id,
-        &program_id,
-    ))
+    Ok(payment_terms_with_program_id(payee, terms_id, &program_id))
 }
 
-/// Compute the Plan PDA address from string identifier
+/// Compute the `PaymentTerms` PDA address only (without bump)
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as string
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as bytes
 ///
 /// # Returns
 /// * `Ok(Pubkey)` - The PDA address
 /// * `Err(TallyError)` - If PDA computation fails
-pub fn plan_address_from_string(merchant: &Pubkey, plan_id: &str) -> Result<Pubkey> {
+pub fn payment_terms_address(payee: &Pubkey, terms_id: &[u8]) -> Result<Pubkey> {
     let program_id = program_id_string().parse()?;
-    Ok(plan_address_from_string_with_program_id(
-        merchant,
-        plan_id,
-        &program_id,
-    ))
+    Ok(payment_terms_address_with_program_id(payee, terms_id, &program_id))
 }
 
-/// Compute the Plan PDA from string identifier with custom program ID
+/// Compute the `PaymentTerms` PDA with custom program ID
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as string
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as bytes
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `(Pubkey, u8)` - The PDA address and bump seed
 #[must_use]
-pub fn plan_from_string_with_program_id(
-    merchant: &Pubkey,
-    plan_id: &str,
+pub fn payment_terms_with_program_id(
+    payee: &Pubkey,
+    terms_id: &[u8],
     program_id: &Pubkey,
 ) -> (Pubkey, u8) {
-    plan_with_program_id(merchant, plan_id.as_bytes(), program_id)
+    let seeds = &[b"payment_terms", payee.as_ref(), terms_id];
+    Pubkey::find_program_address(seeds, program_id)
 }
 
-/// Compute the Plan PDA address from string identifier with custom program ID
+/// Compute the `PaymentTerms` PDA address only (without bump) with custom program ID
 ///
 /// # Arguments
-/// * `merchant` - The merchant PDA pubkey
-/// * `plan_id` - The plan identifier as string
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as bytes
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `Pubkey` - The PDA address
 #[must_use]
-pub fn plan_address_from_string_with_program_id(
-    merchant: &Pubkey,
-    plan_id: &str,
+pub fn payment_terms_address_with_program_id(
+    payee: &Pubkey,
+    terms_id: &[u8],
     program_id: &Pubkey,
 ) -> Pubkey {
-    plan_from_string_with_program_id(merchant, plan_id, program_id).0
+    payment_terms_with_program_id(payee, terms_id, program_id).0
 }
 
-/// Compute the Subscription PDA
+/// Compute the `PaymentTerms` PDA from string identifier
 ///
 /// # Arguments
-/// * `plan` - The plan PDA pubkey
-/// * `subscriber` - The subscriber's pubkey
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as string
 ///
 /// # Returns
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
 /// * `Err(TallyError)` - If PDA computation fails
-pub fn subscription(plan: &Pubkey, subscriber: &Pubkey) -> Result<(Pubkey, u8)> {
+pub fn payment_terms_from_string(payee: &Pubkey, terms_id: &str) -> Result<(Pubkey, u8)> {
     let program_id = program_id_string().parse()?;
-    Ok(subscription_with_program_id(plan, subscriber, &program_id))
-}
-
-/// Compute the Subscription PDA address only (without bump)
-///
-/// # Arguments
-/// * `plan` - The plan PDA pubkey
-/// * `subscriber` - The subscriber's pubkey
-///
-/// # Returns
-/// * `Ok(Pubkey)` - The PDA address
-/// * `Err(TallyError)` - If PDA computation fails
-pub fn subscription_address(plan: &Pubkey, subscriber: &Pubkey) -> Result<Pubkey> {
-    let program_id = program_id_string().parse()?;
-    Ok(subscription_address_with_program_id(
-        plan,
-        subscriber,
+    Ok(payment_terms_from_string_with_program_id(
+        payee,
+        terms_id,
         &program_id,
     ))
 }
 
-/// Compute the Subscription PDA with custom program ID
+/// Compute the `PaymentTerms` PDA address from string identifier
 ///
 /// # Arguments
-/// * `plan` - The plan PDA pubkey
-/// * `subscriber` - The subscriber's pubkey
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as string
+///
+/// # Returns
+/// * `Ok(Pubkey)` - The PDA address
+/// * `Err(TallyError)` - If PDA computation fails
+pub fn payment_terms_address_from_string(payee: &Pubkey, terms_id: &str) -> Result<Pubkey> {
+    let program_id = program_id_string().parse()?;
+    Ok(payment_terms_address_from_string_with_program_id(
+        payee,
+        terms_id,
+        &program_id,
+    ))
+}
+
+/// Compute the `PaymentTerms` PDA from string identifier with custom program ID
+///
+/// # Arguments
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as string
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `(Pubkey, u8)` - The PDA address and bump seed
 #[must_use]
-pub fn subscription_with_program_id(
-    plan: &Pubkey,
-    subscriber: &Pubkey,
+pub fn payment_terms_from_string_with_program_id(
+    payee: &Pubkey,
+    terms_id: &str,
     program_id: &Pubkey,
 ) -> (Pubkey, u8) {
-    let seeds = &[b"subscription", plan.as_ref(), subscriber.as_ref()];
-    Pubkey::find_program_address(seeds, program_id)
+    payment_terms_with_program_id(payee, terms_id.as_bytes(), program_id)
 }
 
-/// Compute the Subscription PDA address only (without bump) with custom program ID
+/// Compute the `PaymentTerms` PDA address from string identifier with custom program ID
 ///
 /// # Arguments
-/// * `plan` - The plan PDA pubkey
-/// * `subscriber` - The subscriber's pubkey
+/// * `payee` - The payee PDA pubkey
+/// * `terms_id` - The payment terms identifier as string
 /// * `program_id` - The program ID to use for PDA computation
 ///
 /// # Returns
 /// * `Pubkey` - The PDA address
 #[must_use]
-pub fn subscription_address_with_program_id(
-    plan: &Pubkey,
-    subscriber: &Pubkey,
+pub fn payment_terms_address_from_string_with_program_id(
+    payee: &Pubkey,
+    terms_id: &str,
     program_id: &Pubkey,
 ) -> Pubkey {
-    subscription_with_program_id(plan, subscriber, program_id).0
+    payment_terms_from_string_with_program_id(payee, terms_id, program_id).0
+}
+
+/// Compute the `PaymentAgreement` PDA
+///
+/// # Arguments
+/// * `payment_terms` - The payment terms PDA pubkey
+/// * `payer` - The payer's pubkey
+///
+/// # Returns
+/// * `Ok((Pubkey, u8))` - The PDA address and bump seed
+/// * `Err(TallyError)` - If PDA computation fails
+pub fn payment_agreement(payment_terms: &Pubkey, payer: &Pubkey) -> Result<(Pubkey, u8)> {
+    let program_id = program_id_string().parse()?;
+    Ok(payment_agreement_with_program_id(payment_terms, payer, &program_id))
+}
+
+/// Compute the `PaymentAgreement` PDA address only (without bump)
+///
+/// # Arguments
+/// * `payment_terms` - The payment terms PDA pubkey
+/// * `payer` - The payer's pubkey
+///
+/// # Returns
+/// * `Ok(Pubkey)` - The PDA address
+/// * `Err(TallyError)` - If PDA computation fails
+pub fn payment_agreement_address(payment_terms: &Pubkey, payer: &Pubkey) -> Result<Pubkey> {
+    let program_id = program_id_string().parse()?;
+    Ok(payment_agreement_address_with_program_id(
+        payment_terms,
+        payer,
+        &program_id,
+    ))
+}
+
+/// Compute the `PaymentAgreement` PDA with custom program ID
+///
+/// # Arguments
+/// * `payment_terms` - The payment terms PDA pubkey
+/// * `payer` - The payer's pubkey
+/// * `program_id` - The program ID to use for PDA computation
+///
+/// # Returns
+/// * `(Pubkey, u8)` - The PDA address and bump seed
+#[must_use]
+pub fn payment_agreement_with_program_id(
+    payment_terms: &Pubkey,
+    payer: &Pubkey,
+    program_id: &Pubkey,
+) -> (Pubkey, u8) {
+    let seeds = &[b"payment_agreement", payment_terms.as_ref(), payer.as_ref()];
+    Pubkey::find_program_address(seeds, program_id)
+}
+
+/// Compute the `PaymentAgreement` PDA address only (without bump) with custom program ID
+///
+/// # Arguments
+/// * `payment_terms` - The payment terms PDA pubkey
+/// * `payer` - The payer's pubkey
+/// * `program_id` - The program ID to use for PDA computation
+///
+/// # Returns
+/// * `Pubkey` - The PDA address
+#[must_use]
+pub fn payment_agreement_address_with_program_id(
+    payment_terms: &Pubkey,
+    payer: &Pubkey,
+    program_id: &Pubkey,
+) -> Pubkey {
+    payment_agreement_with_program_id(payment_terms, payer, program_id).0
 }
 
 /// Compute the Config PDA
@@ -311,8 +311,8 @@ pub fn config_address_with_program_id(program_id: &Pubkey) -> Pubkey {
 
 /// Compute the global Delegate PDA
 ///
-/// The protocol uses a single global delegate shared by all merchants,
-/// enabling users to subscribe to multiple merchants with one token account.
+/// The protocol uses a single global delegate shared by all payees,
+/// enabling users to subscribe to multiple payees with one token account.
 ///
 /// # Returns
 /// * `Ok((Pubkey, u8))` - The PDA address and bump seed
@@ -326,7 +326,7 @@ pub fn delegate() -> Result<(Pubkey, u8)> {
 
 /// Compute the global Delegate PDA address only (without bump)
 ///
-/// The protocol uses a single global delegate shared by all merchants.
+/// The protocol uses a single global delegate shared by all payees.
 ///
 /// # Returns
 /// * `Ok(Pubkey)` - The delegate PDA address
@@ -338,7 +338,7 @@ pub fn delegate_address() -> Result<Pubkey> {
 
 /// Compute the global Delegate PDA with custom program ID
 ///
-/// The protocol uses a single global delegate shared by all merchants.
+/// The protocol uses a single global delegate shared by all payees.
 ///
 /// # Arguments
 /// * `program_id` - The program ID to use for PDA computation
@@ -353,7 +353,7 @@ pub fn delegate_with_program_id(program_id: &Pubkey) -> (Pubkey, u8) {
 
 /// Compute the global Delegate PDA address only (without bump) with custom program ID
 ///
-/// The protocol uses a single global delegate shared by all merchants.
+/// The protocol uses a single global delegate shared by all payees.
 ///
 /// # Arguments
 /// * `program_id` - The program ID to use for PDA computation
@@ -365,6 +365,9 @@ pub fn delegate_address_with_program_id(program_id: &Pubkey) -> Pubkey {
     delegate_with_program_id(program_id).0
 }
 
+
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,64 +375,64 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn test_merchant_pda() {
+    fn test_payee_pda() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let (merchant_pda, _bump) = merchant(&authority).unwrap();
+        let (payee_pda, _bump) = payee(&authority).unwrap();
 
         // PDA should be different from authority
-        assert_ne!(merchant_pda, authority);
+        assert_ne!(payee_pda, authority);
 
         // Should be deterministic
-        let (merchant_pda2, _) = merchant(&authority).unwrap();
-        assert_eq!(merchant_pda, merchant_pda2);
+        let (payee_pda2, _) = payee(&authority).unwrap();
+        assert_eq!(payee_pda, payee_pda2);
     }
 
     #[test]
-    fn test_plan_pda() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_id = b"premium_plan";
+    fn test_payment_terms_pda() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let terms_id = b"premium_payment_terms";
 
-        let (plan_pda, _bump) = plan(&merchant, plan_id).unwrap();
+        let (terms_pda, _bump) = payment_terms(&payee, terms_id).unwrap();
 
         // Should be deterministic
-        let (plan_pda2, _) = plan(&merchant, plan_id).unwrap();
-        assert_eq!(plan_pda, plan_pda2);
+        let (terms_pda2, _) = payment_terms(&payee, terms_id).unwrap();
+        assert_eq!(terms_pda, terms_pda2);
 
-        // Different plan IDs should produce different PDAs
-        let (plan_pda3, _) = plan(&merchant, b"basic_plan").unwrap();
-        assert_ne!(plan_pda, plan_pda3);
+        // Different terms IDs should produce different PDAs
+        let (terms_pda3, _) = payment_terms(&payee, b"basic_payment_terms").unwrap();
+        assert_ne!(terms_pda, terms_pda3);
     }
 
     #[test]
-    fn test_subscription_pda() {
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_payment_agreement_pda() {
+        let payment_terms_pda = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let (sub_pda, _bump) = subscription(&plan, &subscriber).unwrap();
+        let (agreement_pda, _bump) = payment_agreement(&payment_terms_pda, &payer).unwrap();
 
         // Should be deterministic
-        let (sub_pda2, _) = subscription(&plan, &subscriber).unwrap();
-        assert_eq!(sub_pda, sub_pda2);
+        let (agreement_pda2, _) = payment_agreement(&payment_terms_pda, &payer).unwrap();
+        assert_eq!(agreement_pda, agreement_pda2);
 
-        // Different subscribers should produce different PDAs
-        let subscriber2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let (sub_pda3, _) = subscription(&plan, &subscriber2).unwrap();
-        assert_ne!(sub_pda, sub_pda3);
+        // Different payers should produce different PDAs
+        let payer2 = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let (agreement_pda3, _) = payment_agreement(&payment_terms_pda, &payer2).unwrap();
+        assert_ne!(agreement_pda, agreement_pda3);
     }
 
     #[test]
-    fn test_plan_string_functions() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_id = "premium_plan";
+    fn test_payment_terms_string_functions() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let terms_id = "premium_payment_terms";
 
-        let (pda1, bump1) = plan_from_string(&merchant, plan_id).unwrap();
-        let (pda2, bump2) = plan(&merchant, plan_id.as_bytes()).unwrap();
+        let (pda1, bump1) = payment_terms_from_string(&payee, terms_id).unwrap();
+        let (pda2, bump2) = payment_terms(&payee, terms_id.as_bytes()).unwrap();
 
         assert_eq!(pda1, pda2);
         assert_eq!(bump1, bump2);
 
-        let addr1 = plan_address_from_string(&merchant, plan_id).unwrap();
-        let addr2 = plan_address(&merchant, plan_id.as_bytes()).unwrap();
+        let addr1 = payment_terms_address_from_string(&payee, terms_id).unwrap();
+        let addr2 = payment_terms_address(&payee, terms_id.as_bytes()).unwrap();
 
         assert_eq!(addr1, addr2);
     }
@@ -437,46 +440,46 @@ mod tests {
     #[test]
     fn test_address_only_functions() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant_addr = merchant_address(&authority).unwrap();
-        let (merchant_pda, _) = merchant(&authority).unwrap();
-        assert_eq!(merchant_addr, merchant_pda);
+        let payee_addr = payee_address(&authority).unwrap();
+        let (payee_pda, _) = payee(&authority).unwrap();
+        assert_eq!(payee_addr, payee_pda);
 
-        let plan_id = b"test_plan";
-        let plan_addr = plan_address(&merchant_addr, plan_id).unwrap();
-        let (plan_pda, _) = plan(&merchant_addr, plan_id).unwrap();
-        assert_eq!(plan_addr, plan_pda);
+        let terms_id = b"test_payment_terms";
+        let terms_addr = payment_terms_address(&payee_addr, terms_id).unwrap();
+        let (terms_pda, _) = payment_terms(&payee_addr, terms_id).unwrap();
+        assert_eq!(terms_addr, terms_pda);
 
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let sub_addr = subscription_address(&plan_addr, &subscriber).unwrap();
-        let (sub_pda, _) = subscription(&plan_addr, &subscriber).unwrap();
-        assert_eq!(sub_addr, sub_pda);
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let agreement_addr = payment_agreement_address(&terms_addr, &payer).unwrap();
+        let (agreement_pda, _) = payment_agreement(&terms_addr, &payer).unwrap();
+        assert_eq!(agreement_addr, agreement_pda);
     }
 
     #[test]
-    fn test_plan_id_raw_bytes() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_terms_id_raw_bytes() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        // Test short plan ID (uses raw bytes directly)
+        // Test short terms ID (uses raw bytes directly)
         let short_id = b"short";
-        let (pda1, _) = plan(&merchant, short_id).unwrap();
+        let (pda1, _) = payment_terms(&payee, short_id).unwrap();
 
-        // Test same plan ID should produce same PDA (deterministic)
-        let (pda2, _) = plan(&merchant, b"short").unwrap();
+        // Test same terms ID should produce same PDA (deterministic)
+        let (pda2, _) = payment_terms(&payee, b"short").unwrap();
         assert_eq!(pda1, pda2);
 
-        // Test different plan IDs should produce different PDAs
+        // Test different terms IDs should produce different PDAs
         let basic_id = b"basic";
-        let (pda3, _) = plan(&merchant, basic_id).unwrap();
+        let (pda3, _) = payment_terms(&payee, basic_id).unwrap();
         assert_ne!(pda1, pda3);
 
         let other_id = b"other";
-        let (pda5, _) = plan(&merchant, other_id).unwrap();
+        let (pda5, _) = payment_terms(&payee, other_id).unwrap();
         assert_ne!(pda1, pda5);
         assert_ne!(pda3, pda5);
 
-        // Test longer plan ID (raw bytes, no truncation)
-        let long_id = b"premium_monthly_subscription";
-        let (pda4, _) = plan(&merchant, long_id).unwrap();
+        // Test longer terms ID (but within reasonable limits for PDA generation)
+        let long_id = b"premium_monthly";
+        let (pda4, _) = payment_terms(&payee, long_id).unwrap();
 
         // Should not panic and should produce a valid PDA
         assert_ne!(pda4, pda1);
@@ -509,8 +512,8 @@ mod tests {
         let delegate_addr = delegate_address().unwrap();
         assert_eq!(delegate_pda, delegate_addr);
 
-        // Global delegate: same PDA regardless of merchant
-        // This is intentional - all merchants share the same delegate
+        // Global delegate: same PDA regardless of payee
+        // This is intentional - all payees share the same delegate
         let (delegate_pda3, _) = delegate().unwrap();
         assert_eq!(delegate_pda, delegate_pda3);
     }

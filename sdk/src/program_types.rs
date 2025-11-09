@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Volume tier determines platform fee rate based on monthly payment volume
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum VolumeTier {
     /// Standard tier: Up to $10K monthly volume, 0.25% platform fee (25 basis points)
@@ -13,6 +13,34 @@ pub enum VolumeTier {
     Growth = 1,
     /// Scale tier: Over $100K monthly volume, 0.15% platform fee (15 basis points)
     Scale = 2,
+}
+
+// Manual borsh implementations for VolumeTier to avoid version conflicts
+impl anchor_lang::AnchorSerialize for VolumeTier {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let discriminant = *self as u8;
+        anchor_lang::AnchorSerialize::serialize(&discriminant, writer)
+    }
+}
+
+impl anchor_lang::AnchorDeserialize for VolumeTier {
+    fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
+        let discriminant: u8 = anchor_lang::AnchorDeserialize::deserialize(buf)?;
+        Self::from_discriminant(discriminant)
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid VolumeTier discriminant: {discriminant}")
+            ))
+    }
+
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let discriminant: u8 = anchor_lang::AnchorDeserialize::deserialize_reader(reader)?;
+        Self::from_discriminant(discriminant)
+            .ok_or_else(|| std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid VolumeTier discriminant: {discriminant}")
+            ))
+    }
 }
 
 impl VolumeTier {
@@ -53,167 +81,148 @@ impl VolumeTier {
     }
 }
 
-/// Merchant account stores merchant configuration and settings
-/// PDA seeds: ["merchant", authority]
+/// Payee account stores payment recipient configuration and settings
+/// PDA seeds: ["payee", authority]
+///
+/// # Volume Tracking
+///
+/// The Payee account tracks rolling 30-day payment volume to automatically
+/// determine the payee's fee tier. Volume resets after 30 days of inactivity.
+///
+/// # Account Size: 122 bytes
+/// - Discriminator: 8 bytes
+/// - authority: 32 bytes
+/// - `usdc_mint`: 32 bytes
+/// - `treasury_ata`: 32 bytes
+/// - `volume_tier`: 1 byte
+/// - `monthly_volume_usdc`: 8 bytes
+/// - `last_volume_update_ts`: 8 bytes
+/// - bump: 1 byte
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Merchant {
-    /// Merchant authority (signer for merchant operations)
+pub struct Payee {
+    /// Payee authority (signer for payee operations)
     pub authority: Pubkey,
     /// Pinned USDC mint address for all transactions
     pub usdc_mint: Pubkey,
-    /// Merchant's USDC treasury ATA (where merchant fees are sent)
+    /// Payee's USDC treasury ATA (where payment revenues are sent)
     pub treasury_ata: Pubkey,
-    /// Platform fee in basis points (0-1000, representing 0-10%)
-    pub platform_fee_bps: u16,
-    /// Current volume tier (Standard/Growth/Scale)
-    pub volume_tier: u8,
-    /// Rolling 30-day payment volume in USDC microlamports
-    /// Updated on each payment execution
+    /// Current volume tier (automatically calculated from `monthly_volume_usdc`)
+    ///
+    /// This tier determines the platform fee rate:
+    /// - Standard: 0.25% (up to $10K monthly)
+    /// - Growth: 0.20% ($10K-$100K monthly)
+    /// - Scale: 0.15% (>$100K monthly)
+    ///
+    /// The tier is recalculated on every payment execution.
+    pub volume_tier: VolumeTier,
+    /// Rolling 30-day payment volume in USDC microlamports (6 decimals)
+    ///
+    /// This field accumulates total payment volume processed by this payee
+    /// over a rolling 30-day window. It resets to zero if no payments are
+    /// processed for 30 days.
     pub monthly_volume_usdc: u64,
-    /// Timestamp of last volume calculation (for tier updates)
+    /// Unix timestamp of last volume calculation
+    ///
+    /// Used to determine if 30-day window has elapsed and volume should reset.
     pub last_volume_update_ts: i64,
     /// PDA bump seed
     pub bump: u8,
 }
 
-/// Plan account defines subscription plan details
-/// PDA seeds: ["plan", merchant, `plan_id`]
+/// `PaymentTerms` account defines payment schedule and amount for recurring payments
+/// PDA seeds: [`"payment_terms"`, `payee`, `terms_id`]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Plan {
-    /// Reference to the merchant PDA
-    pub merchant: Pubkey,
-    /// Deterministic plan identifier (string as bytes, padded to 32)
-    pub plan_id: [u8; 32],
-    /// Price in USDC microlamports (6 decimals)
-    pub price_usdc: u64,
-    /// Subscription period in seconds
+pub struct PaymentTerms {
+    /// Reference to the payee PDA
+    pub payee: Pubkey,
+    /// Deterministic payment terms identifier (string as bytes, padded to 32)
+    pub terms_id: [u8; 32],
+    /// Payment amount in USDC microlamports (6 decimals)
+    pub amount_usdc: u64,
+    /// Payment period in seconds (payment frequency)
     pub period_secs: u64,
-    /// Grace period for renewals in seconds
-    pub grace_secs: u64,
-    /// Plan display name (string as bytes, padded to 32)
-    pub name: [u8; 32],
-    /// Whether new subscriptions can be created for this plan
-    pub active: bool,
 }
 
-/// Subscription account tracks individual user subscriptions
-/// PDA seeds: ["subscription", plan, subscriber]
+/// `PaymentAgreement` account tracks recurring payment relationship between payer and payee
+/// PDA seeds: [`"payment_agreement"`, `payment_terms`, `payer`]
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Subscription {
-    /// Reference to the plan PDA
-    pub plan: Pubkey,
-    /// User's pubkey (the subscriber)
-    pub subscriber: Pubkey,
-    /// Unix timestamp for next renewal
-    pub next_renewal_ts: i64,
-    /// Whether subscription is active
+pub struct PaymentAgreement {
+    /// Reference to the payment terms PDA
+    pub payment_terms: Pubkey,
+    /// Payer's pubkey (the one making payments)
+    pub payer: Pubkey,
+    /// Unix timestamp for next payment execution
+    pub next_payment_ts: i64,
+    /// Whether payment agreement is active
     pub active: bool,
-    /// Number of renewals processed for this subscription.
-    ///
-    /// This counter increments with each successful renewal payment and is preserved
-    /// across subscription cancellation and reactivation cycles. When a subscription
-    /// is canceled and later reactivated, this field retains its historical value
-    /// rather than resetting to zero.
-    pub renewals: u32,
-    /// Unix timestamp when subscription was created
+    /// Number of payments executed under this agreement
+    pub payment_count: u32,
+    /// Unix timestamp when agreement was created
     pub created_ts: i64,
-    /// Last charged amount for audit purposes
+    /// Last payment amount for audit purposes
     pub last_amount: u64,
-    /// Unix timestamp when subscription was last renewed (prevents double-renewal attacks)
-    pub last_renewed_ts: i64,
-    /// Unix timestamp when free trial period ends (None if no trial)
-    ///
-    /// When present, indicates the subscription is in or was in a free trial period.
-    /// During the trial, no payment is required. After `trial_ends_at`, the first
-    /// renewal will process the initial payment.
-    pub trial_ends_at: Option<i64>,
-    /// Whether subscription is currently in free trial period
-    ///
-    /// When true, the subscription is active but no payment has been made yet.
-    /// The first payment will occur at `next_renewal_ts` (when trial ends).
-    pub in_trial: bool,
+    /// Unix timestamp when last payment was executed (prevents double-payment attacks)
+    pub last_payment_ts: i64,
     /// PDA bump seed
     pub bump: u8,
 }
 
-/// Arguments for initializing a merchant
+/// Arguments for initializing a payee
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct InitMerchantArgs {
+pub struct InitPayeeArgs {
     /// USDC mint address
     pub usdc_mint: Pubkey,
-    /// Treasury ATA for receiving merchant fees
+    /// Treasury ATA for receiving payee revenues
     pub treasury_ata: Pubkey,
 }
 
-/// Arguments for creating a subscription plan
+/// Arguments for creating payment terms
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct CreatePlanArgs {
-    /// Unique plan identifier (will be padded to 32 bytes)
-    pub plan_id: String,
-    /// Padded `plan_id` bytes for PDA seeds (must match program constraint calculation)
-    pub plan_id_bytes: [u8; 32],
-    /// Price in USDC microlamports (6 decimals)
-    pub price_usdc: u64,
-    /// Subscription period in seconds
+pub struct CreatePaymentTermsArgs {
+    /// Unique terms identifier (original string)
+    pub terms_id: String,
+    /// Padded `terms_id` bytes for PDA seeds (must match program constraint calculation)
+    pub terms_id_bytes: [u8; 32],
+    /// Payment amount in USDC microlamports (6 decimals)
+    pub amount_usdc: u64,
+    /// Payment period in seconds
     pub period_secs: u64,
-    /// Grace period for renewals in seconds
-    pub grace_secs: u64,
-    /// Plan display name (will be padded to 32 bytes)
-    pub name: String,
 }
 
-/// Arguments for starting a subscription
+/// Arguments for starting a payment agreement
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize, Default,
 )]
-pub struct StartSubscriptionArgs {
-    /// Allowance periods multiplier (default 3)
+pub struct StartAgreementArgs {
+    /// Allowance periods multiplier (default from config if 0)
     pub allowance_periods: u8,
-    /// Optional trial period duration in seconds (7, 14, or 30 days)
-    /// Valid values: 604800 (7 days), 1209600 (14 days), 2592000 (30 days)
-    pub trial_duration_secs: Option<u64>,
 }
 
-/// Arguments for renewing a subscription
+/// Arguments for executing a payment
+#[derive(
+    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize, Default,
+)]
+pub struct ExecutePaymentArgs {
+    // No args needed - payment execution driven by executor
+}
+
+/// Arguments for pausing a payment agreement
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct RenewSubscriptionArgs {
-    // No args needed - renewal driven by keeper
+pub struct PauseAgreementArgs {
+    // No args needed for pausing
 }
-
-/// Arguments for updating a subscription plan
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct UpdatePlanArgs {
-    /// New plan display name (will be padded to 32 bytes)
-    pub name: Option<String>,
-    /// Whether plan accepts new subscriptions
-    pub active: Option<bool>,
-    /// New price in USDC microlamports (affects only new subscriptions)
-    pub price_usdc: Option<u64>,
-    /// New subscription period in seconds (with validation)
-    pub period_secs: Option<u64>,
-    /// New grace period for renewals in seconds (with validation)
-    pub grace_secs: Option<u64>,
-}
-
-/// Arguments for canceling a subscription
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct CancelSubscriptionArgs;
 
 /// Arguments for admin fee withdrawal
 #[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
@@ -239,18 +248,18 @@ pub struct Config {
     pub max_platform_fee_bps: u16,
     /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
     pub min_platform_fee_bps: u16,
-    /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
+    /// Minimum payment agreement period in seconds (e.g., 86400 = 24 hours)
     pub min_period_seconds: u64,
     /// Default allowance periods multiplier (e.g., 3)
     pub default_allowance_periods: u8,
     /// Allowed token mint address (e.g., official USDC mint)
-    /// This prevents merchants from using fake or arbitrary tokens
+    /// This prevents payees from using fake or arbitrary tokens
     pub allowed_mint: Pubkey,
     /// Maximum withdrawal amount per transaction in USDC microlamports
     /// Prevents accidental or malicious drainage of entire treasury
     pub max_withdrawal_amount: u64,
     /// Maximum grace period in seconds (e.g., 604800 = 7 days)
-    /// Prevents excessively long grace periods that increase merchant payment risk
+    /// Prevents excessively long grace periods that increase payee payment risk
     pub max_grace_period_seconds: u64,
     /// Emergency pause state - when true, all user-facing operations are disabled
     /// This allows the platform authority to halt operations in case of security incidents
@@ -275,7 +284,7 @@ pub struct InitConfigArgs {
     pub max_platform_fee_bps: u16,
     /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
     pub min_platform_fee_bps: u16,
-    /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
+    /// Minimum payment agreement period in seconds (e.g., 86400 = 24 hours)
     pub min_period_seconds: u64,
     /// Default allowance periods multiplier (e.g., 3)
     pub default_allowance_periods: u8,
@@ -289,42 +298,20 @@ pub struct InitConfigArgs {
     pub keeper_fee_bps: u16,
 }
 
-impl Plan {
-    /// Convert `plan_id` bytes to string, trimming null bytes
+impl PaymentTerms {
+    /// Convert `terms_id` bytes to string, trimming null bytes
     #[must_use]
-    pub fn plan_id_str(&self) -> String {
-        String::from_utf8_lossy(&self.plan_id)
+    pub fn terms_id_str(&self) -> String {
+        String::from_utf8_lossy(&self.terms_id)
             .trim_end_matches('\0')
             .to_string()
     }
 
-    /// Convert name bytes to string, trimming null bytes
-    #[must_use]
-    pub fn name_str(&self) -> String {
-        String::from_utf8_lossy(&self.name)
-            .trim_end_matches('\0')
-            .to_string()
-    }
-
-    // Compatibility methods for tally-actions migration
-
-    /// Get plan ID as string, removing null padding (alias for `plan_id_str`)
-    #[must_use]
-    pub fn plan_id_string(&self) -> String {
-        self.plan_id_str()
-    }
-
-    /// Get plan name as string, removing null padding (alias for `name_str`)
-    #[must_use]
-    pub fn name_string(&self) -> String {
-        self.name_str()
-    }
-
-    /// Get plan price in USDC (human readable, with 6 decimals)
+    /// Get payment amount in USDC (human readable, with 6 decimals)
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
-    pub fn price_usdc_formatted(&self) -> f64 {
-        self.price_usdc as f64 / 1_000_000.0
+    pub fn amount_usdc_formatted(&self) -> f64 {
+        self.amount_usdc as f64 / 1_000_000.0
     }
 
     /// Get period in human readable format
@@ -345,110 +332,23 @@ impl Plan {
     }
 }
 
-impl CreatePlanArgs {
-    /// Convert `plan_id` string to padded 32-byte array
+impl CreatePaymentTermsArgs {
+    /// Convert `terms_id` string to padded 32-byte array
     #[must_use]
-    pub fn plan_id_bytes(&self) -> [u8; 32] {
+    pub fn terms_id_bytes_from_string(&self) -> [u8; 32] {
         let mut bytes = [0u8; 32];
-        let id_bytes = self.plan_id.as_bytes();
+        let id_bytes = self.terms_id.as_bytes();
         let len = id_bytes.len().min(32);
         bytes[..len].copy_from_slice(&id_bytes[..len]);
         bytes
     }
-
-    /// Convert name string to padded 32-byte array
-    #[must_use]
-    pub fn name_bytes(&self) -> [u8; 32] {
-        let mut bytes = [0u8; 32];
-        let name_bytes = self.name.as_bytes();
-        let len = name_bytes.len().min(32);
-        bytes[..len].copy_from_slice(&name_bytes[..len]);
-        bytes
-    }
 }
 
-impl UpdatePlanArgs {
-    /// Create a new `UpdatePlanArgs` with all fields None
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            name: None,
-            active: None,
-            price_usdc: None,
-            period_secs: None,
-            grace_secs: None,
-        }
-    }
-
-    /// Set the plan name
-    #[must_use]
-    pub fn with_name(mut self, name: String) -> Self {
-        self.name = Some(name);
-        self
-    }
-
-    /// Set the plan active status
-    #[must_use]
-    pub const fn with_active(mut self, active: bool) -> Self {
-        self.active = Some(active);
-        self
-    }
-
-    /// Set the plan price
-    #[must_use]
-    pub const fn with_price_usdc(mut self, price_usdc: u64) -> Self {
-        self.price_usdc = Some(price_usdc);
-        self
-    }
-
-    /// Set the plan period
-    #[must_use]
-    pub const fn with_period_secs(mut self, period_secs: u64) -> Self {
-        self.period_secs = Some(period_secs);
-        self
-    }
-
-    /// Set the plan grace period
-    #[must_use]
-    pub const fn with_grace_secs(mut self, grace_secs: u64) -> Self {
-        self.grace_secs = Some(grace_secs);
-        self
-    }
-
-    /// Check if any fields are set for update
-    #[must_use]
-    pub const fn has_updates(&self) -> bool {
-        self.name.is_some()
-            || self.active.is_some()
-            || self.price_usdc.is_some()
-            || self.period_secs.is_some()
-            || self.grace_secs.is_some()
-    }
-
-    /// Convert name string to padded 32-byte array if present
-    #[must_use]
-    pub fn name_bytes(&self) -> Option<[u8; 32]> {
-        self.name.as_ref().map(|name| {
-            let mut bytes = [0u8; 32];
-            let name_bytes = name.as_bytes();
-            let len = name_bytes.len().min(32);
-            bytes[..len].copy_from_slice(&name_bytes[..len]);
-            bytes
-        })
-    }
-}
-
-impl Default for UpdatePlanArgs {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Arguments for closing a subscription
+/// Arguments for closing a payment agreement
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct CloseSubscriptionArgs {
+pub struct CloseAgreementArgs {
     // No args needed for closing
 }
 
@@ -516,96 +416,5 @@ pub struct UpdateConfigArgs {
     pub default_allowance_periods: Option<u8>,
 }
 
-/// Arguments for updating merchant tier
-#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct UpdateMerchantTierArgs {
-    /// New tier for the merchant (as discriminant: 0=Free, 1=Pro, 2=Enterprise)
-    pub new_tier: u8,
-}
 
-/// Arguments for updating a subscription plan's pricing and terms
-///
-/// All fields are optional - at least one must be provided.
-/// Only the merchant authority can update plan terms.
-#[derive(
-    Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct UpdatePlanTermsArgs {
-    /// Price in USDC microlamports (6 decimals)
-    /// Must be > 0 if provided
-    pub price_usdc: Option<u64>,
-    /// Subscription period in seconds
-    /// Must be >= `config.min_period_seconds` if provided
-    pub period_secs: Option<u64>,
-    /// Grace period for renewals in seconds
-    /// Must be <= period AND <= `config.max_grace_period_seconds` if provided
-    pub grace_secs: Option<u64>,
-    /// Plan display name
-    /// Must not be empty if provided
-    pub name: Option<String>,
-}
 
-impl UpdatePlanTermsArgs {
-    /// Create a new `UpdatePlanTermsArgs` with all fields None
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            price_usdc: None,
-            period_secs: None,
-            grace_secs: None,
-            name: None,
-        }
-    }
-
-    /// Set the plan price
-    #[must_use]
-    pub const fn with_price_usdc(mut self, price_usdc: u64) -> Self {
-        self.price_usdc = Some(price_usdc);
-        self
-    }
-
-    /// Set the plan period
-    #[must_use]
-    pub const fn with_period_secs(mut self, period_secs: u64) -> Self {
-        self.period_secs = Some(period_secs);
-        self
-    }
-
-    /// Set the plan grace period
-    #[must_use]
-    pub const fn with_grace_secs(mut self, grace_secs: u64) -> Self {
-        self.grace_secs = Some(grace_secs);
-        self
-    }
-
-    /// Set the plan name
-    #[must_use]
-    pub fn with_name(mut self, name: String) -> Self {
-        self.name = Some(name);
-        self
-    }
-
-    /// Check if any fields are set for update
-    #[must_use]
-    pub const fn has_updates(&self) -> bool {
-        self.price_usdc.is_some()
-            || self.period_secs.is_some()
-            || self.grace_secs.is_some()
-            || self.name.is_some()
-    }
-
-    /// Convert name string to padded 32-byte array if present
-    #[must_use]
-    pub fn name_bytes(&self) -> Option<[u8; 32]> {
-        self.name.as_ref().map(|name| {
-            let mut bytes = [0u8; 32];
-            let name_bytes = name.as_bytes();
-            let len = name_bytes.len().min(32);
-            bytes[..len].copy_from_slice(&name_bytes[..len]);
-            bytes
-        })
-    }
-}

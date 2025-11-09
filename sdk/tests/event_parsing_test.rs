@@ -17,25 +17,25 @@ use std::collections::HashMap;
 use tally_sdk::{
     events::{
         create_receipt, extract_memo_from_logs, parse_events_from_logs, parse_single_event,
-        Canceled, PaymentFailed, ReceiptParams, Renewed, Subscribed, TallyEvent, TallyReceipt,
+         PaymentFailed, ReceiptParams,  PaymentAgreementStarted, PaymentExecuted, PaymentAgreementPaused, TallyEvent, TallyReceipt,
     },
     TallyError,
 };
 
 /// Test fixture for creating realistic event data
 struct EventTestFixture {
-    pub merchant: Pubkey,
-    pub plan: Pubkey,
-    pub subscriber: Pubkey,
+    pub payee: Pubkey,
+    pub payment_terms: Pubkey,
+    pub payer: Pubkey,
     pub program_id: Pubkey,
 }
 
 impl EventTestFixture {
     fn new() -> Self {
         Self {
-            merchant: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            plan: Pubkey::from(Keypair::new().pubkey().to_bytes()),
-            subscriber: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payee: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payment_terms: Pubkey::from(Keypair::new().pubkey().to_bytes()),
+            payer: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             program_id: tally_sdk::program_id(),
         }
     }
@@ -59,43 +59,43 @@ impl EventTestFixture {
         discriminator
     }
 
-    /// Create a Subscribed event
-    const fn create_subscribed_event(&self, amount: u64) -> Subscribed {
-        Subscribed {
-            merchant: self.merchant,
-            plan: self.plan,
-            subscriber: self.subscriber,
+    /// Create a PaymentAgreementStarted event
+    const fn create_payment_agreement_started_event(&self, amount: u64) -> PaymentAgreementStarted {
+        PaymentAgreementStarted {
+            payee: self.payee,
+            payment_terms: self.payment_terms,
+            payer: self.payer,
             amount,
         }
     }
 
-    /// Create a Renewed event
-    const fn create_renewed_event(&self, amount: u64, keeper: Pubkey, keeper_fee: u64) -> Renewed {
-        Renewed {
-            merchant: self.merchant,
-            plan: self.plan,
-            subscriber: self.subscriber,
+    /// Create a PaymentExecuted event
+    const fn create_payment_executed_event(&self, amount: u64, keeper: Pubkey, keeper_fee: u64) -> PaymentExecuted {
+        PaymentExecuted {
+            payee: self.payee,
+            payment_terms: self.payment_terms,
+            payer: self.payer,
             amount,
             keeper,
             keeper_fee,
         }
     }
 
-    /// Create a Canceled event
-    const fn create_canceled_event(&self) -> Canceled {
-        Canceled {
-            merchant: self.merchant,
-            plan: self.plan,
-            subscriber: self.subscriber,
+    /// Create a PaymentAgreementPaused event
+    const fn create_agreement_paused_event(&self) -> PaymentAgreementPaused {
+        PaymentAgreementPaused {
+            payee: self.payee,
+            payment_terms: self.payment_terms,
+            payer: self.payer,
         }
     }
 
     /// Create a `PaymentFailed` event
     const fn create_payment_failed_event(&self, reason: String) -> PaymentFailed {
         PaymentFailed {
-            merchant: self.merchant,
-            plan: self.plan,
-            subscriber: self.subscriber,
+            payee: self.payee,
+            payment_terms: self.payment_terms,
+            payer: self.payer,
             reason,
         }
     }
@@ -104,7 +104,7 @@ impl EventTestFixture {
     fn create_program_logs(&self, events: Vec<(&str, String)>) -> Vec<String> {
         let mut logs = vec![
             format!("Program {} invoke [1]", self.program_id),
-            "Program log: Instruction: ProcessSubscription".to_string(),
+            "Program log: Instruction: ProcessPaymentAgreement".to_string(),
         ];
 
         for (event_name, event_data) in events {
@@ -122,7 +122,7 @@ impl EventTestFixture {
 }
 
 #[tokio::test]
-async fn test_subscribed_event_parsing_comprehensive() {
+async fn test_payment_agreement_started_event_parsing_comprehensive() {
     let fixture = EventTestFixture::new();
 
     // Test various amounts including edge cases
@@ -130,85 +130,85 @@ async fn test_subscribed_event_parsing_comprehensive() {
         0,           // Zero amount
         1,           // Minimum amount
         1_000_000,   // 1 USDC
-        5_000_000,   // 5 USDC (typical subscription)
-        100_000_000, // 100 USDC (high-value subscription)
+        5_000_000,   // 5 USDC (typical payment agreement)
+        100_000_000, // 100 USDC (high-value payment agreement)
         u64::MAX,    // Maximum possible amount
     ];
 
     for amount in test_amounts {
-        let event = fixture.create_subscribed_event(amount);
-        let encoded_data = EventTestFixture::create_encoded_event("Subscribed", &event);
+        let event = fixture.create_payment_agreement_started_event(amount);
+        let encoded_data = EventTestFixture::create_encoded_event("PaymentAgreementStarted", &event);
 
         // Parse the event
         let result = parse_single_event(&encoded_data);
         assert!(
             result.is_ok(),
-            "Failed to parse Subscribed event with amount {amount}"
+            "Failed to parse PaymentAgreementStarted event with amount {amount}"
         );
 
         match result.unwrap() {
-            TallyEvent::Subscribed(parsed) => {
-                assert_eq!(parsed.merchant, fixture.merchant);
-                assert_eq!(parsed.plan, fixture.plan);
-                assert_eq!(parsed.subscriber, fixture.subscriber);
+            TallyEvent::PaymentAgreementStarted(parsed) => {
+                assert_eq!(parsed.payee, fixture.payee);
+                assert_eq!(parsed.payment_terms, fixture.payment_terms);
+                assert_eq!(parsed.payer, fixture.payer);
                 assert_eq!(parsed.amount, amount);
             }
-            _ => panic!("Expected Subscribed event"),
+            _ => panic!("Expected PaymentAgreementStarted event"),
         }
     }
 }
 
 #[tokio::test]
-async fn test_renewed_event_parsing_comprehensive() {
+async fn test_payment_executed_event_parsing_comprehensive() {
     let fixture = EventTestFixture::new();
 
-    // Test multiple renewal scenarios
-    let renewal_scenarios = vec![
-        (1_000_000, "Monthly renewal"),
-        (5_000_000, "Premium monthly renewal"),
-        (12_000_000, "Annual renewal"),
-        (100_000_000, "Enterprise annual renewal"),
+    // Test multiple payment execution scenarios
+    let payment_scenarios = vec![
+        (1_000_000, "Monthly payment"),
+        (5_000_000, "Premium monthly payment"),
+        (12_000_000, "Annual payment"),
+        (100_000_000, "Enterprise annual payment"),
     ];
 
-    for (amount, description) in renewal_scenarios {
+    for (amount, description) in payment_scenarios {
         let keeper_fee = amount / 200; // 0.5% keeper fee
-        let event = fixture.create_renewed_event(amount, fixture.merchant, keeper_fee);
-        let encoded_data = EventTestFixture::create_encoded_event("Renewed", &event);
+        let event = fixture.create_payment_executed_event(amount, fixture.payee, keeper_fee);
+        let encoded_data = EventTestFixture::create_encoded_event("PaymentExecuted", &event);
 
         let result = parse_single_event(&encoded_data);
         assert!(
             result.is_ok(),
-            "Failed to parse Renewed event: {description}"
+            "Failed to parse PaymentExecuted event: {description}"
         );
 
         match result.unwrap() {
-            TallyEvent::Renewed(parsed) => {
-                assert_eq!(parsed.merchant, fixture.merchant);
-                assert_eq!(parsed.plan, fixture.plan);
-                assert_eq!(parsed.subscriber, fixture.subscriber);
+            TallyEvent::PaymentExecuted(parsed) => {
+                assert_eq!(parsed.payee, fixture.payee);
+                assert_eq!(parsed.payment_terms, fixture.payment_terms);
+                assert_eq!(parsed.payer, fixture.payer);
                 assert_eq!(parsed.amount, amount);
             }
-            _ => panic!("Expected Renewed event for {description}"),
+            _ => panic!("Expected PaymentExecuted event for {description}"),
         }
     }
 }
 
 #[tokio::test]
-async fn test_canceled_event_parsing() {
+async fn test_agreement_paused_event_parsing() {
     let fixture = EventTestFixture::new();
-    let event = fixture.create_canceled_event();
-    let encoded_data = EventTestFixture::create_encoded_event("Canceled", &event);
+    let event = fixture.create_agreement_paused_event();
+    let encoded_data = EventTestFixture::create_encoded_event("PaymentAgreementPaused", &event);
 
     let result = parse_single_event(&encoded_data);
     assert!(result.is_ok());
 
     match result.unwrap() {
-        TallyEvent::Canceled(parsed) => {
-            assert_eq!(parsed.merchant, fixture.merchant);
-            assert_eq!(parsed.plan, fixture.plan);
-            assert_eq!(parsed.subscriber, fixture.subscriber);
+        TallyEvent::PaymentAgreementPaused(parsed) => {
+            assert_eq!(parsed.payee, fixture.payee);
+            assert_eq!(parsed.payment_terms, fixture.payment_terms);
+            assert_eq!(parsed.payer, fixture.payer);
         }
-        _ => panic!("Expected Canceled event"),
+        _ => panic!("Expected PaymentAgreementPaused event"),
     }
 }
 
@@ -244,9 +244,9 @@ async fn test_payment_failed_event_parsing_comprehensive() {
 
         match result.unwrap() {
             TallyEvent::PaymentFailed(parsed) => {
-                assert_eq!(parsed.merchant, fixture.merchant);
-                assert_eq!(parsed.plan, fixture.plan);
-                assert_eq!(parsed.subscriber, fixture.subscriber);
+                assert_eq!(parsed.payee, fixture.payee);
+                assert_eq!(parsed.payment_terms, fixture.payment_terms);
+                assert_eq!(parsed.payer, fixture.payer);
                 assert_eq!(parsed.reason, reason);
             }
             _ => panic!("Expected PaymentFailed event"),
@@ -301,14 +301,14 @@ async fn test_corrupted_event_serialization() {
     let _fixture = EventTestFixture::new();
 
     // Create valid discriminator but corrupted serialized data
-    let discriminator = EventTestFixture::compute_discriminator("Subscribed");
+    let discriminator = EventTestFixture::compute_discriminator("PaymentAgreementStarted");
     let corrupted_cases = vec![
         (vec![], "No event data after discriminator"),
         (vec![0xFF], "Single corrupted byte"),
         (vec![0xFF, 0xFF, 0xFF], "Multiple corrupted bytes"),
         (
             vec![1, 2, 3, 4, 5],
-            "Invalid data that can't be deserialized as Subscribed",
+            "Invalid data that can't be deserialized as PaymentAgreementStarted",
         ),
     ];
 
@@ -341,24 +341,24 @@ async fn test_multiple_events_in_logs() {
     let fixture = EventTestFixture::new();
 
     // Create multiple events of different types
-    let subscribed = fixture.create_subscribed_event(5_000_000);
+    let payment_agreement_started = fixture.create_payment_agreement_started_event(5_000_000);
     let keeper_fee = 5_000_000 / 200; // 0.5% keeper fee
-    let renewed = fixture.create_renewed_event(5_000_000, fixture.merchant, keeper_fee);
-    let canceled = fixture.create_canceled_event();
+    let payment_executed = fixture.create_payment_executed_event(5_000_000, fixture.payee, keeper_fee);
+    let agreement_paused = fixture.create_agreement_paused_event();
     let payment_failed = fixture.create_payment_failed_event("Test failure".to_string());
 
     let events_data = vec![
         (
-            "Subscribed",
-            EventTestFixture::create_encoded_event("Subscribed", &subscribed),
+            "PaymentAgreementStarted",
+            EventTestFixture::create_encoded_event("PaymentAgreementStarted", &payment_agreement_started),
         ),
         (
-            "Renewed",
-            EventTestFixture::create_encoded_event("Renewed", &renewed),
+            "PaymentExecuted",
+            EventTestFixture::create_encoded_event("PaymentExecuted", &payment_executed),
         ),
         (
-            "Canceled",
-            EventTestFixture::create_encoded_event("Canceled", &canceled),
+            "PaymentAgreementPaused",
+            EventTestFixture::create_encoded_event("PaymentAgreementPaused", &agreement_paused),
         ),
         (
             "PaymentFailed",
@@ -375,16 +375,16 @@ async fn test_multiple_events_in_logs() {
     let event_types: Vec<&str> = parsed_events
         .iter()
         .map(|e| match e {
-            TallyEvent::Subscribed(_) => "Subscribed",
-            TallyEvent::SubscriptionReactivated(_) => "SubscriptionReactivated",
-            TallyEvent::Renewed(_) => "Renewed",
-            TallyEvent::Canceled(_) => "Canceled",
-            TallyEvent::SubscriptionClosed(_) => "SubscriptionClosed",
+            TallyEvent::PaymentAgreementStarted(_) => "PaymentAgreementStarted",
+            TallyEvent::PaymentAgreementResumed(_) => "PaymentAgreementResumed",
+            TallyEvent::PaymentExecuted(_) => "PaymentExecuted",
+            TallyEvent::PaymentAgreementPaused(_) => "PaymentAgreementPaused",
+            TallyEvent::PaymentAgreementClosed(_) => "PaymentAgreementClosed",
             TallyEvent::PaymentFailed(_) => "PaymentFailed",
-            TallyEvent::PlanStatusChanged(_) => "PlanStatusChanged",
+            TallyEvent::PaymentTermsStatusChanged(_) => "PaymentTermsStatusChanged",
             TallyEvent::ConfigInitialized(_) => "ConfigInitialized",
-            TallyEvent::MerchantInitialized(_) => "MerchantInitialized",
-            TallyEvent::PlanCreated(_) => "PlanCreated",
+            TallyEvent::PayeeInitialized(_) => "PayeeInitialized",
+            TallyEvent::PaymentTermsCreated(_) => "PaymentTermsCreated",
             TallyEvent::ProgramPaused(_) => "ProgramPaused",
             TallyEvent::ProgramUnpaused(_) => "ProgramUnpaused",
             TallyEvent::LowAllowanceWarning(_) => "LowAllowanceWarning",
@@ -392,15 +392,13 @@ async fn test_multiple_events_in_logs() {
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning",
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated",
             TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded",
-            TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated",
-            TallyEvent::TrialStarted(_) => "TrialStarted",
-            TallyEvent::TrialConverted(_) => "TrialConverted",
+            TallyEvent::PaymentTermsUpdated(_) => "PaymentTermsUpdated",
         })
         .collect();
 
     assert_eq!(
         event_types,
-        vec!["Subscribed", "Renewed", "Canceled", "PaymentFailed"]
+        vec!["PaymentAgreementStarted", "PaymentExecuted", "PaymentAgreementPaused", "PaymentFailed"]
     );
 }
 
@@ -409,11 +407,11 @@ async fn test_mixed_valid_and_invalid_events_in_logs() {
     let fixture = EventTestFixture::new();
 
     // Mix valid and invalid events
-    let valid_event = fixture.create_subscribed_event(1_000_000);
-    let valid_data = EventTestFixture::create_encoded_event("Subscribed", &valid_event);
+    let valid_event = fixture.create_payment_agreement_started_event(1_000_000);
+    let valid_data = EventTestFixture::create_encoded_event("PaymentAgreementStarted", &valid_event);
 
     let events_data = vec![
-        ("Subscribed", valid_data),
+        ("PaymentAgreementStarted", valid_data),
         ("Invalid", "invalid_base64_!@#$".to_string()), // This should be skipped
         ("Corrupted", BASE64_STANDARD.encode(vec![0xFF; 4])), // This should be skipped
     ];
@@ -425,10 +423,10 @@ async fn test_mixed_valid_and_invalid_events_in_logs() {
     assert_eq!(parsed_events.len(), 1, "Should only parse valid events");
 
     match &parsed_events[0] {
-        TallyEvent::Subscribed(event) => {
+        TallyEvent::PaymentAgreementStarted(event) => {
             assert_eq!(event.amount, 1_000_000);
         }
-        _ => panic!("Expected first event to be Subscribed"),
+        _ => panic!("Expected first event to be PaymentAgreementStarted"),
     }
 }
 
@@ -442,9 +440,9 @@ async fn test_high_volume_event_parsing_performance() {
     let mut events_data = Vec::new();
 
     for i in 0..EVENT_COUNT {
-        let event = fixture.create_subscribed_event((i as u64) * 1_000_000);
-        let encoded = EventTestFixture::create_encoded_event("Subscribed", &event);
-        events_data.push(("Subscribed", encoded));
+        let event = fixture.create_payment_agreement_started_event((i as u64) * 1_000_000);
+        let encoded = EventTestFixture::create_encoded_event("PaymentAgreementStarted", &event);
+        events_data.push(("PaymentAgreementStarted", encoded));
     }
 
     let logs = fixture.create_program_logs(events_data);
@@ -466,11 +464,11 @@ async fn test_high_volume_event_parsing_performance() {
     // Verify event data integrity
     for (i, event) in parsed_events.iter().enumerate() {
         match event {
-            TallyEvent::Subscribed(subscribed) => {
-                assert_eq!(subscribed.amount, (i as u64) * 1_000_000);
-                assert_eq!(subscribed.merchant, fixture.merchant);
+            TallyEvent::PaymentAgreementStarted(payment_agreement_started) => {
+                assert_eq!(payment_agreement_started.amount, (i as u64) * 1_000_000);
+                assert_eq!(payment_agreement_started.payee, fixture.payee);
             }
-            _ => panic!("Expected Subscribed event at index {i}"),
+            _ => panic!("Expected PaymentAgreementStarted event at index {i}"),
         }
     }
 }
@@ -480,8 +478,8 @@ async fn test_program_id_filtering() {
     let fixture = EventTestFixture::new();
     let other_program_id: Pubkey = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-    let event = fixture.create_subscribed_event(1_000_000);
-    let event_data = EventTestFixture::create_encoded_event("Subscribed", &event);
+    let event = fixture.create_payment_agreement_started_event(1_000_000);
+    let event_data = EventTestFixture::create_encoded_event("PaymentAgreementStarted", &event);
 
     // Create logs with events from different programs
     let logs = vec![
@@ -513,13 +511,13 @@ async fn test_receipt_creation_comprehensive() {
     let fixture = EventTestFixture::new();
 
     // Create events
-    let subscribed = fixture.create_subscribed_event(5_000_000);
+    let payment_agreement_started = fixture.create_payment_agreement_started_event(5_000_000);
     let payment_failed = fixture.create_payment_failed_event("Insufficient balance".to_string());
 
     let events_data = vec![
         (
-            "Subscribed",
-            EventTestFixture::create_encoded_event("Subscribed", &subscribed),
+            "PaymentAgreementStarted",
+            EventTestFixture::create_encoded_event("PaymentAgreementStarted", &payment_agreement_started),
         ),
         (
             "PaymentFailed",
@@ -580,16 +578,16 @@ async fn test_receipt_event_getters() {
     let fixture = EventTestFixture::new();
 
     // Create receipt with multiple event types
-    let subscribed = fixture.create_subscribed_event(5_000_000);
+    let payment_agreement_started = fixture.create_payment_agreement_started_event(5_000_000);
     let keeper_fee = 5_000_000 / 200; // 0.5% keeper fee
-    let renewed = fixture.create_renewed_event(5_000_000, fixture.merchant, keeper_fee);
-    let canceled = fixture.create_canceled_event();
+    let payment_executed = fixture.create_payment_executed_event(5_000_000, fixture.payee, keeper_fee);
+    let agreement_paused = fixture.create_agreement_paused_event();
     let payment_failed = fixture.create_payment_failed_event("Test failure".to_string());
 
     let events = vec![
-        TallyEvent::Subscribed(subscribed.clone()),
-        TallyEvent::Renewed(renewed.clone()),
-        TallyEvent::Canceled(canceled.clone()),
+        TallyEvent::PaymentAgreementStarted(payment_agreement_started.clone()),
+        TallyEvent::PaymentExecuted(payment_executed.clone()),
+        TallyEvent::PaymentAgreementPaused(agreement_paused.clone()),
         TallyEvent::PaymentFailed(payment_failed.clone()),
     ];
 
@@ -606,13 +604,13 @@ async fn test_receipt_event_getters() {
     };
 
     // Test event getters
-    assert_eq!(receipt.get_subscribed_event(), Some(&subscribed));
-    assert_eq!(receipt.get_renewed_event(), Some(&renewed));
-    assert_eq!(receipt.get_canceled_event(), Some(&canceled));
+    assert_eq!(receipt.get_agreement_started_event(), Some(&payment_agreement_started));
+    assert_eq!(receipt.get_payment_executed_event(), Some(&payment_executed));
+    assert_eq!(receipt.get_agreement_paused_event(), Some(&agreement_paused));
     assert_eq!(receipt.get_payment_failed_event(), Some(&payment_failed));
 
-    // Test subscription success detection
-    assert!(receipt.is_subscription_success());
+    // Test payment agreement success detection
+    assert!(receipt.is_agreement_success());
 }
 
 #[tokio::test]
@@ -625,8 +623,8 @@ async fn test_memo_extraction_comprehensive() {
         ),
         // Alternative memo format
         (
-            vec!["Program log: Processing memo: Payment for subscription".to_string()],
-            Some("Payment for subscription".to_string()),
+            vec!["Program log: Processing memo: Payment for payment agreement".to_string()],
+            Some("Payment for payment agreement".to_string()),
         ),
         // Multiple memos (should return first)
         (
@@ -661,7 +659,7 @@ async fn test_event_discriminator_uniqueness_and_determinism() {
     let _fixture = EventTestFixture::new();
 
     // Test that all discriminators are unique
-    let event_names = vec!["Subscribed", "Renewed", "Canceled", "PaymentFailed"];
+    let event_names = vec!["PaymentAgreementStarted", "Renewed", "Canceled", "PaymentFailed"];
     let mut discriminators = HashMap::new();
 
     for event_name in &event_names {
@@ -705,19 +703,19 @@ async fn test_concurrent_event_parsing() {
         .map(|i| {
             let fixture = EventTestFixture::new(); // Each task gets its own fixture
             tokio::spawn(async move {
-                let event = fixture.create_subscribed_event(i * 1_000_000);
-                let encoded = EventTestFixture::create_encoded_event("Subscribed", &event);
+                let event = fixture.create_payment_agreement_started_event(i * 1_000_000);
+                let encoded = EventTestFixture::create_encoded_event("PaymentAgreementStarted", &event);
 
                 // Parse the event
                 let result = parse_single_event(&encoded);
                 assert!(result.is_ok(), "Failed to parse event in task {i}");
 
                 match result.unwrap() {
-                    TallyEvent::Subscribed(parsed) => {
+                    TallyEvent::PaymentAgreementStarted(parsed) => {
                         assert_eq!(parsed.amount, i * 1_000_000);
                         i // Return the task number for verification
                     }
-                    _ => panic!("Expected Subscribed event in task {i}"),
+                    _ => panic!("Expected PaymentAgreementStarted event in task {i}"),
                 }
             })
         })
@@ -755,8 +753,8 @@ async fn test_edge_case_scenarios() {
     }
 
     // Test with minimum viable data
-    let min_event = fixture.create_canceled_event();
-    let min_encoded = EventTestFixture::create_encoded_event("Canceled", &min_event);
+    let min_event = fixture.create_agreement_paused_event();
+    let min_encoded = EventTestFixture::create_encoded_event("PaymentAgreementPaused", &min_event);
 
     let min_result = parse_single_event(&min_encoded);
     assert!(min_result.is_ok(), "Should handle minimal event data");

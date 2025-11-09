@@ -8,110 +8,110 @@ use chrono;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Event emitted when a subscription is successfully started
+/// Event emitted when a payment agreement is successfully started
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Subscribed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being subscribed to
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount paid for the subscription (in USDC micro-units)
+pub struct PaymentAgreementStarted {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being agreed to
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
+    /// The amount paid for the first payment (in USDC micro-units)
     pub amount: u64,
 }
 
-/// Event emitted when a subscription is successfully renewed
+/// Event emitted when a payment is successfully executed
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Renewed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being renewed
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount paid for the renewal (in USDC micro-units)
+pub struct PaymentExecuted {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being executed
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
+    /// The amount paid (in USDC micro-units)
     pub amount: u64,
-    /// The keeper who executed the renewal
+    /// The keeper who executed the payment
     pub keeper: Pubkey,
     /// The fee paid to the keeper (in USDC micro-units)
     pub keeper_fee: u64,
 }
 
-/// Event emitted when a subscription is canceled
+/// Event emitted when a payment agreement is paused
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct Canceled {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being canceled
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
+pub struct PaymentAgreementPaused {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being paused
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
 }
 
-/// Event emitted when a subscription payment fails
+/// Event emitted when a payment fails
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct PaymentFailed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan where payment failed
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms where payment failed
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
     /// The reason for payment failure (encoded as string for off-chain analysis)
     pub reason: String,
 }
 
-/// Event emitted when a previously canceled subscription is reactivated
+/// Event emitted when a previously paused payment agreement is resumed
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct SubscriptionReactivated {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being reactivated
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount paid for reactivation (in USDC micro-units)
+pub struct PaymentAgreementResumed {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being resumed
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
+    /// The amount paid for resumption (in USDC micro-units)
     pub amount: u64,
-    /// Cumulative number of renewals across all subscription sessions
-    pub total_renewals: u32,
-    /// Original subscription creation timestamp (preserved from first session)
+    /// Cumulative number of payments across all agreement sessions
+    pub total_payments: u32,
+    /// Original agreement creation timestamp (preserved from first session)
     pub original_created_ts: i64,
 }
 
-/// Event emitted when a subscription account is closed and rent is reclaimed
+/// Event emitted when a payment agreement account is closed and rent is reclaimed
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct SubscriptionClosed {
-    /// The subscription plan that was closed
-    pub plan: Pubkey,
-    /// The subscriber's public key who closed the subscription and received the rent
-    pub subscriber: Pubkey,
+pub struct PaymentAgreementClosed {
+    /// The payment terms that was closed
+    pub payment_terms: Pubkey,
+    /// The payer's public key who closed the agreement and received the rent
+    pub payer: Pubkey,
 }
 
-/// Event emitted when a plan's active status is changed
+/// Event emitted when payment terms' active status is changed
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct PlanStatusChanged {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan whose status changed
-    pub plan: Pubkey,
+pub struct PaymentTermsStatusChanged {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms whose status changed
+    pub payment_terms: Pubkey,
     /// The new active status
     pub active: bool,
-    /// Who changed the status: "merchant" or "platform"
+    /// Who changed the status: "payee" or "platform"
     pub changed_by: String,
 }
 
@@ -126,7 +126,7 @@ pub struct ConfigInitialized {
     pub max_platform_fee_bps: u16,
     /// Minimum platform fee in basis points
     pub min_platform_fee_bps: u16,
-    /// Minimum subscription period in seconds
+    /// Minimum payment agreement period in seconds
     pub min_period_seconds: u64,
     /// Default allowance periods multiplier
     pub default_allowance_periods: u8,
@@ -140,45 +140,45 @@ pub struct ConfigInitialized {
     pub timestamp: i64,
 }
 
-/// Event emitted when a merchant account is initialized
+/// Event emitted when a payee account is initialized
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct MerchantInitialized {
-    /// The merchant PDA account
-    pub merchant: Pubkey,
-    /// Merchant authority (signer for merchant operations)
+pub struct PayeeInitialized {
+    /// The payee PDA account
+    pub payee: Pubkey,
+    /// Payee authority (signer for payee operations)
     pub authority: Pubkey,
     /// Pinned USDC mint address for all transactions
     pub usdc_mint: Pubkey,
-    /// Merchant's USDC treasury ATA
+    /// Payee's USDC treasury ATA
     pub treasury_ata: Pubkey,
     /// Platform fee in basis points
     pub platform_fee_bps: u16,
-    /// Unix timestamp when merchant was initialized
+    /// Unix timestamp when payee was initialized
     pub timestamp: i64,
 }
 
-/// Event emitted when a subscription plan is created
+/// Event emitted when payment terms are created
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct PlanCreated {
-    /// The plan PDA account
-    pub plan: Pubkey,
-    /// Reference to the merchant PDA
-    pub merchant: Pubkey,
-    /// Deterministic plan identifier
-    pub plan_id: String,
+pub struct PaymentTermsCreated {
+    /// The payment terms PDA account
+    pub payment_terms: Pubkey,
+    /// Reference to the payee PDA
+    pub payee: Pubkey,
+    /// Deterministic payment terms identifier
+    pub terms_id: String,
     /// Price in USDC microlamports (6 decimals)
-    pub price_usdc: u64,
-    /// Subscription period in seconds
+    pub amount_usdc: u64,
+    /// Payment period in seconds
     pub period_secs: u64,
-    /// Grace period for renewals in seconds
+    /// Grace period for payments in seconds
     pub grace_secs: u64,
-    /// Plan display name
+    /// Payment terms display name
     pub name: String,
-    /// Unix timestamp when plan was created
+    /// Unix timestamp when payment terms were created
     pub timestamp: i64,
 }
 
@@ -204,23 +204,23 @@ pub struct ProgramUnpaused {
     pub timestamp: i64,
 }
 
-/// Event emitted when a subscription renewal succeeds but remaining allowance is low
+/// Event emitted when a payment succeeds but remaining allowance is low
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct LowAllowanceWarning {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan with low allowance
-    pub plan: Pubkey,
-    /// The subscriber who needs to increase allowance
-    pub subscriber: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms with low allowance
+    pub payment_terms: Pubkey,
+    /// The payer who needs to increase allowance
+    pub payer: Pubkey,
     /// Current remaining allowance (in USDC micro-units)
     pub current_allowance: u64,
-    /// Recommended minimum allowance (2x plan price)
+    /// Recommended minimum allowance (2x payment amount)
     pub recommended_allowance: u64,
-    /// Plan price for reference (in USDC micro-units)
-    pub plan_price: u64,
+    /// Payment amount for reference (in USDC micro-units)
+    pub payment_amount: u64,
 }
 
 /// Event emitted when platform fees are withdrawn
@@ -238,20 +238,20 @@ pub struct FeesWithdrawn {
     pub timestamp: i64,
 }
 
-/// Event emitted when a delegate mismatch is detected during subscription renewal
+/// Event emitted when a delegate mismatch is detected during payment execution
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
 pub struct DelegateMismatchWarning {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan with delegate mismatch
-    pub plan: Pubkey,
-    /// The subscriber whose token account has incorrect delegate
-    pub subscriber: Pubkey,
-    /// The expected delegate PDA for this merchant
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms with delegate mismatch
+    pub payment_terms: Pubkey,
+    /// The payer whose token account has incorrect delegate
+    pub payer: Pubkey,
+    /// The expected delegate PDA for this payee
     pub expected_delegate: Pubkey,
-    /// The actual delegate currently set on the token account (may be None or different merchant)
+    /// The actual delegate currently set on the token account (may be None or different payee)
     pub actual_delegate: Option<Pubkey>,
 }
 
@@ -335,8 +335,8 @@ impl anchor_lang::AnchorDeserialize for VolumeTier {
 /// Event emitted when a payee's volume tier is upgraded based on payment volume
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VolumeTierUpgraded {
-    /// The merchant account whose tier was upgraded
-    pub merchant: Pubkey,
+    /// The payee account whose tier was upgraded
+    pub payee: Pubkey,
     /// The previous tier before the upgrade
     pub old_tier: VolumeTier,
     /// The new tier after the upgrade
@@ -347,15 +347,15 @@ pub struct VolumeTierUpgraded {
     pub new_platform_fee_bps: u16,
 }
 
-/// Event emitted when a plan's pricing or terms are updated
+/// Event emitted when payment terms pricing or terms are updated
 #[derive(
     Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
 )]
-pub struct PlanTermsUpdated {
-    /// The plan account whose terms were updated
-    pub plan: Pubkey,
-    /// The merchant who owns the plan
-    pub merchant: Pubkey,
+pub struct PaymentTermsUpdated {
+    /// The payment terms account that was updated
+    pub payment_terms: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
     /// The old price before update (if price was updated)
     pub old_price: Option<u64>,
     /// The new price after update (if price was updated)
@@ -368,61 +368,33 @@ pub struct PlanTermsUpdated {
     pub old_grace: Option<u64>,
     /// The new grace period after update (if grace was updated)
     pub new_grace: Option<u64>,
-    /// Merchant authority who performed the update
+    /// Payee authority who performed the update
     pub updated_by: Pubkey,
-}
-
-/// Event emitted when a subscription starts with a free trial period
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct TrialStarted {
-    /// The subscription account that entered trial period
-    pub subscription: Pubkey,
-    /// The subscriber who started the trial
-    pub subscriber: Pubkey,
-    /// The subscription plan for this trial
-    pub plan: Pubkey,
-    /// Unix timestamp when the trial period ends
-    pub trial_ends_at: i64,
-}
-
-/// Event emitted when a trial subscription converts to paid
-#[derive(
-    Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AnchorSerialize, AnchorDeserialize,
-)]
-pub struct TrialConverted {
-    /// The subscription account that converted from trial to paid
-    pub subscription: Pubkey,
-    /// The subscriber who converted to paid
-    pub subscriber: Pubkey,
-    /// The subscription plan that was converted
-    pub plan: Pubkey,
 }
 
 /// All possible Tally program events
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TallyEvent {
-    /// Subscription started
-    Subscribed(Subscribed),
-    /// Subscription reactivated
-    SubscriptionReactivated(SubscriptionReactivated),
-    /// Subscription renewed
-    Renewed(Renewed),
-    /// Subscription canceled
-    Canceled(Canceled),
-    /// Subscription closed
-    SubscriptionClosed(SubscriptionClosed),
+    /// Payment agreement started
+    PaymentAgreementStarted(PaymentAgreementStarted),
+    /// Payment agreement resumed
+    PaymentAgreementResumed(PaymentAgreementResumed),
+    /// Payment executed
+    PaymentExecuted(PaymentExecuted),
+    /// Payment agreement paused
+    PaymentAgreementPaused(PaymentAgreementPaused),
+    /// Payment agreement closed
+    PaymentAgreementClosed(PaymentAgreementClosed),
     /// Payment failed
     PaymentFailed(PaymentFailed),
-    /// Plan status changed
-    PlanStatusChanged(PlanStatusChanged),
+    /// Payment terms status changed
+    PaymentTermsStatusChanged(PaymentTermsStatusChanged),
     /// Config initialized
     ConfigInitialized(ConfigInitialized),
-    /// Merchant initialized
-    MerchantInitialized(MerchantInitialized),
-    /// Plan created
-    PlanCreated(PlanCreated),
+    /// Payee initialized
+    PayeeInitialized(PayeeInitialized),
+    /// Payment terms created
+    PaymentTermsCreated(PaymentTermsCreated),
     /// Program paused
     ProgramPaused(ProgramPaused),
     /// Program unpaused
@@ -437,12 +409,8 @@ pub enum TallyEvent {
     ConfigUpdated(ConfigUpdated),
     /// Volume tier upgraded based on payment volume
     VolumeTierUpgraded(VolumeTierUpgraded),
-    /// Plan terms updated
-    PlanTermsUpdated(PlanTermsUpdated),
-    /// Trial started
-    TrialStarted(TrialStarted),
-    /// Trial converted
-    TrialConverted(TrialConverted),
+    /// Payment terms updated
+    PaymentTermsUpdated(PaymentTermsUpdated),
 }
 
 /// Enhanced parsed event with transaction context for RPC queries and WebSocket streaming
@@ -467,8 +435,8 @@ pub struct ParsedEventWithContext {
 pub struct StreamableEventData {
     /// Event type as string
     pub event_type: String,
-    /// Merchant PDA
-    pub merchant_pda: String,
+    /// Payee PDA
+    pub payee_pda: String,
     /// Transaction signature
     pub transaction_signature: String,
     /// Event timestamp
@@ -477,10 +445,10 @@ pub struct StreamableEventData {
     pub metadata: HashMap<String, String>,
     /// Amount involved (if applicable)
     pub amount: Option<u64>,
-    /// Plan address (if applicable)
-    pub plan_address: Option<String>,
-    /// Subscription address (if applicable)
-    pub subscription_address: Option<String>,
+    /// `PaymentTerms` address (if applicable)
+    pub payment_terms_address: Option<String>,
+    /// `PaymentAgreement` address (if applicable)
+    pub agreement_address: Option<String>,
 }
 
 impl ParsedEventWithContext {
@@ -510,59 +478,59 @@ impl ParsedEventWithContext {
     pub fn to_streamable(&self) -> StreamableEventData {
         let mut metadata = HashMap::new();
 
-        let (event_type, merchant_pda, plan_address, amount) = match &self.event {
-            TallyEvent::Subscribed(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                ("subscribed".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), Some(e.amount))
+        let (event_type, payee_pda, payment_terms_address, amount) = match &self.event {
+            TallyEvent::PaymentAgreementStarted(e) => {
+                metadata.insert("payer".to_string(), e.payer.to_string());
+                ("payment_agreement_started".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), Some(e.amount))
             }
-            TallyEvent::SubscriptionReactivated(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                metadata.insert("total_renewals".to_string(), e.total_renewals.to_string());
+            TallyEvent::PaymentAgreementResumed(e) => {
+                metadata.insert("payer".to_string(), e.payer.to_string());
+                metadata.insert("total_payments".to_string(), e.total_payments.to_string());
                 metadata.insert("original_created_ts".to_string(), e.original_created_ts.to_string());
-                ("subscription_reactivated".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), Some(e.amount))
+                ("payment_agreement_resumed".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), Some(e.amount))
             }
-            TallyEvent::Renewed(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+            TallyEvent::PaymentExecuted(e) => {
+                metadata.insert("payer".to_string(), e.payer.to_string());
                 metadata.insert("keeper".to_string(), e.keeper.to_string());
                 metadata.insert("keeper_fee".to_string(), e.keeper_fee.to_string());
-                ("renewed".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), Some(e.amount))
+                ("payment_executed".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), Some(e.amount))
             }
-            TallyEvent::Canceled(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                ("canceled".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+            TallyEvent::PaymentAgreementPaused(e) => {
+                metadata.insert("payer".to_string(), e.payer.to_string());
+                ("payment_agreement_paused".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
-            TallyEvent::SubscriptionClosed(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                ("subscription_closed".to_string(), String::new(), Some(e.plan.to_string()), None)
+            TallyEvent::PaymentAgreementClosed(e) => {
+                metadata.insert("payer".to_string(), e.payer.to_string());
+                ("payment_agreement_closed".to_string(), String::new(), Some(e.payment_terms.to_string()), None)
             }
             TallyEvent::PaymentFailed(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                metadata.insert("payer".to_string(), e.payer.to_string());
                 metadata.insert("reason".to_string(), e.reason.clone());
-                ("payment_failed".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+                ("payment_failed".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
-            TallyEvent::PlanStatusChanged(e) => {
+            TallyEvent::PaymentTermsStatusChanged(e) => {
                 metadata.insert("active".to_string(), e.active.to_string());
                 metadata.insert("changed_by".to_string(), e.changed_by.clone());
-                ("plan_status_changed".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+                ("payment_terms_status_changed".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
             TallyEvent::ConfigInitialized(e) => {
                 metadata.insert("platform_authority".to_string(), e.platform_authority.to_string());
                 metadata.insert("allowed_mint".to_string(), e.allowed_mint.to_string());
                 ("config_initialized".to_string(), String::new(), None, None)
             }
-            TallyEvent::MerchantInitialized(e) => {
+            TallyEvent::PayeeInitialized(e) => {
                 metadata.insert("authority".to_string(), e.authority.to_string());
                 metadata.insert("usdc_mint".to_string(), e.usdc_mint.to_string());
                 metadata.insert("treasury_ata".to_string(), e.treasury_ata.to_string());
-                ("merchant_initialized".to_string(), e.merchant.to_string(), None, None)
+                ("payee_initialized".to_string(), e.payee.to_string(), None, None)
             }
-            TallyEvent::PlanCreated(e) => {
-                metadata.insert("plan_id".to_string(), e.plan_id.clone());
-                metadata.insert("price_usdc".to_string(), e.price_usdc.to_string());
+            TallyEvent::PaymentTermsCreated(e) => {
+                metadata.insert("terms_id".to_string(), e.terms_id.clone());
+                metadata.insert("amount_usdc".to_string(), e.amount_usdc.to_string());
                 metadata.insert("period_secs".to_string(), e.period_secs.to_string());
                 metadata.insert("grace_secs".to_string(), e.grace_secs.to_string());
                 metadata.insert("name".to_string(), e.name.clone());
-                ("plan_created".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+                ("payment_terms_created".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
             TallyEvent::ProgramPaused(e) => {
                 metadata.insert("authority".to_string(), e.authority.to_string());
@@ -573,11 +541,11 @@ impl ParsedEventWithContext {
                 ("program_unpaused".to_string(), String::new(), None, None)
             }
             TallyEvent::LowAllowanceWarning(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                metadata.insert("payer".to_string(), e.payer.to_string());
                 metadata.insert("current_allowance".to_string(), e.current_allowance.to_string());
                 metadata.insert("recommended_allowance".to_string(), e.recommended_allowance.to_string());
-                metadata.insert("plan_price".to_string(), e.plan_price.to_string());
-                ("low_allowance_warning".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+                metadata.insert("payment_amount".to_string(), e.payment_amount.to_string());
+                ("low_allowance_warning".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
             TallyEvent::FeesWithdrawn(e) => {
                 metadata.insert("platform_authority".to_string(), e.platform_authority.to_string());
@@ -585,12 +553,12 @@ impl ParsedEventWithContext {
                 ("fees_withdrawn".to_string(), String::new(), None, Some(e.amount))
             }
             TallyEvent::DelegateMismatchWarning(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
+                metadata.insert("payer".to_string(), e.payer.to_string());
                 metadata.insert("expected_delegate".to_string(), e.expected_delegate.to_string());
                 if let Some(actual) = &e.actual_delegate {
                     metadata.insert("actual_delegate".to_string(), actual.to_string());
                 }
-                ("delegate_mismatch_warning".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
+                ("delegate_mismatch_warning".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
             TallyEvent::ConfigUpdated(e) => {
                 metadata.insert("updated_by".to_string(), e.updated_by.to_string());
@@ -602,9 +570,9 @@ impl ParsedEventWithContext {
                 metadata.insert("new_tier".to_string(), format!("{:?}", e.new_tier));
                 metadata.insert("monthly_volume_usdc".to_string(), e.monthly_volume_usdc.to_string());
                 metadata.insert("new_platform_fee_bps".to_string(), e.new_platform_fee_bps.to_string());
-                ("volume_tier_upgraded".to_string(), e.merchant.to_string(), None, None)
+                ("volume_tier_upgraded".to_string(), e.payee.to_string(), None, None)
             }
-            TallyEvent::PlanTermsUpdated(e) => {
+            TallyEvent::PaymentTermsUpdated(e) => {
                 metadata.insert("updated_by".to_string(), e.updated_by.to_string());
                 if let Some(old_price) = e.old_price {
                     metadata.insert("old_price".to_string(), old_price.to_string());
@@ -612,31 +580,20 @@ impl ParsedEventWithContext {
                 if let Some(new_price) = e.new_price {
                     metadata.insert("new_price".to_string(), new_price.to_string());
                 }
-                ("plan_terms_updated".to_string(), e.merchant.to_string(), Some(e.plan.to_string()), None)
-            }
-            TallyEvent::TrialStarted(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                metadata.insert("subscription".to_string(), e.subscription.to_string());
-                metadata.insert("trial_ends_at".to_string(), e.trial_ends_at.to_string());
-                ("trial_started".to_string(), String::new(), Some(e.plan.to_string()), None)
-            }
-            TallyEvent::TrialConverted(e) => {
-                metadata.insert("subscriber".to_string(), e.subscriber.to_string());
-                metadata.insert("subscription".to_string(), e.subscription.to_string());
-                ("trial_converted".to_string(), String::new(), Some(e.plan.to_string()), None)
+                ("payment_terms_updated".to_string(), e.payee.to_string(), Some(e.payment_terms.to_string()), None)
             }
         };
         metadata.insert("slot".to_string(), self.slot.to_string());
         metadata.insert("success".to_string(), self.success.to_string());
 
-        // Generate subscription address for events that have plan + subscriber
-        let subscription_address = if plan_address.is_some() && metadata.contains_key("subscriber")
+        // Generate payment agreement address for events that have payment_terms + payer
+        let agreement_address = if payment_terms_address.is_some() && metadata.contains_key("payer")
         {
-            let subscriber_str = metadata.get("subscriber").map_or("unknown", String::as_str);
+            let payer_str = metadata.get("payer").map_or("unknown", String::as_str);
             Some(format!(
-                "subscription_{}_{}",
-                plan_address.as_deref().unwrap_or("unknown"),
-                subscriber_str
+                "payment_agreement_{}_{}",
+                payment_terms_address.as_deref().unwrap_or("unknown"),
+                payer_str
             ))
         } else {
             None
@@ -644,13 +601,13 @@ impl ParsedEventWithContext {
 
         StreamableEventData {
             event_type,
-            merchant_pda,
+            payee_pda,
             transaction_signature: self.signature.to_string(),
             timestamp: self.block_time.unwrap_or(0),
             metadata,
             amount,
-            plan_address,
-            subscription_address,
+            payment_terms_address,
+            agreement_address,
         }
     }
 
@@ -660,61 +617,57 @@ impl ParsedEventWithContext {
         self.success
     }
 
-    /// Get the merchant pubkey from the event
+    /// Get the payee pubkey from the event
     #[must_use]
-    pub const fn get_merchant(&self) -> Option<Pubkey> {
+    pub const fn get_payee(&self) -> Option<Pubkey> {
         match &self.event {
-            TallyEvent::Subscribed(e) => Some(e.merchant),
-            TallyEvent::SubscriptionReactivated(e) => Some(e.merchant),
-            TallyEvent::Renewed(e) => Some(e.merchant),
-            TallyEvent::Canceled(e) => Some(e.merchant),
-            TallyEvent::PaymentFailed(e) => Some(e.merchant),
-            TallyEvent::PlanStatusChanged(e) => Some(e.merchant),
-            TallyEvent::MerchantInitialized(e) => Some(e.merchant),
-            TallyEvent::PlanCreated(e) => Some(e.merchant),
-            TallyEvent::LowAllowanceWarning(e) => Some(e.merchant),
-            TallyEvent::DelegateMismatchWarning(e) => Some(e.merchant),
-            TallyEvent::VolumeTierUpgraded(e) => Some(e.merchant),
-            TallyEvent::PlanTermsUpdated(e) => Some(e.merchant),
+            TallyEvent::PaymentAgreementStarted(e) => Some(e.payee),
+            TallyEvent::PaymentAgreementResumed(e) => Some(e.payee),
+            TallyEvent::PaymentExecuted(e) => Some(e.payee),
+            TallyEvent::PaymentAgreementPaused(e) => Some(e.payee),
+            TallyEvent::PaymentFailed(e) => Some(e.payee),
+            TallyEvent::PaymentTermsStatusChanged(e) => Some(e.payee),
+            TallyEvent::PayeeInitialized(e) => Some(e.payee),
+            TallyEvent::PaymentTermsCreated(e) => Some(e.payee),
+            TallyEvent::LowAllowanceWarning(e) => Some(e.payee),
+            TallyEvent::DelegateMismatchWarning(e) => Some(e.payee),
+            TallyEvent::VolumeTierUpgraded(e) => Some(e.payee),
+            TallyEvent::PaymentTermsUpdated(e) => Some(e.payee),
             _ => None,
         }
     }
 
-    /// Get the plan pubkey from the event
+    /// Get the payment terms pubkey from the event
     #[must_use]
-    pub const fn get_plan(&self) -> Option<Pubkey> {
+    pub const fn get_payment_terms(&self) -> Option<Pubkey> {
         match &self.event {
-            TallyEvent::Subscribed(e) => Some(e.plan),
-            TallyEvent::SubscriptionReactivated(e) => Some(e.plan),
-            TallyEvent::Renewed(e) => Some(e.plan),
-            TallyEvent::Canceled(e) => Some(e.plan),
-            TallyEvent::SubscriptionClosed(e) => Some(e.plan),
-            TallyEvent::PaymentFailed(e) => Some(e.plan),
-            TallyEvent::PlanStatusChanged(e) => Some(e.plan),
-            TallyEvent::PlanCreated(e) => Some(e.plan),
-            TallyEvent::LowAllowanceWarning(e) => Some(e.plan),
-            TallyEvent::DelegateMismatchWarning(e) => Some(e.plan),
-            TallyEvent::PlanTermsUpdated(e) => Some(e.plan),
-            TallyEvent::TrialStarted(e) => Some(e.plan),
-            TallyEvent::TrialConverted(e) => Some(e.plan),
+            TallyEvent::PaymentAgreementStarted(e) => Some(e.payment_terms),
+            TallyEvent::PaymentAgreementResumed(e) => Some(e.payment_terms),
+            TallyEvent::PaymentExecuted(e) => Some(e.payment_terms),
+            TallyEvent::PaymentAgreementPaused(e) => Some(e.payment_terms),
+            TallyEvent::PaymentAgreementClosed(e) => Some(e.payment_terms),
+            TallyEvent::PaymentFailed(e) => Some(e.payment_terms),
+            TallyEvent::PaymentTermsStatusChanged(e) => Some(e.payment_terms),
+            TallyEvent::PaymentTermsCreated(e) => Some(e.payment_terms),
+            TallyEvent::LowAllowanceWarning(e) => Some(e.payment_terms),
+            TallyEvent::DelegateMismatchWarning(e) => Some(e.payment_terms),
+            TallyEvent::PaymentTermsUpdated(e) => Some(e.payment_terms),
             _ => None,
         }
     }
 
-    /// Get the subscriber pubkey from the event
+    /// Get the payer pubkey from the event
     #[must_use]
-    pub const fn get_subscriber(&self) -> Option<Pubkey> {
+    pub const fn get_payer(&self) -> Option<Pubkey> {
         match &self.event {
-            TallyEvent::Subscribed(e) => Some(e.subscriber),
-            TallyEvent::SubscriptionReactivated(e) => Some(e.subscriber),
-            TallyEvent::Renewed(e) => Some(e.subscriber),
-            TallyEvent::Canceled(e) => Some(e.subscriber),
-            TallyEvent::SubscriptionClosed(e) => Some(e.subscriber),
-            TallyEvent::PaymentFailed(e) => Some(e.subscriber),
-            TallyEvent::LowAllowanceWarning(e) => Some(e.subscriber),
-            TallyEvent::DelegateMismatchWarning(e) => Some(e.subscriber),
-            TallyEvent::TrialStarted(e) => Some(e.subscriber),
-            TallyEvent::TrialConverted(e) => Some(e.subscriber),
+            TallyEvent::PaymentAgreementStarted(e) => Some(e.payer),
+            TallyEvent::PaymentAgreementResumed(e) => Some(e.payer),
+            TallyEvent::PaymentExecuted(e) => Some(e.payer),
+            TallyEvent::PaymentAgreementPaused(e) => Some(e.payer),
+            TallyEvent::PaymentAgreementClosed(e) => Some(e.payer),
+            TallyEvent::PaymentFailed(e) => Some(e.payer),
+            TallyEvent::LowAllowanceWarning(e) => Some(e.payer),
+            TallyEvent::DelegateMismatchWarning(e) => Some(e.payer),
             _ => None,
         }
     }
@@ -723,9 +676,9 @@ impl ParsedEventWithContext {
     #[must_use]
     pub const fn get_amount(&self) -> Option<u64> {
         match &self.event {
-            TallyEvent::Subscribed(e) => Some(e.amount),
-            TallyEvent::SubscriptionReactivated(e) => Some(e.amount),
-            TallyEvent::Renewed(e) => Some(e.amount),
+            TallyEvent::PaymentAgreementStarted(e) => Some(e.amount),
+            TallyEvent::PaymentAgreementResumed(e) => Some(e.amount),
+            TallyEvent::PaymentExecuted(e) => Some(e.amount),
             TallyEvent::FeesWithdrawn(e) => Some(e.amount),
             _ => None,
         }
@@ -735,16 +688,16 @@ impl ParsedEventWithContext {
     #[must_use]
     pub fn get_event_type_string(&self) -> String {
         match &self.event {
-            TallyEvent::Subscribed(_) => "Subscribed".to_string(),
-            TallyEvent::SubscriptionReactivated(_) => "SubscriptionReactivated".to_string(),
-            TallyEvent::Renewed(_) => "Renewed".to_string(),
-            TallyEvent::Canceled(_) => "Canceled".to_string(),
-            TallyEvent::SubscriptionClosed(_) => "SubscriptionClosed".to_string(),
+            TallyEvent::PaymentAgreementStarted(_) => "PaymentAgreementStarted".to_string(),
+            TallyEvent::PaymentAgreementResumed(_) => "PaymentAgreementResumed".to_string(),
+            TallyEvent::PaymentExecuted(_) => "PaymentExecuted".to_string(),
+            TallyEvent::PaymentAgreementPaused(_) => "PaymentAgreementPaused".to_string(),
+            TallyEvent::PaymentAgreementClosed(_) => "PaymentAgreementClosed".to_string(),
             TallyEvent::PaymentFailed(_) => "PaymentFailed".to_string(),
-            TallyEvent::PlanStatusChanged(_) => "PlanStatusChanged".to_string(),
+            TallyEvent::PaymentTermsStatusChanged(_) => "PaymentTermsStatusChanged".to_string(),
             TallyEvent::ConfigInitialized(_) => "ConfigInitialized".to_string(),
-            TallyEvent::MerchantInitialized(_) => "MerchantInitialized".to_string(),
-            TallyEvent::PlanCreated(_) => "PlanCreated".to_string(),
+            TallyEvent::PayeeInitialized(_) => "PayeeInitialized".to_string(),
+            TallyEvent::PaymentTermsCreated(_) => "PaymentTermsCreated".to_string(),
             TallyEvent::ProgramPaused(_) => "ProgramPaused".to_string(),
             TallyEvent::ProgramUnpaused(_) => "ProgramUnpaused".to_string(),
             TallyEvent::LowAllowanceWarning(_) => "LowAllowanceWarning".to_string(),
@@ -752,9 +705,7 @@ impl ParsedEventWithContext {
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning".to_string(),
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated".to_string(),
             TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded".to_string(),
-            TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated".to_string(),
-            TallyEvent::TrialStarted(_) => "TrialStarted".to_string(),
-            TallyEvent::TrialConverted(_) => "TrialConverted".to_string(),
+            TallyEvent::PaymentTermsUpdated(_) => "PaymentTermsUpdated".to_string(),
         }
     }
 
@@ -782,16 +733,16 @@ impl ParsedEventWithContext {
     pub const fn affects_revenue(&self) -> bool {
         matches!(
             &self.event,
-            TallyEvent::Subscribed(_) | TallyEvent::Renewed(_)
+            TallyEvent::PaymentAgreementStarted(_) | TallyEvent::PaymentExecuted(_)
         )
     }
 
-    /// Check if this event affects subscription count
+    /// Check if this event affects payment agreement count
     #[must_use]
-    pub const fn affects_subscription_count(&self) -> bool {
+    pub const fn affects_agreement_count(&self) -> bool {
         matches!(
             &self.event,
-            TallyEvent::Subscribed(_) | TallyEvent::Canceled(_)
+            TallyEvent::PaymentAgreementStarted(_) | TallyEvent::PaymentAgreementPaused(_)
         )
     }
 
@@ -819,9 +770,9 @@ fn compute_event_discriminator(event_name: &str) -> [u8; 8] {
 /// Get all event discriminators for fast lookup
 fn get_event_discriminators() -> HashMap<[u8; 8], &'static str> {
     let mut discriminators = HashMap::new();
-    discriminators.insert(compute_event_discriminator("Subscribed"), "Subscribed");
-    discriminators.insert(compute_event_discriminator("Renewed"), "Renewed");
-    discriminators.insert(compute_event_discriminator("Canceled"), "Canceled");
+    discriminators.insert(compute_event_discriminator("PaymentAgreementStarted"), "PaymentAgreementStarted");
+    discriminators.insert(compute_event_discriminator("PaymentExecuted"), "PaymentExecuted");
+    discriminators.insert(compute_event_discriminator("PaymentAgreementPaused"), "PaymentAgreementPaused");
     discriminators.insert(
         compute_event_discriminator("PaymentFailed"),
         "PaymentFailed",
@@ -942,23 +893,23 @@ pub fn parse_single_event(data: &str) -> Result<TallyEvent> {
 
     // Deserialize the event data using Borsh
     match *event_type {
-        "Subscribed" => {
-            let event = Subscribed::try_from_slice(event_data).map_err(|e| {
-                TallyError::ParseError(format!("Failed to deserialize Subscribed event: {e}"))
+        "PaymentAgreementStarted" => {
+            let event = PaymentAgreementStarted::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize PaymentAgreementStarted event: {e}"))
             })?;
-            Ok(TallyEvent::Subscribed(event))
+            Ok(TallyEvent::PaymentAgreementStarted(event))
         }
-        "Renewed" => {
-            let event = Renewed::try_from_slice(event_data).map_err(|e| {
-                TallyError::ParseError(format!("Failed to deserialize Renewed event: {e}"))
+        "PaymentExecuted" => {
+            let event = PaymentExecuted::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize PaymentExecuted event: {e}"))
             })?;
-            Ok(TallyEvent::Renewed(event))
+            Ok(TallyEvent::PaymentExecuted(event))
         }
-        "Canceled" => {
-            let event = Canceled::try_from_slice(event_data).map_err(|e| {
-                TallyError::ParseError(format!("Failed to deserialize Canceled event: {e}"))
+        "PaymentAgreementPaused" => {
+            let event = PaymentAgreementPaused::try_from_slice(event_data).map_err(|e| {
+                TallyError::ParseError(format!("Failed to deserialize PaymentAgreementPaused event: {e}"))
             })?;
-            Ok(TallyEvent::Canceled(event))
+            Ok(TallyEvent::PaymentAgreementPaused(event))
         }
         "PaymentFailed" => {
             let event = PaymentFailed::try_from_slice(event_data).map_err(|e| {
@@ -1092,29 +1043,29 @@ pub fn extract_memo_from_logs(logs: &[String]) -> Option<String> {
 
 /// Find the first Tally event of a specific type in a receipt
 impl TallyReceipt {
-    /// Get the first Subscribed event, if any
+    /// Get the first `PaymentAgreementStarted` event, if any
     #[must_use]
-    pub fn get_subscribed_event(&self) -> Option<&Subscribed> {
+    pub fn get_agreement_started_event(&self) -> Option<&PaymentAgreementStarted> {
         self.events.iter().find_map(|event| match event {
-            TallyEvent::Subscribed(e) => Some(e),
+            TallyEvent::PaymentAgreementStarted(e) => Some(e),
             _ => None,
         })
     }
 
-    /// Get the first Renewed event, if any
+    /// Get the first `PaymentExecuted` event, if any
     #[must_use]
-    pub fn get_renewed_event(&self) -> Option<&Renewed> {
+    pub fn get_payment_executed_event(&self) -> Option<&PaymentExecuted> {
         self.events.iter().find_map(|event| match event {
-            TallyEvent::Renewed(e) => Some(e),
+            TallyEvent::PaymentExecuted(e) => Some(e),
             _ => None,
         })
     }
 
-    /// Get the first Canceled event, if any
+    /// Get the first `PaymentAgreementPaused` event, if any
     #[must_use]
-    pub fn get_canceled_event(&self) -> Option<&Canceled> {
+    pub fn get_agreement_paused_event(&self) -> Option<&PaymentAgreementPaused> {
         self.events.iter().find_map(|event| match event {
-            TallyEvent::Canceled(e) => Some(e),
+            TallyEvent::PaymentAgreementPaused(e) => Some(e),
             _ => None,
         })
     }
@@ -1134,13 +1085,13 @@ impl TallyReceipt {
         extract_memo_from_logs(&self.logs)
     }
 
-    /// Check if this receipt represents a successful subscription operation
+    /// Check if this receipt represents a successful payment agreement operation
     #[must_use]
-    pub fn is_subscription_success(&self) -> bool {
+    pub fn is_agreement_success(&self) -> bool {
         self.success
-            && (self.get_subscribed_event().is_some()
-                || self.get_renewed_event().is_some()
-                || self.get_canceled_event().is_some())
+            && (self.get_agreement_started_event().is_some()
+                || self.get_payment_executed_event().is_some()
+                || self.get_agreement_paused_event().is_some())
     }
 }
 
@@ -1185,14 +1136,14 @@ mod tests {
     #[test]
     fn test_tally_receipt_event_getters() {
         let signature = Signature::default();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let subscribed_event = Subscribed {
-            merchant,
-            plan,
-            subscriber,
+        let agreement_started_event = PaymentAgreementStarted {
+            payee,
+            payment_terms,
+            payer,
             amount: 1_000_000, // 1 USDC
         };
 
@@ -1202,17 +1153,17 @@ mod tests {
             slot: 100,
             success: true,
             error: None,
-            events: vec![TallyEvent::Subscribed(subscribed_event.clone())],
+            events: vec![TallyEvent::PaymentAgreementStarted(agreement_started_event.clone())],
             logs: vec![],
             compute_units_consumed: Some(5000),
             fee: 5000,
         };
 
-        assert_eq!(receipt.get_subscribed_event(), Some(&subscribed_event));
-        assert_eq!(receipt.get_renewed_event(), None);
-        assert_eq!(receipt.get_canceled_event(), None);
+        assert_eq!(receipt.get_agreement_started_event(), Some(&agreement_started_event));
+        assert_eq!(receipt.get_payment_executed_event(), None);
+        assert_eq!(receipt.get_agreement_paused_event(), None);
         assert_eq!(receipt.get_payment_failed_event(), None);
-        assert!(receipt.is_subscription_success());
+        assert!(receipt.is_agreement_success());
     }
 
     #[test]
@@ -1231,7 +1182,7 @@ mod tests {
             fee: 5000,
         };
 
-        assert!(!receipt.is_subscription_success());
+        assert!(!receipt.is_agreement_success());
     }
 
     #[test]
@@ -1270,22 +1221,22 @@ mod tests {
 
     #[test]
     fn test_compute_event_discriminator() {
-        let subscribed_disc = compute_event_discriminator("Subscribed");
-        let renewed_disc = compute_event_discriminator("Renewed");
-        let canceled_disc = compute_event_discriminator("Canceled");
+        let agreement_started_disc = compute_event_discriminator("PaymentAgreementStarted");
+        let payment_executed_disc = compute_event_discriminator("PaymentExecuted");
+        let agreement_paused_disc = compute_event_discriminator("PaymentAgreementPaused");
         let payment_failed_disc = compute_event_discriminator("PaymentFailed");
 
         // All discriminators should be unique
-        assert_ne!(subscribed_disc, renewed_disc);
-        assert_ne!(subscribed_disc, canceled_disc);
-        assert_ne!(subscribed_disc, payment_failed_disc);
-        assert_ne!(renewed_disc, canceled_disc);
-        assert_ne!(renewed_disc, payment_failed_disc);
-        assert_ne!(canceled_disc, payment_failed_disc);
+        assert_ne!(agreement_started_disc, payment_executed_disc);
+        assert_ne!(agreement_started_disc, agreement_paused_disc);
+        assert_ne!(agreement_started_disc, payment_failed_disc);
+        assert_ne!(payment_executed_disc, agreement_paused_disc);
+        assert_ne!(payment_executed_disc, payment_failed_disc);
+        assert_ne!(agreement_paused_disc, payment_failed_disc);
 
         // Discriminators should be deterministic
-        assert_eq!(subscribed_disc, compute_event_discriminator("Subscribed"));
-        assert_eq!(renewed_disc, compute_event_discriminator("Renewed"));
+        assert_eq!(agreement_started_disc, compute_event_discriminator("PaymentAgreementStarted"));
+        assert_eq!(payment_executed_disc, compute_event_discriminator("PaymentExecuted"));
     }
 
     #[test]
@@ -1293,104 +1244,104 @@ mod tests {
         let discriminators = get_event_discriminators();
 
         assert_eq!(discriminators.len(), 4);
-        assert!(discriminators.contains_key(&compute_event_discriminator("Subscribed")));
-        assert!(discriminators.contains_key(&compute_event_discriminator("Renewed")));
-        assert!(discriminators.contains_key(&compute_event_discriminator("Canceled")));
+        assert!(discriminators.contains_key(&compute_event_discriminator("PaymentAgreementStarted")));
+        assert!(discriminators.contains_key(&compute_event_discriminator("PaymentExecuted")));
+        assert!(discriminators.contains_key(&compute_event_discriminator("PaymentAgreementPaused")));
         assert!(discriminators.contains_key(&compute_event_discriminator("PaymentFailed")));
     }
 
     #[test]
-    fn test_parse_subscribed_event() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_parse_agreement_started_event() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let event = Subscribed {
-            merchant,
-            plan,
-            subscriber,
+        let event = PaymentAgreementStarted {
+            payee,
+            payment_terms,
+            payer,
             amount: 5_000_000, // 5 USDC
         };
 
-        let encoded_data = create_test_event_data("Subscribed", &event);
+        let encoded_data = create_test_event_data("PaymentAgreementStarted", &event);
         let parsed_event = parse_single_event(&encoded_data).unwrap();
 
         match parsed_event {
-            TallyEvent::Subscribed(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+            TallyEvent::PaymentAgreementStarted(parsed) => {
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
                 assert_eq!(parsed.amount, 5_000_000);
             }
-            _ => panic!("Expected Subscribed event"),
+            _ => panic!("Expected PaymentAgreementStarted event"),
         }
     }
 
     #[test]
-    fn test_parse_renewed_event() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_parse_payment_executed_event() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let event = Renewed {
-            merchant,
-            plan,
-            subscriber,
+        let event = PaymentExecuted {
+            payee,
+            payment_terms,
+            payer,
             amount: 10_000_000, // 10 USDC
             keeper,
             keeper_fee: 50_000, // 0.05 USDC keeper fee
         };
 
-        let encoded_data = create_test_event_data("Renewed", &event);
+        let encoded_data = create_test_event_data("PaymentExecuted", &event);
         let parsed_event = parse_single_event(&encoded_data).unwrap();
 
         match parsed_event {
-            TallyEvent::Renewed(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+            TallyEvent::PaymentExecuted(parsed) => {
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
                 assert_eq!(parsed.amount, 10_000_000);
             }
-            _ => panic!("Expected Renewed event"),
+            _ => panic!("Expected PaymentExecuted event"),
         }
     }
 
     #[test]
-    fn test_parse_canceled_event() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_parse_agreement_paused_event() {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let event = Canceled {
-            merchant,
-            plan,
-            subscriber,
+        let event = PaymentAgreementPaused {
+            payee,
+            payment_terms,
+            payer,
         };
 
-        let encoded_data = create_test_event_data("Canceled", &event);
+        let encoded_data = create_test_event_data("PaymentAgreementPaused", &event);
         let parsed_event = parse_single_event(&encoded_data).unwrap();
 
         match parsed_event {
-            TallyEvent::Canceled(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+            TallyEvent::PaymentAgreementPaused(parsed) => {
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
             }
-            _ => panic!("Expected Canceled event"),
+            _ => panic!("Expected PaymentAgreementPaused event"),
         }
     }
 
     #[test]
     fn test_parse_payment_failed_event() {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let event = PaymentFailed {
-            merchant,
-            plan,
-            subscriber,
+            payee,
+            payment_terms,
+            payer,
             reason: "Insufficient funds".to_string(),
         };
 
@@ -1399,9 +1350,9 @@ mod tests {
 
         match parsed_event {
             TallyEvent::PaymentFailed(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
                 assert_eq!(parsed.reason, "Insufficient funds");
             }
             _ => panic!("Expected PaymentFailed event"),
@@ -1446,90 +1397,90 @@ mod tests {
     #[test]
     fn test_parse_single_event_malformed_event_data() {
         // Create data with correct discriminator but malformed event data
-        let discriminator = compute_event_discriminator("Subscribed");
+        let discriminator = compute_event_discriminator("PaymentAgreementStarted");
         let mut data = Vec::new();
         data.extend_from_slice(&discriminator);
-        data.extend_from_slice(&[0xFF, 0xFF, 0xFF]); // Malformed data that can't be deserialized as Subscribed
+        data.extend_from_slice(&[0xFF, 0xFF, 0xFF]); // Malformed data that can't be deserialized as PaymentAgreementStarted
         let encoded_data = base64::prelude::BASE64_STANDARD.encode(data);
 
         let result = parse_single_event(&encoded_data);
         assert!(result.is_err());
         if let Err(TallyError::ParseError(msg)) = result {
-            assert!(msg.contains("Failed to deserialize Subscribed event"));
+            assert!(msg.contains("Failed to deserialize PaymentAgreementStarted event"));
         }
     }
 
     #[test]
     fn test_parse_events_from_logs() {
         let program_id = crate::program_id();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let subscribed_event = Subscribed {
-            merchant,
-            plan,
-            subscriber,
+        let agreement_started_event = PaymentAgreementStarted {
+            payee,
+            payment_terms,
+            payer,
             amount: 1_000_000,
         };
 
-        let canceled_event = Canceled {
-            merchant,
-            plan,
-            subscriber,
+        let agreement_paused_event = PaymentAgreementPaused {
+            payee,
+            payment_terms,
+            payer,
         };
 
-        let subscribed_data = create_test_event_data("Subscribed", &subscribed_event);
-        let canceled_data = create_test_event_data("Canceled", &canceled_event);
+        let started_data = create_test_event_data("PaymentAgreementStarted", &agreement_started_event);
+        let paused_data = create_test_event_data("PaymentAgreementPaused", &agreement_paused_event);
 
         let logs = vec![
             "Program 11111111111111111111111111111111 invoke [1]".to_string(),
-            format!("Program data: {} {}", program_id, subscribed_data),
+            format!("Program data: {} {}", program_id, started_data),
             "Program log: Some other log".to_string(),
-            format!("Program data: {} {}", program_id, canceled_data),
+            format!("Program data: {} {}", program_id, paused_data),
             "Program 11111111111111111111111111111111 success".to_string(),
         ];
 
         let events = parse_events_from_logs(&logs, &program_id).unwrap();
         assert_eq!(events.len(), 2);
 
-        // Check first event (Subscribed)
+        // Check first event (PaymentAgreementStarted)
         match &events[0] {
-            TallyEvent::Subscribed(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+            TallyEvent::PaymentAgreementStarted(parsed) => {
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
                 assert_eq!(parsed.amount, 1_000_000);
             }
-            _ => panic!("Expected first event to be Subscribed"),
+            _ => panic!("Expected first event to be PaymentAgreementStarted"),
         }
 
-        // Check second event (Canceled)
+        // Check second event (PaymentAgreementPaused)
         match &events[1] {
-            TallyEvent::Canceled(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
-                assert_eq!(parsed.plan, plan);
-                assert_eq!(parsed.subscriber, subscriber);
+            TallyEvent::PaymentAgreementPaused(parsed) => {
+                assert_eq!(parsed.payee, payee);
+                assert_eq!(parsed.payment_terms, payment_terms);
+                assert_eq!(parsed.payer, payer);
             }
-            _ => panic!("Expected second event to be Canceled"),
+            _ => panic!("Expected second event to be PaymentAgreementPaused"),
         }
     }
 
     #[test]
     fn test_parse_events_from_logs_with_malformed_data() {
         let program_id = crate::program_id();
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let valid_event = Subscribed {
-            merchant,
-            plan,
-            subscriber,
+        let valid_event = PaymentAgreementStarted {
+            payee,
+            payment_terms,
+            payer,
             amount: 1_000_000,
         };
 
-        let valid_data = create_test_event_data("Subscribed", &valid_event);
+        let valid_data = create_test_event_data("PaymentAgreementStarted", &valid_event);
 
         let logs = vec![
             "Program 11111111111111111111111111111111 invoke [1]".to_string(),
@@ -1543,11 +1494,11 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         match &events[0] {
-            TallyEvent::Subscribed(parsed) => {
-                assert_eq!(parsed.merchant, merchant);
+            TallyEvent::PaymentAgreementStarted(parsed) => {
+                assert_eq!(parsed.payee, payee);
                 assert_eq!(parsed.amount, 1_000_000);
             }
-            _ => panic!("Expected event to be Subscribed"),
+            _ => panic!("Expected event to be PaymentAgreementStarted"),
         }
     }
 
@@ -1569,18 +1520,18 @@ mod tests {
         let program_id = crate::program_id();
         let other_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let event = Subscribed {
-            merchant,
-            plan,
-            subscriber,
+        let event = PaymentAgreementStarted {
+            payee,
+            payment_terms,
+            payer,
             amount: 1_000_000,
         };
 
-        let event_data = create_test_event_data("Subscribed", &event);
+        let event_data = create_test_event_data("PaymentAgreementStarted", &event);
 
         let logs = vec![
             "Program 11111111111111111111111111111111 invoke [1]".to_string(),

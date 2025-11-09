@@ -16,16 +16,16 @@ use anchor_client::solana_sdk::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-/// Parameters for building a subscribe transaction
+/// Parameters for building a start agreement transaction
 #[derive(Debug, Clone)]
-pub struct SubscribeTransactionParams<'a> {
-    pub user: &'a Pubkey,
-    pub plan_pda: &'a Pubkey,
-    pub plan_price: u64,
+pub struct StartAgreementTransactionParams<'a> {
+    pub payer: &'a Pubkey,
+    pub payment_terms_pda: &'a Pubkey,
+    pub payment_amount: u64,
     pub allowance_periods: u8,
     pub recent_blockhash: Hash,
-    pub merchant: &'a crate::program_types::Merchant,
-    pub plan: &'a crate::program_types::Plan,
+    pub payee: &'a crate::program_types::Payee,
+    pub payment_terms: &'a crate::program_types::PaymentTerms,
     pub platform_treasury_ata: &'a Pubkey,
 }
 
@@ -129,7 +129,7 @@ pub fn get_user_usdc_ata(user: &Pubkey, usdc_mint: &Pubkey) -> Result<Pubkey> {
 pub fn map_tally_error_to_string(err: &TallyError) -> String {
     match err {
         TallyError::Generic(msg) => msg.clone(),
-        TallyError::InvalidPda(msg) | TallyError::InvalidSubscriptionState(msg) => {
+        TallyError::InvalidPda(msg) => {
             format!("Invalid account: {msg}")
         }
         TallyError::SplToken(err) => format!("SPL Token error: {err}"),

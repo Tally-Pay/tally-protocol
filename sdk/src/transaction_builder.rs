@@ -1,13 +1,12 @@
-//! Transaction building utilities for Tally subscription flows
+//! Transaction building utilities for Tally payment agreement flows
 
 use crate::{
     ata::{get_associated_token_address_with_program, TokenProgram},
     error::{Result, TallyError},
     pda, program_id,
     program_types::{
-        CancelSubscriptionArgs, CreatePlanArgs,
-        InitMerchantArgs, Merchant, Plan, StartSubscriptionArgs, UpdatePlanArgs,
-        UpdatePlanTermsArgs,
+        PauseAgreementArgs, CreatePaymentTermsArgs,
+        StartAgreementArgs, Payee, PaymentTerms, InitPayeeArgs,
     },
 };
 
@@ -21,31 +20,28 @@ use spl_token_2022::instruction::{
     approve_checked as approve_checked_token2022, revoke as revoke_token2022,
 };
 
-/// Builder for start subscription transactions (approve → start flow)
+/// Builder for start agreement transactions (approve → start flow)
 #[derive(Clone, Debug, Default)]
-pub struct StartSubscriptionBuilder {
-    plan: Option<Pubkey>,
-    subscriber: Option<Pubkey>,
+pub struct StartAgreementBuilder {
+    payment_terms: Option<Pubkey>,
     payer: Option<Pubkey>,
     allowance_periods: Option<u8>,
-    trial_duration_secs: Option<u64>,
     token_program: Option<TokenProgram>,
     program_id: Option<Pubkey>,
 }
 
-/// Builder for cancel subscription transactions (revoke → cancel flow)
+/// Builder for pause agreement transactions (revoke → cancel flow)
 #[derive(Clone, Debug, Default)]
-pub struct CancelSubscriptionBuilder {
-    plan: Option<Pubkey>,
-    subscriber: Option<Pubkey>,
+pub struct PauseAgreementBuilder {
+    payment_terms: Option<Pubkey>,
     payer: Option<Pubkey>,
     token_program: Option<TokenProgram>,
     program_id: Option<Pubkey>,
 }
 
-/// Builder for create merchant transactions
+/// Builder for init payee transactions
 #[derive(Clone, Debug, Default)]
-pub struct CreateMerchantBuilder {
+pub struct InitPayeeBuilder {
     authority: Option<Pubkey>,
     payer: Option<Pubkey>,
     usdc_mint: Option<Pubkey>,
@@ -53,24 +49,15 @@ pub struct CreateMerchantBuilder {
     program_id: Option<Pubkey>,
 }
 
-/// Builder for create plan transactions
+/// Builder for create payment terms transactions
 #[derive(Clone, Debug, Default)]
-pub struct CreatePlanBuilder {
+pub struct CreatePaymentTermsBuilder {
     authority: Option<Pubkey>,
     payer: Option<Pubkey>,
-    plan_args: Option<CreatePlanArgs>,
+    payment_terms_args: Option<CreatePaymentTermsArgs>,
     program_id: Option<Pubkey>,
 }
 
-/// Builder for update plan transactions
-#[derive(Clone, Debug, Default)]
-pub struct UpdatePlanBuilder {
-    authority: Option<Pubkey>,
-    payer: Option<Pubkey>,
-    plan_key: Option<Pubkey>,
-    update_args: Option<UpdatePlanArgs>,
-    program_id: Option<Pubkey>,
-}
 
 /// Builder for admin fee withdrawal transactions
 #[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
@@ -97,22 +84,22 @@ pub struct InitConfigBuilder {
     program_id: Option<Pubkey>,
 }
 
-/// Builder for renew subscription transactions
+/// Builder for execute payment transactions
 #[derive(Clone, Debug, Default)]
-pub struct RenewSubscriptionBuilder {
-    plan: Option<Pubkey>,
-    subscriber: Option<Pubkey>,
+pub struct ExecutePaymentBuilder {
+    payment_terms: Option<Pubkey>,
+    payer: Option<Pubkey>,
     keeper: Option<Pubkey>,
     keeper_ata: Option<Pubkey>,
     token_program: Option<TokenProgram>,
     program_id: Option<Pubkey>,
 }
 
-/// Builder for close subscription transactions
+/// Builder for close agreement transactions
 #[derive(Clone, Debug, Default)]
-pub struct CloseSubscriptionBuilder {
-    plan: Option<Pubkey>,
-    subscriber: Option<Pubkey>,
+pub struct CloseAgreementBuilder {
+    payment_terms: Option<Pubkey>,
+    payer: Option<Pubkey>,
     program_id: Option<Pubkey>,
 }
 
@@ -172,50 +159,22 @@ pub struct UpdateConfigBuilder {
     program_id: Option<Pubkey>,
 }
 
-/// Builder for update merchant tier transactions
-#[cfg_attr(not(feature = "platform-admin"), allow(dead_code))]
-#[derive(Clone, Debug, Default)]
-pub struct UpdateMerchantTierBuilder {
-    authority: Option<Pubkey>,
-    merchant: Option<Pubkey>,
-    new_tier: Option<u8>,
-    program_id: Option<Pubkey>,
-}
 
-/// Builder for update plan terms transactions
-#[derive(Clone, Debug, Default)]
-pub struct UpdatePlanTermsBuilder {
-    authority: Option<Pubkey>,
-    plan_key: Option<Pubkey>,
-    price_usdc: Option<u64>,
-    period_secs: Option<u64>,
-    grace_secs: Option<u64>,
-    name: Option<String>,
-    program_id: Option<Pubkey>,
-}
-
-impl StartSubscriptionBuilder {
-    /// Create a new start subscription builder
+impl StartAgreementBuilder {
+    /// Create a new start agreement builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the plan PDA
+    /// Set the `payment_terms` PDA
     #[must_use]
-    pub const fn plan(mut self, plan: Pubkey) -> Self {
-        self.plan = Some(plan);
+    pub const fn payment_terms(mut self, payment_terms: Pubkey) -> Self {
+        self.payment_terms = Some(payment_terms);
         self
     }
 
-    /// Set the subscriber pubkey
-    #[must_use]
-    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
-        self.subscriber = Some(subscriber);
-        self
-    }
-
-    /// Set the transaction payer
+    /// Set the payer pubkey (also sets as transaction payer)
     #[must_use]
     pub const fn payer(mut self, payer: Pubkey) -> Self {
         self.payer = Some(payer);
@@ -226,20 +185,6 @@ impl StartSubscriptionBuilder {
     #[must_use]
     pub const fn allowance_periods(mut self, periods: u8) -> Self {
         self.allowance_periods = Some(periods);
-        self
-    }
-
-    /// Set the trial duration in seconds (optional)
-    ///
-    /// Valid values:
-    /// - 604800 (7 days) - Use `TRIAL_DURATION_7_DAYS` constant
-    /// - 1209600 (14 days) - Use `TRIAL_DURATION_14_DAYS` constant
-    /// - 2592000 (30 days) - Use `TRIAL_DURATION_30_DAYS` constant
-    ///
-    /// Any other value will be rejected by the program with `InvalidTrialDuration` error.
-    #[must_use]
-    pub const fn trial_duration_secs(mut self, duration: u64) -> Self {
-        self.trial_duration_secs = Some(duration);
         self
     }
 
@@ -260,22 +205,22 @@ impl StartSubscriptionBuilder {
     /// Build the transaction instructions
     ///
     /// # Arguments
-    /// * `merchant` - The merchant account data
-    /// * `plan_data` - The plan account data
+    /// * `payee` - The payee account data
+    /// * `payment_terms_data` - The `payment_terms` account data
     /// * `platform_treasury_ata` - Platform treasury ATA address
     ///
     /// # Returns
-    /// * `Ok(Vec<Instruction>)` - The transaction instructions (`approve_checked` + `start_subscription`)
+    /// * `Ok(Vec<Instruction>)` - The transaction instructions (`approve_checked` + `start_payment_agreement`)
     /// * `Err(TallyError)` - If building fails
+    #[allow(clippy::similar_names)] // payer and payee are distinct payment domain terms
     pub fn build_instructions(
         self,
-        merchant: &Merchant,
-        plan_data: &Plan,
+        payee: &Payee,
+        payment_terms_data: &PaymentTerms,
         platform_treasury_ata: &Pubkey,
     ) -> Result<Vec<Instruction>> {
-        let plan = self.plan.ok_or("Plan not set")?;
-        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
-        let _payer = self.payer.unwrap_or(subscriber);
+        let payment_terms = self.payment_terms.ok_or("PaymentTerms not set")?;
+        let payer = self.payer.ok_or("Payer not set")?;
         let allowance_periods = self.allowance_periods.unwrap_or(3);
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
@@ -283,19 +228,19 @@ impl StartSubscriptionBuilder {
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
-        let subscription_pda =
-            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
+        let payee_pda = pda::payee_address_with_program_id(&payee.authority, &program_id);
+        let payment_agreement_pda =
+            pda::payment_agreement_address_with_program_id(&payment_terms, &payer, &program_id);
         let delegate_pda = pda::delegate_address_with_program_id(&program_id);
-        let subscriber_ata = get_associated_token_address_with_program(
-            &subscriber,
-            &merchant.usdc_mint,
+        let payer_ata = get_associated_token_address_with_program(
+            &payer,
+            &payee.usdc_mint,
             token_program,
         )?;
 
-        // Calculate allowance amount based on plan price and periods
-        let allowance_amount = plan_data
-            .price_usdc
+        // Calculate allowance amount based on payment_terms price and periods
+        let allowance_amount = payment_terms_data
+            .amount_usdc
             .checked_mul(u64::from(allowance_periods))
             .ok_or_else(|| TallyError::Generic("Arithmetic overflow".to_string()))?;
 
@@ -303,50 +248,49 @@ impl StartSubscriptionBuilder {
         let approve_ix = match token_program {
             TokenProgram::Token => approve_checked_token(
                 &token_program.program_id(),
-                &subscriber_ata,
-                &merchant.usdc_mint,
+                &payer_ata,
+                &payee.usdc_mint,
                 &delegate_pda, // Program delegate PDA
-                &subscriber,   // Subscriber as owner
+                &payer,        // Payer as owner
                 &[],           // No additional signers
                 allowance_amount,
                 6, // USDC decimals
             )?,
             TokenProgram::Token2022 => approve_checked_token2022(
                 &token_program.program_id(),
-                &subscriber_ata,
-                &merchant.usdc_mint,
+                &payer_ata,
+                &payee.usdc_mint,
                 &delegate_pda, // Program delegate PDA
-                &subscriber,   // Subscriber as owner
+                &payer,        // Payer as owner
                 &[],           // No additional signers
                 allowance_amount,
                 6, // USDC decimals
             )?,
         };
 
-        // Create start_subscription instruction
+        // Create start_payment_agreement instruction
         let start_sub_accounts = vec![
             AccountMeta::new_readonly(config_pda, false),   // config
-            AccountMeta::new(subscription_pda, false),      // subscription (PDA)
-            AccountMeta::new_readonly(plan, false),         // plan
-            AccountMeta::new_readonly(merchant_pda, false), // merchant
-            AccountMeta::new(subscriber, true),             // subscriber (signer)
-            AccountMeta::new(subscriber_ata, false),        // subscriber_usdc_ata
-            AccountMeta::new(merchant.treasury_ata, false), // merchant_treasury_ata
+            AccountMeta::new(payment_agreement_pda, false),      // payment agreement (PDA)
+            AccountMeta::new_readonly(payment_terms, false),         // payment_terms
+            AccountMeta::new_readonly(payee_pda, false), // payee
+            AccountMeta::new(payer, true),                  // payer (signer)
+            AccountMeta::new(payer_ata, false),        // payer_usdc_ata
+            AccountMeta::new(payee.treasury_ata, false), // payee_treasury_ata
             AccountMeta::new(*platform_treasury_ata, false), // platform_treasury_ata
-            AccountMeta::new_readonly(merchant.usdc_mint, false), // usdc_mint
+            AccountMeta::new_readonly(payee.usdc_mint, false), // usdc_mint
             AccountMeta::new_readonly(delegate_pda, false), // program_delegate
             AccountMeta::new_readonly(token_program.program_id(), false), // token_program
             AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
-        let start_sub_args = StartSubscriptionArgs {
+        let start_sub_args = StartAgreementArgs {
             allowance_periods,
-            trial_duration_secs: self.trial_duration_secs,
         };
         let start_sub_data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "start_subscription")
-            data.extend_from_slice(&[167, 59, 160, 222, 194, 175, 3, 13]);
+            // Instruction discriminator (computed from "start_agreement")
+            data.extend_from_slice(&[174, 25, 237, 147, 127, 156, 238, 34]);
             borsh::to_writer(&mut data, &start_sub_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -362,28 +306,21 @@ impl StartSubscriptionBuilder {
     }
 }
 
-impl CancelSubscriptionBuilder {
-    /// Create a new cancel subscription builder
+impl PauseAgreementBuilder {
+    /// Create a new pause agreement builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the plan PDA
+    /// Set the `payment_terms` PDA
     #[must_use]
-    pub const fn plan(mut self, plan: Pubkey) -> Self {
-        self.plan = Some(plan);
+    pub const fn payment_terms(mut self, payment_terms: Pubkey) -> Self {
+        self.payment_terms = Some(payment_terms);
         self
     }
 
-    /// Set the subscriber pubkey
-    #[must_use]
-    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
-        self.subscriber = Some(subscriber);
-        self
-    }
-
-    /// Set the transaction payer
+    /// Set the payer pubkey (also sets as transaction payer)
     #[must_use]
     pub const fn payer(mut self, payer: Pubkey) -> Self {
         self.payer = Some(payer);
@@ -407,25 +344,25 @@ impl CancelSubscriptionBuilder {
     /// Build the transaction instructions
     ///
     /// # Arguments
-    /// * `merchant` - The merchant account data
+    /// * `payee` - The payee account data
     ///
     /// # Returns
-    /// * `Ok(Vec<Instruction>)` - The transaction instructions (revoke + `cancel_subscription`)
+    /// * `Ok(Vec<Instruction>)` - The transaction instructions (revoke + `cancel_payment_agreement`)
     /// * `Err(TallyError)` - If building fails
-    pub fn build_instructions(self, merchant: &Merchant) -> Result<Vec<Instruction>> {
-        let plan = self.plan.ok_or("Plan not set")?;
-        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
-        let _payer = self.payer.unwrap_or(subscriber);
+    #[allow(clippy::similar_names)] // payer and payee are distinct payment domain terms
+    pub fn build_instructions(self, payee: &Payee) -> Result<Vec<Instruction>> {
+        let payment_terms = self.payment_terms.ok_or("PaymentTerms not set")?;
+        let payer = self.payer.ok_or("Payer not set")?;
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
 
         let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute required PDAs
-        let subscription_pda =
-            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
-        let subscriber_ata = get_associated_token_address_with_program(
-            &subscriber,
-            &merchant.usdc_mint,
+        let payment_agreement_pda =
+            pda::payment_agreement_address_with_program_id(&payment_terms, &payer, &program_id);
+        let payer_ata = get_associated_token_address_with_program(
+            &payer,
+            &payee.usdc_mint,
             token_program,
         )?;
 
@@ -433,32 +370,32 @@ impl CancelSubscriptionBuilder {
         let revoke_ix = match token_program {
             TokenProgram::Token => revoke_token(
                 &token_program.program_id(),
-                &subscriber_ata,
-                &subscriber, // Subscriber as owner
+                &payer_ata,
+                &payer,      // Payer as owner
                 &[],         // No additional signers
             )?,
             TokenProgram::Token2022 => revoke_token2022(
                 &token_program.program_id(),
-                &subscriber_ata,
-                &subscriber, // Subscriber as owner
+                &payer_ata,
+                &payer,      // Payer as owner
                 &[],         // No additional signers
             )?,
         };
 
-        // Create cancel_subscription instruction
-        let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
+        // Create cancel_payment_agreement instruction
+        let payee_pda = pda::payee_address_with_program_id(&payee.authority, &program_id);
         let cancel_sub_accounts = vec![
-            AccountMeta::new(subscription_pda, false), // subscription (PDA)
-            AccountMeta::new_readonly(plan, false),    // plan
-            AccountMeta::new_readonly(merchant_pda, false), // merchant
-            AccountMeta::new_readonly(subscriber, true), // subscriber (signer)
+            AccountMeta::new(payment_agreement_pda, false), // payment agreement (PDA)
+            AccountMeta::new_readonly(payment_terms, false),    // payment_terms
+            AccountMeta::new_readonly(payee_pda, false), // payee
+            AccountMeta::new_readonly(payer, true),  // payer (signer)
         ];
 
-        let cancel_sub_args = CancelSubscriptionArgs;
+        let cancel_sub_args = PauseAgreementArgs {};
         let cancel_sub_data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "cancel_subscription")
-            data.extend_from_slice(&[60, 139, 189, 242, 191, 208, 143, 18]);
+            // Instruction discriminator (computed from "pause_agreement")
+            data.extend_from_slice(&[130, 90, 85, 99, 205, 60, 132, 245]);
             borsh::to_writer(&mut data, &cancel_sub_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -474,14 +411,14 @@ impl CancelSubscriptionBuilder {
     }
 }
 
-impl CreateMerchantBuilder {
-    /// Create a new create merchant builder
+impl InitPayeeBuilder {
+    /// Create a new init payee builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the merchant authority
+    /// Set the payee authority
     #[must_use]
     pub const fn authority(mut self, authority: Pubkey) -> Self {
         self.authority = Some(authority);
@@ -519,7 +456,7 @@ impl CreateMerchantBuilder {
     /// Build the transaction instruction
     ///
     /// # Returns
-    /// * `Ok(Instruction)` - The `init_merchant` instruction
+    /// * `Ok(Instruction)` - The `init_payee` instruction
     /// * `Err(TallyError)` - If building fails
     pub fn build_instruction(self) -> Result<Instruction> {
         let authority = self.authority.ok_or("Authority not set")?;
@@ -530,11 +467,11 @@ impl CreateMerchantBuilder {
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
+        let payee_pda = pda::payee_address_with_program_id(&authority, &program_id);
 
         let accounts = vec![
             AccountMeta::new_readonly(config_pda, false),   // config
-            AccountMeta::new(merchant_pda, false),          // merchant (PDA)
+            AccountMeta::new(payee_pda, false),          // payee (PDA)
             AccountMeta::new(authority, true),              // authority (signer)
             AccountMeta::new_readonly(usdc_mint, false),    // usdc_mint
             AccountMeta::new_readonly(treasury_ata, false), // treasury_ata
@@ -543,15 +480,15 @@ impl CreateMerchantBuilder {
             AccountMeta::new_readonly(system_program::ID, false),                 // system_program
         ];
 
-        let args = InitMerchantArgs {
+        let args = InitPayeeArgs {
             usdc_mint,
             treasury_ata,
         };
 
         let data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "init_merchant")
-            data.extend_from_slice(&[209, 11, 214, 195, 222, 157, 124, 192]);
+            // Instruction discriminator (computed from "init_payee")
+            data.extend_from_slice(&[145, 253, 226, 173, 120, 41, 140, 49]);
             borsh::to_writer(&mut data, &args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -565,14 +502,14 @@ impl CreateMerchantBuilder {
     }
 }
 
-impl CreatePlanBuilder {
-    /// Create a new create plan builder
+impl CreatePaymentTermsBuilder {
+    /// Create a new create payment terms builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the merchant authority
+    /// Set the payee authority
     #[must_use]
     pub const fn authority(mut self, authority: Pubkey) -> Self {
         self.authority = Some(authority);
@@ -586,10 +523,10 @@ impl CreatePlanBuilder {
         self
     }
 
-    /// Set the plan creation arguments
+    /// Set the `payment_terms` creation arguments
     #[must_use]
-    pub fn plan_args(mut self, args: CreatePlanArgs) -> Self {
-        self.plan_args = Some(args);
+    pub fn payment_terms_args(mut self, args: CreatePaymentTermsArgs) -> Self {
+        self.payment_terms_args = Some(args);
         self
     }
 
@@ -603,34 +540,34 @@ impl CreatePlanBuilder {
     /// Build the transaction instruction
     ///
     /// # Returns
-    /// * `Ok(Instruction)` - The `create_plan` instruction
+    /// * `Ok(Instruction)` - The `create_payment_terms` instruction
     /// * `Err(TallyError)` - If building fails
     pub fn build_instruction(self) -> Result<Instruction> {
         let authority = self.authority.ok_or("Authority not set")?;
         let _payer = self.payer.unwrap_or(authority);
-        let plan_args = self.plan_args.ok_or("Plan args not set")?;
+        let payment_terms_args = self.payment_terms_args.ok_or("PaymentTerms args not set")?;
 
         let program_id = self.program_id.unwrap_or_else(program_id);
 
         // Compute PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
-        let plan_pda =
-            pda::plan_address_with_program_id(&merchant_pda, &plan_args.plan_id_bytes, &program_id);
+        let payee_pda = pda::payee_address_with_program_id(&authority, &program_id);
+        let payment_terms_pda =
+            pda::payment_terms_address_with_program_id(&payee_pda, &payment_terms_args.terms_id_bytes, &program_id);
 
         let accounts = vec![
             AccountMeta::new_readonly(config_pda, false),   // config
-            AccountMeta::new(plan_pda, false),              // plan (PDA)
-            AccountMeta::new_readonly(merchant_pda, false), // merchant
+            AccountMeta::new(payment_terms_pda, false),              // payment_terms (PDA)
+            AccountMeta::new_readonly(payee_pda, false), // payee
             AccountMeta::new(authority, true),              // authority (signer)
             AccountMeta::new_readonly(system_program::ID, false), // system_program
         ];
 
         let data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "create_plan")
-            data.extend_from_slice(&[77, 43, 141, 254, 212, 118, 41, 186]);
-            borsh::to_writer(&mut data, &plan_args)
+            // Instruction discriminator (computed from "create_payment_terms")
+            data.extend_from_slice(&[220, 74, 165, 113, 140, 252, 204, 241]);
+            borsh::to_writer(&mut data, &payment_terms_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
         };
@@ -643,104 +580,6 @@ impl CreatePlanBuilder {
     }
 }
 
-impl UpdatePlanBuilder {
-    /// Create a new update plan builder
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the merchant authority
-    #[must_use]
-    pub const fn authority(mut self, authority: Pubkey) -> Self {
-        self.authority = Some(authority);
-        self
-    }
-
-    /// Set the transaction payer
-    #[must_use]
-    pub const fn payer(mut self, payer: Pubkey) -> Self {
-        self.payer = Some(payer);
-        self
-    }
-
-    /// Set the plan account key
-    #[must_use]
-    pub const fn plan_key(mut self, plan_key: Pubkey) -> Self {
-        self.plan_key = Some(plan_key);
-        self
-    }
-
-    /// Set the plan update arguments
-    #[must_use]
-    pub fn update_args(mut self, args: UpdatePlanArgs) -> Self {
-        self.update_args = Some(args);
-        self
-    }
-
-    /// Set the program ID to use
-    #[must_use]
-    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
-        self.program_id = Some(program_id);
-        self
-    }
-
-    /// Build the transaction instruction
-    ///
-    /// # Arguments
-    /// * `merchant` - The merchant account data for validation
-    ///
-    /// # Returns
-    /// * `Ok(Instruction)` - The `update_plan` instruction
-    /// * `Err(TallyError)` - If building fails
-    pub fn build_instruction(self, merchant: &Merchant) -> Result<Instruction> {
-        let authority = self.authority.ok_or("Authority not set")?;
-        let plan_key = self.plan_key.ok_or("Plan key not set")?;
-        let update_args = self.update_args.ok_or("Update args not set")?;
-
-        // Validate that authority matches merchant authority
-        if authority != merchant.authority {
-            return Err(TallyError::Generic(
-                "Authority does not match merchant authority".to_string(),
-            ));
-        }
-
-        // Validate that at least one field is being updated
-        if !update_args.has_updates() {
-            return Err(TallyError::Generic(
-                "No updates specified in UpdatePlanArgs".to_string(),
-            ));
-        }
-
-        let program_id = self.program_id.unwrap_or_else(program_id);
-
-        // Compute required PDAs
-        let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
-
-        let accounts = vec![
-            AccountMeta::new_readonly(config_pda, false),   // config
-            AccountMeta::new(plan_key, false),              // plan (PDA, mutable)
-            AccountMeta::new_readonly(merchant_pda, false), // merchant
-            AccountMeta::new(authority, true),              // authority (signer)
-        ];
-
-        let data = {
-            let mut data = Vec::new();
-            // Instruction discriminator (computed from "update_plan")
-            data.extend_from_slice(&[219, 200, 88, 176, 158, 63, 253, 127]);
-            borsh::to_writer(&mut data, &update_args)
-                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
-            data
-        };
-
-        Ok(Instruction {
-            program_id,
-            accounts,
-            data,
-        })
-    }
-}
 
 #[cfg(feature = "platform-admin")]
 impl AdminWithdrawFeesBuilder {
@@ -929,24 +768,24 @@ impl InitConfigBuilder {
     }
 }
 
-impl RenewSubscriptionBuilder {
-    /// Create a new renew subscription builder
+impl ExecutePaymentBuilder {
+    /// Create a new execute payment builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the plan PDA
+    /// Set the `payment_terms` PDA
     #[must_use]
-    pub const fn plan(mut self, plan: Pubkey) -> Self {
-        self.plan = Some(plan);
+    pub const fn payment_terms(mut self, payment_terms: Pubkey) -> Self {
+        self.payment_terms = Some(payment_terms);
         self
     }
 
-    /// Set the subscriber pubkey
+    /// Set the payer pubkey
     #[must_use]
-    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
-        self.subscriber = Some(subscriber);
+    pub const fn payer(mut self, payer: Pubkey) -> Self {
+        self.payer = Some(payer);
         self
     }
 
@@ -981,21 +820,22 @@ impl RenewSubscriptionBuilder {
     /// Build the transaction instruction
     ///
     /// # Arguments
-    /// * `merchant` - The merchant account data
-    /// * `plan_data` - The plan account data
+    /// * `payee` - The payee account data
+    /// * `payment_terms_data` - The `payment_terms` account data
     /// * `platform_treasury_ata` - Platform treasury ATA address
     ///
     /// # Returns
-    /// * `Ok(Instruction)` - The `renew_subscription` instruction
+    /// * `Ok(Instruction)` - The `renew_payment_agreement` instruction
     /// * `Err(TallyError)` - If building fails
+    #[allow(clippy::similar_names)] // payer and payee are distinct payment domain terms
     pub fn build_instruction(
         self,
-        merchant: &Merchant,
-        _plan_data: &Plan,
+        payee: &Payee,
+        _payment_terms_data: &PaymentTerms,
         platform_treasury_ata: &Pubkey,
     ) -> Result<Instruction> {
-        let plan = self.plan.ok_or("Plan not set")?;
-        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
+        let payment_terms = self.payment_terms.ok_or("PaymentTerms not set")?;
+        let payer = self.payer.ok_or("Payer not set")?;
         let keeper = self.keeper.ok_or("Keeper not set")?;
         let keeper_ata = self.keeper_ata.ok_or("Keeper ATA not set")?;
         let token_program = self.token_program.unwrap_or(TokenProgram::Token);
@@ -1004,37 +844,37 @@ impl RenewSubscriptionBuilder {
 
         // Compute required PDAs
         let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&merchant.authority, &program_id);
-        let subscription_pda =
-            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
+        let payee_pda = pda::payee_address_with_program_id(&payee.authority, &program_id);
+        let payment_agreement_pda =
+            pda::payment_agreement_address_with_program_id(&payment_terms, &payer, &program_id);
         let delegate_pda = pda::delegate_address_with_program_id(&program_id);
-        let subscriber_ata = get_associated_token_address_with_program(
-            &subscriber,
-            &merchant.usdc_mint,
+        let payer_ata = get_associated_token_address_with_program(
+            &payer,
+            &payee.usdc_mint,
             token_program,
         )?;
 
-        // Create renew_subscription instruction
+        // Create renew_payment_agreement instruction
         let renew_sub_accounts = vec![
             AccountMeta::new_readonly(config_pda, false),   // config
-            AccountMeta::new(subscription_pda, false),      // subscription (PDA, mutable)
-            AccountMeta::new_readonly(plan, false),         // plan
-            AccountMeta::new_readonly(merchant_pda, false), // merchant
-            AccountMeta::new(subscriber_ata, false),        // subscriber_usdc_ata (mutable)
-            AccountMeta::new(merchant.treasury_ata, false), // merchant_treasury_ata (mutable)
+            AccountMeta::new(payment_agreement_pda, false),      // payment agreement (PDA, mutable)
+            AccountMeta::new_readonly(payment_terms, false),         // payment_terms
+            AccountMeta::new_readonly(payee_pda, false), // payee
+            AccountMeta::new(payer_ata, false),        // payer_usdc_ata (mutable)
+            AccountMeta::new(payee.treasury_ata, false), // payee_treasury_ata (mutable)
             AccountMeta::new(*platform_treasury_ata, false), // platform_treasury_ata (mutable)
             AccountMeta::new(keeper, true),                 // keeper (signer, mutable for fees)
             AccountMeta::new(keeper_ata, false),            // keeper_usdc_ata (mutable)
-            AccountMeta::new_readonly(merchant.usdc_mint, false), // usdc_mint
+            AccountMeta::new_readonly(payee.usdc_mint, false), // usdc_mint
             AccountMeta::new_readonly(delegate_pda, false), // program_delegate
             AccountMeta::new_readonly(token_program.program_id(), false), // token_program
         ];
 
-        let renew_sub_args = crate::program_types::RenewSubscriptionArgs {};
+        let renew_sub_args = crate::program_types::ExecutePaymentArgs {};
         let renew_sub_data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "renew_subscription")
-            data.extend_from_slice(&[45, 75, 154, 194, 160, 10, 111, 183]);
+            // Instruction discriminator (computed from "execute_payment")
+            data.extend_from_slice(&[86, 4, 7, 7, 120, 139, 232, 139]);
             borsh::to_writer(&mut data, &renew_sub_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -1048,24 +888,24 @@ impl RenewSubscriptionBuilder {
     }
 }
 
-impl CloseSubscriptionBuilder {
-    /// Create a new close subscription builder
+impl CloseAgreementBuilder {
+    /// Create a new close agreement builder
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Set the plan PDA
+    /// Set the `payment_terms` PDA
     #[must_use]
-    pub const fn plan(mut self, plan: Pubkey) -> Self {
-        self.plan = Some(plan);
+    pub const fn payment_terms(mut self, payment_terms: Pubkey) -> Self {
+        self.payment_terms = Some(payment_terms);
         self
     }
 
-    /// Set the subscriber pubkey
+    /// Set the payer pubkey
     #[must_use]
-    pub const fn subscriber(mut self, subscriber: Pubkey) -> Self {
-        self.subscriber = Some(subscriber);
+    pub const fn payer(mut self, payer: Pubkey) -> Self {
+        self.payer = Some(payer);
         self
     }
 
@@ -1079,29 +919,29 @@ impl CloseSubscriptionBuilder {
     /// Build the transaction instruction
     ///
     /// # Returns
-    /// * `Ok(Instruction)` - The `close_subscription` instruction
+    /// * `Ok(Instruction)` - The `close_payment_agreement` instruction
     /// * `Err(TallyError)` - If building fails
     pub fn build_instruction(self) -> Result<Instruction> {
-        let plan = self.plan.ok_or("Plan not set")?;
-        let subscriber = self.subscriber.ok_or("Subscriber not set")?;
+        let payment_terms = self.payment_terms.ok_or("PaymentTerms not set")?;
+        let payer = self.payer.ok_or("Payer not set")?;
 
         let program_id = self.program_id.unwrap_or_else(program_id);
 
-        // Compute subscription PDA
-        let subscription_pda =
-            pda::subscription_address_with_program_id(&plan, &subscriber, &program_id);
+        // Compute payment agreement PDA
+        let payment_agreement_pda =
+            pda::payment_agreement_address_with_program_id(&payment_terms, &payer, &program_id);
 
-        // Create close_subscription instruction
+        // Create close_payment_agreement instruction
         let close_sub_accounts = vec![
-            AccountMeta::new(subscription_pda, false), // subscription (PDA, mutable, will be closed)
-            AccountMeta::new(subscriber, true), // subscriber (signer, mutable, receives rent)
+            AccountMeta::new(payment_agreement_pda, false), // payment agreement (PDA, mutable, will be closed)
+            AccountMeta::new(payer, true), // payer (signer, mutable, receives rent)
         ];
 
-        let close_sub_args = crate::program_types::CloseSubscriptionArgs {};
+        let close_sub_args = crate::program_types::CloseAgreementArgs {};
         let close_sub_data = {
             let mut data = Vec::new();
-            // Instruction discriminator (computed from "close_subscription")
-            data.extend_from_slice(&[33, 214, 169, 135, 35, 127, 78, 7]);
+            // Instruction discriminator (computed from "close_agreement")
+            data.extend_from_slice(&[48, 34, 42, 18, 144, 209, 198, 55]);
             borsh::to_writer(&mut data, &close_sub_args)
                 .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
             data
@@ -1605,276 +1445,31 @@ impl UpdateConfigBuilder {
     }
 }
 
-#[cfg(feature = "platform-admin")]
-impl UpdateMerchantTierBuilder {
-    /// Create a new update merchant tier builder
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the authority (must be either merchant authority OR platform authority)
-    #[must_use]
-    pub const fn authority(mut self, authority: Pubkey) -> Self {
-        self.authority = Some(authority);
-        self
-    }
-
-    /// Set the merchant PDA to update
-    #[must_use]
-    pub const fn merchant(mut self, merchant: Pubkey) -> Self {
-        self.merchant = Some(merchant);
-        self
-    }
-
-    /// Set the new tier (0=Free, 1=Pro, 2=Enterprise)
-    #[must_use]
-    pub const fn new_tier(mut self, new_tier: u8) -> Self {
-        self.new_tier = Some(new_tier);
-        self
-    }
-
-    /// Set the program ID to use
-    #[must_use]
-    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
-        self.program_id = Some(program_id);
-        self
-    }
-
-    /// Build the transaction instruction
-    ///
-    /// # Returns
-    /// * `Ok(Instruction)` - The `update_merchant_tier` instruction
-    /// * `Err(TallyError)` - If building fails
-    ///
-    /// # Validation
-    /// * Authority must be set (merchant or platform authority)
-    /// * Merchant must be set
-    /// * New tier must be set and valid (0-2)
-    pub fn build_instruction(self) -> Result<Instruction> {
-        let authority = self.authority.ok_or("Authority not set")?;
-        let merchant = self.merchant.ok_or("Merchant not set")?;
-        let new_tier = self.new_tier.ok_or("New tier not set")?;
-
-        // Validate tier value (0=Free, 1=Pro, 2=Enterprise)
-        if new_tier > 2 {
-            return Err("New tier must be 0 (Free), 1 (Pro), or 2 (Enterprise)".into());
-        }
-
-        let program_id = self.program_id.unwrap_or_else(program_id);
-
-        // Compute config PDA
-        let config_pda = pda::config_address_with_program_id(&program_id);
-
-        let accounts = vec![
-            AccountMeta::new_readonly(config_pda, false), // config (PDA, readonly)
-            AccountMeta::new(merchant, false),            // merchant (PDA, mutable)
-            AccountMeta::new_readonly(authority, true),   // authority (signer)
-        ];
-
-        let args = crate::program_types::UpdateMerchantTierArgs { new_tier };
-
-        let data = {
-            let mut data = Vec::new();
-            // Instruction discriminator (computed from "global:update_merchant_tier")
-            data.extend_from_slice(&[24, 54, 190, 70, 221, 93, 3, 64]);
-            borsh::to_writer(&mut data, &args)
-                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
-            data
-        };
-
-        Ok(Instruction {
-            program_id,
-            accounts,
-            data,
-        })
-    }
-}
-
-impl UpdatePlanTermsBuilder {
-    /// Create a new update plan terms builder
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the authority (must be merchant authority)
-    #[must_use]
-    pub const fn authority(mut self, authority: Pubkey) -> Self {
-        self.authority = Some(authority);
-        self
-    }
-
-    /// Set the plan PDA to update
-    #[must_use]
-    pub const fn plan_key(mut self, plan_key: Pubkey) -> Self {
-        self.plan_key = Some(plan_key);
-        self
-    }
-
-    /// Set the plan price in USDC microlamports
-    #[must_use]
-    pub const fn price_usdc(mut self, price_usdc: u64) -> Self {
-        self.price_usdc = Some(price_usdc);
-        self
-    }
-
-    /// Set the subscription period in seconds
-    #[must_use]
-    pub const fn period_secs(mut self, period_secs: u64) -> Self {
-        self.period_secs = Some(period_secs);
-        self
-    }
-
-    /// Set the grace period in seconds
-    #[must_use]
-    pub const fn grace_secs(mut self, grace_secs: u64) -> Self {
-        self.grace_secs = Some(grace_secs);
-        self
-    }
-
-    /// Set the plan name
-    #[must_use]
-    pub fn name(mut self, name: String) -> Self {
-        self.name = Some(name);
-        self
-    }
-
-    /// Set the program ID to use
-    #[must_use]
-    pub const fn program_id(mut self, program_id: Pubkey) -> Self {
-        self.program_id = Some(program_id);
-        self
-    }
-
-    /// Build the transaction instruction
-    ///
-    /// # Returns
-    /// * `Ok(Instruction)` - The `update_plan_terms` instruction
-    /// * `Err(TallyError)` - If building fails
-    ///
-    /// # Validation
-    /// * Authority must be set
-    /// * Plan key must be set
-    /// * At least one field must be set for update
-    /// * Price > 0 if provided
-    /// * Price <= `MAX_PLAN_PRICE_USDC` (1,000,000 USDC) if provided
-    /// * Period >= `config.min_period_seconds` if provided (validated on-chain)
-    /// * Grace <= 30% of period if both provided
-    /// * Grace <= `config.max_grace_period_seconds` if provided (validated on-chain)
-    /// * Name not empty if provided
-    ///
-    /// # Note
-    /// Some validations (`min_period_seconds`, `max_grace_period_seconds`) require config
-    /// and are validated on-chain. This builder performs client-side validations where possible.
-    pub fn build_instruction(self) -> Result<Instruction> {
-        const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000; // 1 million USDC
-
-        let authority = self.authority.ok_or("Authority not set")?;
-        let plan_key = self.plan_key.ok_or("Plan key not set")?;
-        let program_id = self.program_id.unwrap_or_else(program_id);
-
-        // Validate at least one field is set for update
-        let has_update = self.price_usdc.is_some()
-            || self.period_secs.is_some()
-            || self.grace_secs.is_some()
-            || self.name.is_some();
-
-        if !has_update {
-            return Err("At least one field must be set for update".into());
-        }
-
-        // Validate price > 0 if provided
-        if let Some(price) = self.price_usdc {
-            if price == 0 {
-                return Err("Price must be > 0".into());
-            }
-            if price > MAX_PLAN_PRICE_USDC {
-                return Err("Price must be <= 1,000,000 USDC".into());
-            }
-        }
-
-        // Validate grace <= 30% of period if both provided
-        if let (Some(grace), Some(period)) = (self.grace_secs, self.period_secs) {
-            let max_grace = period
-                .checked_mul(3)
-                .and_then(|v| v.checked_div(10))
-                .ok_or("Arithmetic overflow calculating max grace period")?;
-
-            if grace > max_grace {
-                return Err("Grace period must be <= 30% of billing period".into());
-            }
-        }
-
-        // Validate name not empty if provided
-        if let Some(ref name) = self.name {
-            if name.is_empty() {
-                return Err("Name must not be empty".into());
-            }
-            if name.len() > 32 {
-                return Err("Name must be <= 32 bytes".into());
-            }
-        }
-
-        // Compute PDAs
-        let config_pda = pda::config_address_with_program_id(&program_id);
-        let merchant_pda = pda::merchant_address_with_program_id(&authority, &program_id);
-
-        let accounts = vec![
-            AccountMeta::new_readonly(config_pda, false),  // config (PDA, readonly)
-            AccountMeta::new(plan_key, false),             // plan (PDA, mutable)
-            AccountMeta::new_readonly(merchant_pda, false), // merchant (PDA, readonly)
-            AccountMeta::new_readonly(authority, true),    // authority (signer)
-        ];
-
-        let args = UpdatePlanTermsArgs {
-            price_usdc: self.price_usdc,
-            period_secs: self.period_secs,
-            grace_secs: self.grace_secs,
-            name: self.name,
-        };
-
-        let data = {
-            let mut data = Vec::new();
-            // Instruction discriminator (computed from "global:update_plan_terms")
-            data.extend_from_slice(&[224, 68, 224, 41, 169, 52, 124, 221]);
-            borsh::to_writer(&mut data, &args)
-                .map_err(|e| TallyError::Generic(format!("Failed to serialize args: {e}")))?;
-            data
-        };
-
-        Ok(Instruction {
-            program_id,
-            accounts,
-            data,
-        })
-    }
-}
 
 // Convenience functions for common transaction building patterns
 
-/// Create a start subscription transaction builder
+/// Create a start agreement transaction builder
 #[must_use]
-pub fn start_subscription() -> StartSubscriptionBuilder {
-    StartSubscriptionBuilder::new()
+pub fn start_agreement() -> StartAgreementBuilder {
+    StartAgreementBuilder::new()
 }
 
-/// Create a cancel subscription transaction builder
+/// Create a pause agreement transaction builder
 #[must_use]
-pub fn cancel_subscription() -> CancelSubscriptionBuilder {
-    CancelSubscriptionBuilder::new()
+pub fn pause_agreement() -> PauseAgreementBuilder {
+    PauseAgreementBuilder::new()
 }
 
-/// Create a merchant initialization transaction builder
+/// Create a payee initialization transaction builder
 #[must_use]
-pub fn create_merchant() -> CreateMerchantBuilder {
-    CreateMerchantBuilder::new()
+pub fn init_payee() -> InitPayeeBuilder {
+    InitPayeeBuilder::new()
 }
 
-/// Create a plan creation transaction builder
+/// Create a `payment_terms` creation transaction builder
 #[must_use]
-pub fn create_plan() -> CreatePlanBuilder {
-    CreatePlanBuilder::new()
+pub fn create_payment_terms() -> CreatePaymentTermsBuilder {
+    CreatePaymentTermsBuilder::new()
 }
 
 /// Create an admin withdraw fees transaction builder
@@ -1891,22 +1486,17 @@ pub fn init_config() -> InitConfigBuilder {
     InitConfigBuilder::new()
 }
 
-/// Create a plan update transaction builder
+
+/// Create a execute payment transaction builder
 #[must_use]
-pub fn update_plan() -> UpdatePlanBuilder {
-    UpdatePlanBuilder::new()
+pub fn execute_payment() -> ExecutePaymentBuilder {
+    ExecutePaymentBuilder::new()
 }
 
-/// Create a renew subscription transaction builder
+/// Create a close agreement transaction builder
 #[must_use]
-pub fn renew_subscription() -> RenewSubscriptionBuilder {
-    RenewSubscriptionBuilder::new()
-}
-
-/// Create a close subscription transaction builder
-#[must_use]
-pub fn close_subscription() -> CloseSubscriptionBuilder {
-    CloseSubscriptionBuilder::new()
+pub fn close_agreement() -> CloseAgreementBuilder {
+    CloseAgreementBuilder::new()
 }
 
 /// Create a transfer authority transaction builder
@@ -1951,18 +1541,6 @@ pub fn update_config() -> UpdateConfigBuilder {
     UpdateConfigBuilder::new()
 }
 
-/// Create an update merchant tier transaction builder
-#[must_use]
-#[cfg(feature = "platform-admin")]
-pub fn update_merchant_tier() -> UpdateMerchantTierBuilder {
-    UpdateMerchantTierBuilder::new()
-}
-
-/// Create an update plan terms transaction builder
-#[must_use]
-pub fn update_plan_terms() -> UpdatePlanTermsBuilder {
-    UpdatePlanTermsBuilder::new()
-}
 
 #[cfg(test)]
 mod tests {
@@ -1974,8 +1552,8 @@ mod tests {
     use std::str::FromStr;
 
     #[cfg(feature = "platform-admin")]
-    fn create_test_merchant() -> Merchant {
-        Merchant {
+    fn create_test_payee() -> Payee {
+        Payee {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -1988,17 +1566,17 @@ mod tests {
     }
 
     #[cfg(feature = "platform-admin")]
-    fn create_test_plan() -> Plan {
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let mut plan_id = [0u8; 32];
-        plan_id[..12].copy_from_slice(b"premium_plan");
+    fn create_test_payment_terms() -> PaymentTerms {
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let mut terms_id = [0u8; 32];
+        terms_id[..12].copy_from_slice(b"premium_payment_terms");
         let mut name = [0u8; 32];
-        name[..12].copy_from_slice(b"Premium Plan");
+        name[..12].copy_from_slice(b"Premium PaymentTerms");
 
-        Plan {
-            merchant,
-            plan_id,
-            price_usdc: 5_000_000,  // 5 USDC
+        PaymentTerms {
+            payee,
+            terms_id,
+            amount_usdc: 5_000_000,  // 5 USDC
             period_secs: 2_592_000, // 30 days
             grace_secs: 432_000,    // 5 days
             name,
@@ -2008,28 +1586,28 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_start_subscription_builder() {
-        let merchant = create_test_merchant();
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_start_payment_agreement_builder() {
+        let payee = create_test_payee();
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instructions = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
-            .allowance_periods(3) // 3x plan price
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+        let instructions = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
+            .allowance_periods(3) // 3x payment_terms price
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
-        assert_eq!(instructions.len(), 2, "Should have 2 instructions: approve_checked and start_subscription");
+        assert_eq!(instructions.len(), 2, "Should have 2 instructions: approve_checked and start_payment_agreement");
 
         // ========== Validate approve_checked instruction ==========
         let approve_ix = &instructions[0];
         assert_eq!(approve_ix.program_id, spl_token::id(), "First instruction must be SPL Token program");
 
-        // Validate allowance calculation (3 periods × plan price)
-        let expected_allowance = plan_data.price_usdc.checked_mul(3).expect("Allowance overflow");
+        // Validate allowance calculation (3 periods × payment_terms price)
+        let expected_allowance = payment_terms_data.amount_usdc.checked_mul(3).expect("Allowance overflow");
 
         // Decode approve_checked data to validate amount
         // approve_checked format: [discriminator(1 byte), amount(8 bytes), decimals(1 byte)]
@@ -2041,7 +1619,7 @@ mod tests {
         // Extract amount (bytes 1-8, little-endian u64)
         let amount_bytes: [u8; 8] = approve_ix.data[1..9].try_into().unwrap();
         let actual_amount = u64::from_le_bytes(amount_bytes);
-        assert_eq!(actual_amount, expected_allowance, "Allowance amount should be 3x plan price");
+        assert_eq!(actual_amount, expected_allowance, "Allowance amount should be 3x payment_terms price");
 
         // Decimals byte (byte 9) should be 6 for USDC
         assert_eq!(approve_ix.data[9], 6, "USDC decimals should be 6");
@@ -2049,123 +1627,123 @@ mod tests {
         // Validate approve_checked accounts structure
         assert_eq!(approve_ix.accounts.len(), 4, "approve_checked requires 4 accounts");
 
-        // Account 0: Source account (subscriber's token account, writable)
+        // Account 0: Source account (payer's token account, writable)
         assert!(approve_ix.accounts[0].is_writable, "Source account must be writable");
 
         // Account 1: Mint (USDC mint, readonly)
         assert!(!approve_ix.accounts[1].is_writable, "Mint must be readonly");
-        assert_eq!(approve_ix.accounts[1].pubkey, merchant.usdc_mint, "Second account must be USDC mint");
+        assert_eq!(approve_ix.accounts[1].pubkey, payee.usdc_mint, "Second account must be USDC mint");
 
         // Account 2: Delegate (program delegate PDA, readonly)
         assert!(!approve_ix.accounts[2].is_writable, "Delegate must be readonly");
 
-        // Account 3: Owner (subscriber, signer)
+        // Account 3: Owner (payer, signer)
         assert!(approve_ix.accounts[3].is_signer, "Owner must be signer");
 
-        // ========== Validate start_subscription instruction ==========
+        // ========== Validate start_payment_agreement instruction ==========
         let start_sub_ix = &instructions[1];
         let expected_program_id = program_id();
         assert_eq!(start_sub_ix.program_id, expected_program_id, "Second instruction must be Tally program");
 
-        // Validate start_subscription discriminator
-        // start_subscription discriminator: [167, 59, 160, 222, 194, 175, 3, 13]
+        // Validate start_payment_agreement discriminator
+        // start_payment_agreement discriminator: [167, 59, 160, 222, 194, 175, 3, 13]
         assert!(start_sub_ix.data.len() >= 8, "Instruction data should include discriminator");
         assert_eq!(&start_sub_ix.data[0..8], &[167, 59, 160, 222, 194, 175, 3, 13],
-            "start_subscription discriminator mismatch");
+            "start_payment_agreement discriminator mismatch");
 
-        // Validate account count for start_subscription
-        assert_eq!(start_sub_ix.accounts.len(), 12, "start_subscription requires 12 accounts");
+        // Validate account count for start_payment_agreement
+        assert_eq!(start_sub_ix.accounts.len(), 12, "start_payment_agreement requires 12 accounts");
 
         // Validate key accounts are present (specific indices)
-        // Account indices based on actual start_subscription builder:
-        // 0: config, 1: subscription, 2: plan, 3: merchant, 4: subscriber,
-        // 5: subscriber_ata, 6: merchant_treasury_ata, 7: platform_treasury_ata,
+        // Account indices based on actual start_payment_agreement builder:
+        // 0: config, 1: payment agreement, 2: payment_terms, 3: payee, 4: payer,
+        // 5: payer_ata, 6: payee_treasury_ata, 7: platform_treasury_ata,
         // 8: usdc_mint, 9: delegate, 10: token_program, 11: system_program
 
-        assert_eq!(start_sub_ix.accounts[2].pubkey, plan_key, "Plan account mismatch");
-        assert_eq!(start_sub_ix.accounts[8].pubkey, merchant.usdc_mint, "USDC mint account mismatch");
+        assert_eq!(start_sub_ix.accounts[2].pubkey, payment_terms_key, "PaymentTerms account mismatch");
+        assert_eq!(start_sub_ix.accounts[8].pubkey, payee.usdc_mint, "USDC mint account mismatch");
         assert_eq!(start_sub_ix.accounts[7].pubkey, platform_treasury_ata, "Platform treasury ATA mismatch");
 
-        // Subscriber must be signer and writable (pays for subscription account creation)
-        assert!(start_sub_ix.accounts[4].is_signer, "Subscriber must be signer");
-        assert!(start_sub_ix.accounts[4].is_writable, "Subscriber must be writable");
+        // Payer must be signer and writable (pays for payment agreement account creation)
+        assert!(start_sub_ix.accounts[4].is_signer, "Payer must be signer");
+        assert!(start_sub_ix.accounts[4].is_writable, "Payer must be writable");
 
-        // Subscription PDA must be writable (created in instruction)
-        assert!(start_sub_ix.accounts[1].is_writable, "Subscription PDA must be writable");
+        // PaymentAgreement PDA must be writable (created in instruction)
+        assert!(start_sub_ix.accounts[1].is_writable, "PaymentAgreement PDA must be writable");
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_start_subscription_allowance_edge_cases() {
-        let merchant = create_test_merchant();
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_start_payment_agreement_allowance_edge_cases() {
+        let payee = create_test_payee();
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test with 1 period (minimum)
-        let instructions_min = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instructions_min = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .allowance_periods(1)
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         let approve_ix_min = &instructions_min[0];
         let amount_bytes_min: [u8; 8] = approve_ix_min.data[1..9].try_into().unwrap();
         let amount_min = u64::from_le_bytes(amount_bytes_min);
-        assert_eq!(amount_min, plan_data.price_usdc, "1 period should equal plan price");
+        assert_eq!(amount_min, payment_terms_data.amount_usdc, "1 period should equal payment_terms price");
 
         // Test with 10 periods
-        let instructions_max = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instructions_max = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .allowance_periods(10)
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         let approve_ix_max = &instructions_max[0];
         let amount_bytes_max: [u8; 8] = approve_ix_max.data[1..9].try_into().unwrap();
         let amount_max = u64::from_le_bytes(amount_bytes_max);
-        assert_eq!(amount_max, plan_data.price_usdc * 10, "10 periods should be 10x plan price");
+        assert_eq!(amount_max, payment_terms_data.amount_usdc * 10, "10 periods should be 10x payment_terms price");
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_start_subscription_with_token2022() {
-        let mut merchant = create_test_merchant();
-        merchant.usdc_mint = Pubkey::from(Keypair::new().pubkey().to_bytes()); // Custom Token2022 mint
+    fn test_start_payment_agreement_with_token2022() {
+        let mut payee = create_test_payee();
+        payee.usdc_mint = Pubkey::from(Keypair::new().pubkey().to_bytes()); // Custom Token2022 mint
 
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instructions = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instructions = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .allowance_periods(3)
             .token_program(TokenProgram::Token2022)
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata)
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         // Verify Token2022 program is used
         assert_eq!(instructions[0].program_id, spl_token_2022::id(), "Should use Token2022 program");
         assert_eq!(instructions[1].accounts[10].pubkey, spl_token_2022::id(),
-            "start_subscription should reference Token2022");
+            "start_payment_agreement should reference Token2022");
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_cancel_subscription_builder() {
-        let merchant = create_test_merchant();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_cancel_payment_agreement_builder() {
+        let payee = create_test_payee();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instructions = cancel_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
-            .build_instructions(&merchant)
+        let instructions = pause_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
+            .build_instructions(&payee)
             .unwrap();
 
         assert_eq!(instructions.len(), 2);
@@ -2173,19 +1751,19 @@ mod tests {
         // First instruction should be revoke
         assert_eq!(instructions[0].program_id, spl_token::id());
 
-        // Second instruction should be cancel_subscription
+        // Second instruction should be cancel_payment_agreement
         let program_id = program_id();
         assert_eq!(instructions[1].program_id, program_id);
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_create_merchant_builder() {
+    fn test_create_payee_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let usdc_mint = Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap();
         let treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = create_merchant()
+        let instruction = init_payee()
             .authority(authority)
             .usdc_mint(usdc_mint)
             .treasury_ata(treasury_ata)
@@ -2199,9 +1777,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_create_plan_builder() {
+    fn test_create_payment_terms_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_id_bytes = {
+        let terms_id_bytes = {
             let mut bytes = [0u8; 32];
             let id_bytes = b"premium";
             let len = id_bytes.len().min(32);
@@ -2209,18 +1787,18 @@ mod tests {
             bytes
         };
 
-        let plan_args = CreatePlanArgs {
-            plan_id: "premium".to_string(),
-            plan_id_bytes,
-            price_usdc: 5_000_000,
+        let payment_terms_args = CreatePaymentTermsArgs {
+            terms_id: "premium".to_string(),
+            terms_id_bytes,
+            amount_usdc: 5_000_000,
             period_secs: 2_592_000,
             grace_secs: 432_000,
-            name: "Premium Plan".to_string(),
+            name: "Premium PaymentTerms".to_string(),
         };
 
-        let instruction = create_plan()
+        let instruction = create_payment_terms()
             .authority(authority)
-            .plan_args(plan_args)
+            .payment_terms_args(payment_terms_args)
             .build_instruction()
             .unwrap();
 
@@ -2232,35 +1810,35 @@ mod tests {
     #[test]
     #[cfg(feature = "platform-admin")]
     fn test_builder_missing_required_fields() {
-        let merchant = create_test_merchant();
-        let plan_data = create_test_plan();
+        let payee = create_test_payee();
+        let payment_terms_data = create_test_payment_terms();
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        // Test missing plan
-        let result = start_subscription()
-            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        // Test missing payment_terms
+        let result = start_agreement()
+            .payer(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .allowance_periods(3)
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Plan not set"));
+        assert!(result.unwrap_err().to_string().contains("PaymentTerms not set"));
 
-        // Test missing subscriber
-        let result = start_subscription()
-            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        // Test missing payer
+        let result = start_agreement()
+            .payment_terms(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .allowance_periods(3)
-            .build_instructions(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instructions(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Subscriber not set"));
+            .contains("Payer not set"));
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
     fn test_token_program_variants() {
-        // Create separate merchants for different token programs to avoid compatibility issues
-        let merchant_token = Merchant {
+        // Create separate payees for different token programs to avoid compatibility issues
+        let payee_token = Payee {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a test mint for classic token
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -2271,7 +1849,7 @@ mod tests {
             bump: 255,
         };
 
-        let merchant_token2022 = Merchant {
+        let payee_token2022 = Payee {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a different test mint for Token-2022
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -2282,27 +1860,27 @@ mod tests {
             bump: 255,
         };
 
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test with Token-2022
-        let instructions_token2022 = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instructions_token2022 = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .allowance_periods(3)
             .token_program(TokenProgram::Token2022)
-            .build_instructions(&merchant_token2022, &plan_data, &platform_treasury_ata)
+            .build_instructions(&payee_token2022, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         // Test with classic Token
-        let instructions_token = start_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instructions_token = start_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .allowance_periods(3)
             .token_program(TokenProgram::Token)
-            .build_instructions(&merchant_token, &plan_data, &platform_treasury_ata)
+            .build_instructions(&payee_token, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         // Both should work but have different token program IDs
@@ -2380,20 +1958,20 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_builder() {
-        let merchant = create_test_merchant();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_update_payment_terms_builder() {
+        let payee = create_test_payee();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let update_args = UpdatePlanArgs::new()
-            .with_name("Updated Plan".to_string())
+        let update_args = UpdatePaymentTermsArgs::new()
+            .with_name("Updated PaymentTerms".to_string())
             .with_active(false)
-            .with_price_usdc(10_000_000); // 10 USDC
+            .with_amount_usdc(10_000_000); // 10 USDC
 
-        let instruction = update_plan()
-            .authority(merchant.authority)
-            .plan_key(plan_key)
+        let instruction = update_payment_terms()
+            .authority(payee.authority)
+            .payment_terms_key(payment_terms_key)
             .update_args(update_args)
-            .build_instruction(&merchant)
+            .build_instruction(&payee)
             .unwrap();
 
         let program_id = program_id();
@@ -2403,45 +1981,44 @@ mod tests {
         // Verify account structure
         assert!(!instruction.accounts[0].is_signer); // config (readonly)
         assert!(!instruction.accounts[0].is_writable); // config (readonly)
-        assert!(!instruction.accounts[1].is_signer); // plan (mutable, but not signer)
-        assert!(instruction.accounts[1].is_writable); // plan (mutable)
-        assert!(!instruction.accounts[2].is_signer); // merchant (readonly)
-        assert!(!instruction.accounts[2].is_writable); // merchant (readonly)
+        assert!(!instruction.accounts[1].is_signer); // payment_terms (mutable, but not signer)
+        assert!(instruction.accounts[1].is_writable); // payment_terms (mutable)
+        assert!(!instruction.accounts[2].is_signer); // payee (readonly)
+        assert!(!instruction.accounts[2].is_writable); // payee (readonly)
         assert!(instruction.accounts[3].is_signer); // authority (signer)
         assert!(instruction.accounts[3].is_writable); // authority (mutable for fees)
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_builder_missing_required_fields() {
-        let merchant = create_test_merchant();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let update_args = UpdatePlanArgs::new().with_name("Test".to_string());
+    fn test_update_payment_terms_builder_missing_required_fields() {
+        let payee = create_test_payee();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test missing authority
-        let result = update_plan()
-            .plan_key(plan_key)
+        let result = update_payment_terms()
+            .payment_terms_key(payment_terms_key)
             .update_args(update_args.clone())
-            .build_instruction(&merchant);
+            .build_instruction(&payee);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
             .contains("Authority not set"));
 
-        // Test missing plan key
-        let result = update_plan()
-            .authority(merchant.authority)
+        // Test missing payment_terms key
+        let result = update_payment_terms()
+            .authority(payee.authority)
             .update_args(update_args)
-            .build_instruction(&merchant);
+            .build_instruction(&payee);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Plan key not set"));
+        assert!(result.unwrap_err().to_string().contains("PaymentTerms key not set"));
 
         // Test missing update args
-        let result = update_plan()
-            .authority(merchant.authority)
-            .plan_key(plan_key)
-            .build_instruction(&merchant);
+        let result = update_payment_terms()
+            .authority(payee.authority)
+            .payment_terms_key(payment_terms_key)
+            .build_instruction(&payee);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -2451,31 +2028,29 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_builder_validation() {
-        let merchant = create_test_merchant();
+    fn test_update_payment_terms_builder_validation() {
+        let payee = create_test_payee();
         let wrong_authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test wrong authority
-        let update_args = UpdatePlanArgs::new().with_name("Test".to_string());
-        let result = update_plan()
+        let result = update_payment_terms()
             .authority(wrong_authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .update_args(update_args)
-            .build_instruction(&merchant);
+            .build_instruction(&payee);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Authority does not match merchant authority"));
+            .contains("Authority does not match payee authority"));
 
         // Test empty update args
-        let empty_args = UpdatePlanArgs::new();
-        let result = update_plan()
-            .authority(merchant.authority)
-            .plan_key(plan_key)
+        let result = update_payment_terms()
+            .authority(payee.authority)
+            .payment_terms_key(payment_terms_key)
             .update_args(empty_args)
-            .build_instruction(&merchant);
+            .build_instruction(&payee);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -2485,25 +2060,24 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_args_functionality() {
-        // Test UpdatePlanArgs builder pattern
-        let args = UpdatePlanArgs::new()
-            .with_name("New Plan Name".to_string())
+    fn test_update_payment_terms_args_functionality() {
+        let args = UpdatePaymentTermsArgs::new()
+            .with_name("New PaymentTerms Name".to_string())
             .with_active(true)
-            .with_price_usdc(5_000_000)
+            .with_amount_usdc(5_000_000)
             .with_period_secs(2_592_000)
             .with_grace_secs(432_000);
 
         assert!(args.has_updates());
-        assert_eq!(args.name, Some("New Plan Name".to_string()));
+        assert_eq!(args.name, Some("New PaymentTerms Name".to_string()));
         assert_eq!(args.active, Some(true));
-        assert_eq!(args.price_usdc, Some(5_000_000));
+        assert_eq!(args.amount_usdc, Some(5_000_000));
         assert_eq!(args.period_secs, Some(2_592_000));
         assert_eq!(args.grace_secs, Some(432_000));
 
         // Test name_bytes conversion
         let name_bytes = args.name_bytes().unwrap();
-        let expected_name = "New Plan Name";
+        let expected_name = "New PaymentTerms Name";
         assert_eq!(&name_bytes[..expected_name.len()], expected_name.as_bytes());
         // Check that the rest of the array is zero-padded
         for &byte in &name_bytes[expected_name.len()..] {
@@ -2511,32 +2085,30 @@ mod tests {
         }
 
         // Test empty args
-        let empty_args = UpdatePlanArgs::new();
         assert!(!empty_args.has_updates());
         assert!(empty_args.name_bytes().is_none());
 
         // Test default
-        let default_args = UpdatePlanArgs::default();
         assert!(!default_args.has_updates());
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_renew_subscription_builder() {
-        let merchant = create_test_merchant();
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_renew_payment_agreement_builder() {
+        let payee = create_test_payee();
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let keeper_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = renew_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction = execute_payment()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .keeper(keeper)
             .keeper_ata(keeper_ata)
-            .build_instruction(&merchant, &plan_data, &platform_treasury_ata)
+            .build_instruction(&payee, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         let program_id = program_id();
@@ -2560,8 +2132,8 @@ mod tests {
     #[cfg(feature = "platform-admin")]
     fn verify_renew_readonly_accounts(instruction: &Instruction) {
         assert!(!instruction.accounts[0].is_writable); // config
-        assert!(!instruction.accounts[2].is_writable); // plan
-        assert!(!instruction.accounts[3].is_writable); // merchant
+        assert!(!instruction.accounts[2].is_writable); // payment_terms
+        assert!(!instruction.accounts[3].is_writable); // payee
         assert!(!instruction.accounts[9].is_writable); // usdc_mint
         assert!(!instruction.accounts[10].is_writable); // program_delegate
         assert!(!instruction.accounts[11].is_writable); // token_program
@@ -2569,9 +2141,9 @@ mod tests {
 
     #[cfg(feature = "platform-admin")]
     fn verify_renew_mutable_accounts(instruction: &Instruction) {
-        assert!(instruction.accounts[1].is_writable); // subscription
-        assert!(instruction.accounts[4].is_writable); // subscriber_usdc_ata
-        assert!(instruction.accounts[5].is_writable); // merchant_treasury_ata
+        assert!(instruction.accounts[1].is_writable); // payment agreement
+        assert!(instruction.accounts[4].is_writable); // payer_usdc_ata
+        assert!(instruction.accounts[5].is_writable); // payee_treasury_ata
         assert!(instruction.accounts[6].is_writable); // platform_treasury_ata
         assert!(instruction.accounts[7].is_writable); // keeper
         assert!(instruction.accounts[8].is_writable); // keeper_usdc_ata
@@ -2580,11 +2152,11 @@ mod tests {
     #[cfg(feature = "platform-admin")]
     fn verify_renew_signer_accounts(instruction: &Instruction) {
         assert!(!instruction.accounts[0].is_signer); // config
-        assert!(!instruction.accounts[1].is_signer); // subscription
-        assert!(!instruction.accounts[2].is_signer); // plan
-        assert!(!instruction.accounts[3].is_signer); // merchant
-        assert!(!instruction.accounts[4].is_signer); // subscriber_usdc_ata
-        assert!(!instruction.accounts[5].is_signer); // merchant_treasury_ata
+        assert!(!instruction.accounts[1].is_signer); // payment agreement
+        assert!(!instruction.accounts[2].is_signer); // payment_terms
+        assert!(!instruction.accounts[3].is_signer); // payee
+        assert!(!instruction.accounts[4].is_signer); // payer_usdc_ata
+        assert!(!instruction.accounts[5].is_signer); // payee_treasury_ata
         assert!(!instruction.accounts[6].is_signer); // platform_treasury_ata
         assert!(instruction.accounts[7].is_signer); // keeper (only signer)
         assert!(!instruction.accounts[8].is_signer); // keeper_usdc_ata
@@ -2595,47 +2167,47 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_renew_subscription_builder_missing_required_fields() {
-        let merchant = create_test_merchant();
-        let plan_data = create_test_plan();
+    fn test_renew_payment_agreement_builder_missing_required_fields() {
+        let payee = create_test_payee();
+        let payment_terms_data = create_test_payment_terms();
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        // Test missing plan
-        let result = renew_subscription()
-            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        // Test missing payment_terms
+        let result = execute_payment()
+            .payer(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instruction(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Plan not set"));
+        assert!(result.unwrap_err().to_string().contains("PaymentTerms not set"));
 
-        // Test missing subscriber
-        let result = renew_subscription()
-            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        // Test missing payer
+        let result = execute_payment()
+            .payment_terms(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instruction(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Subscriber not set"));
+            .contains("Payer not set"));
 
         // Test missing keeper
-        let result = renew_subscription()
-            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        let result = execute_payment()
+            .payment_terms(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .payer(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper_ata(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instruction(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Keeper not set"));
 
         // Test missing keeper_ata
-        let result = renew_subscription()
-            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        let result = execute_payment()
+            .payment_terms(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .payer(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .keeper(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .build_instruction(&merchant, &plan_data, &platform_treasury_ata);
+            .build_instruction(&payee, &payment_terms_data, &platform_treasury_ata);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -2645,9 +2217,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_renew_subscription_token_program_variants() {
-        // Create separate merchants for different token programs
-        let merchant_token = Merchant {
+    fn test_renew_payment_agreement_token_program_variants() {
+        // Create separate payees for different token programs
+        let payee_token = Payee {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -2658,7 +2230,7 @@ mod tests {
             bump: 255,
         };
 
-        let merchant_token2022 = Merchant {
+        let payee_token2022 = Payee {
             authority: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
@@ -2669,31 +2241,31 @@ mod tests {
             bump: 255,
         };
 
-        let plan_data = create_test_plan();
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_data = create_test_payment_terms();
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let keeper = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let keeper_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let platform_treasury_ata = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test with Token-2022
-        let instruction_token2022 = renew_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction_token2022 = execute_payment()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .keeper(keeper)
             .keeper_ata(keeper_ata)
             .token_program(TokenProgram::Token2022)
-            .build_instruction(&merchant_token2022, &plan_data, &platform_treasury_ata)
+            .build_instruction(&payee_token2022, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         // Test with classic Token
-        let instruction_token = renew_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction_token = execute_payment()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .keeper(keeper)
             .keeper_ata(keeper_ata)
             .token_program(TokenProgram::Token)
-            .build_instruction(&merchant_token, &plan_data, &platform_treasury_ata)
+            .build_instruction(&payee_token, &payment_terms_data, &platform_treasury_ata)
             .unwrap();
 
         // Both should work but have different token program IDs in the accounts
@@ -2706,13 +2278,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_close_subscription_builder() {
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_close_payment_agreement_builder() {
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = close_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction = close_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .build_instruction()
             .unwrap();
 
@@ -2724,43 +2296,43 @@ mod tests {
         assert_eq!(&instruction.data[..8], &[33, 214, 169, 135, 35, 127, 78, 7]);
 
         // Verify account structure
-        assert!(instruction.accounts[0].is_writable); // subscription (mutable)
-        assert!(!instruction.accounts[0].is_signer); // subscription (not signer, it's a PDA)
-        assert!(instruction.accounts[1].is_writable); // subscriber (mutable, receives rent)
-        assert!(instruction.accounts[1].is_signer); // subscriber (signer)
+        assert!(instruction.accounts[0].is_writable); // payment agreement (mutable)
+        assert!(!instruction.accounts[0].is_signer); // payment agreement (not signer, it's a PDA)
+        assert!(instruction.accounts[1].is_writable); // payer (mutable, receives rent)
+        assert!(instruction.accounts[1].is_signer); // payer (signer)
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_close_subscription_builder_missing_required_fields() {
-        // Test missing plan
-        let result = close_subscription()
-            .subscriber(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+    fn test_close_payment_agreement_builder_missing_required_fields() {
+        // Test missing payment_terms
+        let result = close_agreement()
+            .payer(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .build_instruction();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Plan not set"));
+        assert!(result.unwrap_err().to_string().contains("PaymentTerms not set"));
 
-        // Test missing subscriber
-        let result = close_subscription()
-            .plan(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+        // Test missing payer
+        let result = close_agreement()
+            .payment_terms(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .build_instruction();
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Subscriber not set"));
+            .contains("Payer not set"));
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_close_subscription_builder_custom_program_id() {
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_close_payment_agreement_builder_custom_program_id() {
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = close_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction = close_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .program_id(custom_program_id)
             .build_instruction()
             .unwrap();
@@ -2770,23 +2342,23 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_close_subscription_builder_pda_computation() {
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let subscriber = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_close_payment_agreement_builder_pda_computation() {
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payer = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = close_subscription()
-            .plan(plan_key)
-            .subscriber(subscriber)
+        let instruction = close_agreement()
+            .payment_terms(payment_terms_key)
+            .payer(payer)
             .build_instruction()
             .unwrap();
 
-        // Verify the computed subscription PDA is correct
+        // Verify the computed payment agreement PDA is correct
         let program_id = program_id();
-        let expected_subscription_pda =
-            pda::subscription_address_with_program_id(&plan_key, &subscriber, &program_id);
+        let expected_payment_agreement_pda =
+            pda::payment_agreement_address_with_program_id(&payment_terms_key, &payer, &program_id);
 
-        assert_eq!(instruction.accounts[0].pubkey, expected_subscription_pda);
-        assert_eq!(instruction.accounts[1].pubkey, subscriber);
+        assert_eq!(instruction.accounts[0].pubkey, expected_payment_agreement_pda);
+        assert_eq!(instruction.accounts[1].pubkey, payer);
     }
 
     #[test]
@@ -3899,13 +3471,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder() {
+    fn test_update_payee_tier_builder() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = update_merchant_tier()
+        let instruction = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1) // Pro tier
             .build_instruction()
             .unwrap();
@@ -3923,8 +3495,8 @@ mod tests {
         // Verify account structure
         assert!(!instruction.accounts[0].is_writable); // config (readonly)
         assert!(!instruction.accounts[0].is_signer); // config (PDA, not signer)
-        assert!(instruction.accounts[1].is_writable); // merchant (mutable)
-        assert!(!instruction.accounts[1].is_signer); // merchant (PDA, not signer)
+        assert!(instruction.accounts[1].is_writable); // payee (mutable)
+        assert!(!instruction.accounts[1].is_signer); // payee (PDA, not signer)
         assert!(!instruction.accounts[2].is_writable); // authority (readonly)
         assert!(instruction.accounts[2].is_signer); // authority (signer)
 
@@ -3933,38 +3505,38 @@ mod tests {
             instruction.accounts[0].pubkey,
             pda::config_address_with_program_id(&program_id)
         );
-        assert_eq!(instruction.accounts[1].pubkey, merchant);
+        assert_eq!(instruction.accounts[1].pubkey, payee);
         assert_eq!(instruction.accounts[2].pubkey, authority);
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_all_tiers() {
+    fn test_update_payee_tier_builder_all_tiers() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test Free tier (0)
-        let instruction_free = update_merchant_tier()
+        let instruction_free = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(0)
             .build_instruction()
             .unwrap();
         assert_eq!(instruction_free.accounts.len(), 3);
 
         // Test Pro tier (1)
-        let instruction_pro = update_merchant_tier()
+        let instruction_pro = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1)
             .build_instruction()
             .unwrap();
         assert_eq!(instruction_pro.accounts.len(), 3);
 
         // Test Enterprise tier (2)
-        let instruction_enterprise = update_merchant_tier()
+        let instruction_enterprise = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(2)
             .build_instruction()
             .unwrap();
@@ -3973,13 +3545,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_missing_required_fields() {
+    fn test_update_payee_tier_builder_missing_required_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test missing authority
-        let result = update_merchant_tier()
-            .merchant(merchant)
+        let result = update_payee_tier()
+            .payee(payee)
             .new_tier(1)
             .build_instruction();
         assert!(result.is_err());
@@ -3988,8 +3560,8 @@ mod tests {
             .to_string()
             .contains("Authority not set"));
 
-        // Test missing merchant
-        let result = update_merchant_tier()
+        // Test missing payee
+        let result = update_payee_tier()
             .authority(authority)
             .new_tier(1)
             .build_instruction();
@@ -3997,12 +3569,12 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Merchant not set"));
+            .contains("Payee not set"));
 
         // Test missing new_tier
-        let result = update_merchant_tier()
+        let result = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .build_instruction();
         assert!(result.is_err());
         assert!(result
@@ -4013,14 +3585,14 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_invalid_tier() {
+    fn test_update_payee_tier_builder_invalid_tier() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test tier > 2 (invalid)
-        let result = update_merchant_tier()
+        let result = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(3)
             .build_instruction();
         assert!(result.is_err());
@@ -4030,9 +3602,9 @@ mod tests {
             .contains("New tier must be 0 (Free), 1 (Pro), or 2 (Enterprise)"));
 
         // Test tier 255 (invalid)
-        let result = update_merchant_tier()
+        let result = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(255)
             .build_instruction();
         assert!(result.is_err());
@@ -4040,14 +3612,14 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_custom_program_id() {
+    fn test_update_payee_tier_builder_custom_program_id() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
         let custom_program_id = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = update_merchant_tier()
+        let instruction = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1)
             .program_id(custom_program_id)
             .build_instruction()
@@ -4058,13 +3630,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_pda_computation() {
+    fn test_update_payee_tier_builder_pda_computation() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = update_merchant_tier()
+        let instruction = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1)
             .build_instruction()
             .unwrap();
@@ -4074,26 +3646,26 @@ mod tests {
         let expected_config_pda = pda::config_address_with_program_id(&program_id);
 
         assert_eq!(instruction.accounts[0].pubkey, expected_config_pda);
-        assert_eq!(instruction.accounts[1].pubkey, merchant);
+        assert_eq!(instruction.accounts[1].pubkey, payee);
         assert_eq!(instruction.accounts[2].pubkey, authority);
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_args_serialization() {
+    fn test_update_payee_tier_args_serialization() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test that args can be serialized and included in instruction data
-        let instruction = update_merchant_tier()
+        let instruction = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1) // Pro tier
             .build_instruction()
             .unwrap();
 
         // Verify the data contains the discriminator (8 bytes) followed by serialized args
-        // UpdateMerchantTierArgs has 1 u8 field, so data should be 9 bytes
+        // UpdatePayeeTierArgs has 1 u8 field, so data should be 9 bytes
         assert_eq!(instruction.data.len(), 9);
 
         // Verify the discriminator matches
@@ -4108,51 +3680,51 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_clone_debug() {
-        let builder = update_merchant_tier()
+    fn test_update_payee_tier_builder_clone_debug() {
+        let builder = update_payee_tier()
             .authority(Pubkey::from(Keypair::new().pubkey().to_bytes()))
-            .merchant(Pubkey::from(Keypair::new().pubkey().to_bytes()))
+            .payee(Pubkey::from(Keypair::new().pubkey().to_bytes()))
             .new_tier(1);
 
         // Test Clone trait
         let cloned_builder = builder.clone();
         assert_eq!(cloned_builder.authority, builder.authority);
-        assert_eq!(cloned_builder.merchant, builder.merchant);
+        assert_eq!(cloned_builder.payee, builder.payee);
         assert_eq!(cloned_builder.new_tier, builder.new_tier);
 
         // Test Debug trait
         let debug_str = format!("{builder:?}");
-        assert!(debug_str.contains("UpdateMerchantTierBuilder"));
+        assert!(debug_str.contains("UpdatePayeeTierBuilder"));
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_builder_default() {
-        let builder = UpdateMerchantTierBuilder::default();
+    fn test_update_payee_tier_builder_default() {
+        let builder = UpdatePayeeTierBuilder::default();
         assert!(builder.authority.is_none());
-        assert!(builder.merchant.is_none());
+        assert!(builder.payee.is_none());
         assert!(builder.new_tier.is_none());
         assert!(builder.program_id.is_none());
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_merchant_tier_convenience_function() {
+    fn test_update_payee_tier_convenience_function() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let merchant = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payee = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test using convenience function
-        let instruction = update_merchant_tier()
+        let instruction = update_payee_tier()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1)
             .build_instruction()
             .unwrap();
 
         // Verify it works the same as using the builder directly
-        let direct_instruction = UpdateMerchantTierBuilder::new()
+        let direct_instruction = UpdatePayeeTierBuilder::new()
             .authority(authority)
-            .merchant(merchant)
+            .payee(payee)
             .new_tier(1)
             .build_instruction()
             .unwrap();
@@ -4167,17 +3739,17 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_builder_all_fields() {
+    fn test_update_payment_terms_terms_builder_all_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(10_000_000) // 10 USDC
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(10_000_000) // 10 USDC
             .period_secs(2_592_000) // 30 days
             .grace_secs(777_600)    // 9 days (< 30% of 30 days = 7.776 days)
-            .name("Updated Plan".to_string())
+            .name("Updated PaymentTerms".to_string())
             .build_instruction()
             .unwrap();
 
@@ -4185,21 +3757,21 @@ mod tests {
         assert_eq!(instruction.program_id, program_id);
         assert_eq!(instruction.accounts.len(), 4);
 
-        // Verify discriminator is correct for "global:update_plan_terms"
+        // Verify discriminator is correct for "global:update_payment_terms_terms"
         assert_eq!(&instruction.data[..8], &[224, 68, 224, 41, 169, 52, 124, 221]);
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_builder_single_field() {
+    fn test_update_payment_terms_terms_builder_single_field() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         // Test updating only price
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(20_000_000)
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(20_000_000)
             .build_instruction()
             .unwrap();
 
@@ -4207,9 +3779,9 @@ mod tests {
         assert_eq!(instruction.accounts.len(), 4);
 
         // Test updating only period
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .period_secs(604_800) // 7 days
             .build_instruction()
             .unwrap();
@@ -4218,9 +3790,9 @@ mod tests {
         assert_eq!(instruction.accounts.len(), 4);
 
         // Test updating only grace
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .grace_secs(86_400) // 1 day
             .build_instruction()
             .unwrap();
@@ -4229,9 +3801,9 @@ mod tests {
         assert_eq!(instruction.accounts.len(), 4);
 
         // Test updating only name
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .name("New Name".to_string())
             .build_instruction()
             .unwrap();
@@ -4242,13 +3814,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_no_fields() {
+    fn test_update_payment_terms_terms_validation_no_fields() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .build_instruction();
 
         assert!(result.is_err());
@@ -4260,12 +3832,12 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_missing_authority() {
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+    fn test_update_payment_terms_terms_validation_missing_authority() {
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
-            .plan_key(plan_key)
-            .price_usdc(10_000_000)
+        let result = update_payment_terms_terms()
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(10_000_000)
             .build_instruction();
 
         assert!(result.is_err());
@@ -4274,28 +3846,28 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_missing_plan() {
+    fn test_update_payment_terms_terms_validation_missing_payment_terms() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .price_usdc(10_000_000)
+            .amount_usdc(10_000_000)
             .build_instruction();
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Plan key not set"));
+        assert!(result.unwrap_err().to_string().contains("PaymentTerms key not set"));
     }
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_zero_price() {
+    fn test_update_payment_terms_terms_validation_zero_price() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(0)
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(0)
             .build_instruction();
 
         assert!(result.is_err());
@@ -4304,14 +3876,14 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_max_price() {
+    fn test_update_payment_terms_terms_validation_max_price() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(1_000_000_000_001) // Just over 1 million USDC
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(1_000_000_000_001) // Just over 1 million USDC
             .build_instruction();
 
         assert!(result.is_err());
@@ -4323,13 +3895,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_grace_exceeds_30_percent() {
+    fn test_update_payment_terms_terms_validation_grace_exceeds_30_percent() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .period_secs(2_592_000) // 30 days
             .grace_secs(800_000)    // > 30% of 30 days (should be <= 777,600)
             .build_instruction();
@@ -4343,13 +3915,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_empty_name() {
+    fn test_update_payment_terms_terms_validation_empty_name() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .name(String::new())
             .build_instruction();
 
@@ -4362,15 +3934,15 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_validation_name_too_long() {
+    fn test_update_payment_terms_terms_validation_name_too_long() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
         let long_name = "a".repeat(33); // 33 bytes, > 32
 
-        let result = update_plan_terms()
+        let result = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
+            .payment_terms_key(payment_terms_key)
             .name(long_name)
             .build_instruction();
 
@@ -4383,22 +3955,22 @@ mod tests {
 
     #[test]
     #[cfg(feature = "platform-admin")]
-    fn test_update_plan_terms_convenience_function() {
+    fn test_update_payment_terms_terms_convenience_function() {
         let authority = Pubkey::from(Keypair::new().pubkey().to_bytes());
-        let plan_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
+        let payment_terms_key = Pubkey::from(Keypair::new().pubkey().to_bytes());
 
-        let instruction = update_plan_terms()
+        let instruction = update_payment_terms_terms()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(15_000_000)
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(15_000_000)
             .build_instruction()
             .unwrap();
 
         // Verify it works the same as using the builder directly
-        let direct_instruction = UpdatePlanTermsBuilder::new()
+        let direct_instruction = UpdatePaymentTermsTermsBuilder::new()
             .authority(authority)
-            .plan_key(plan_key)
-            .price_usdc(15_000_000)
+            .payment_terms_key(payment_terms_key)
+            .amount_usdc(15_000_000)
             .build_instruction()
             .unwrap();
 
