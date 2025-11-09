@@ -45,20 +45,12 @@ pub struct InitMerchant<'info> {
 }
 
 pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()> {
-    // New merchants default to Free tier with its associated platform fee
-    // Only platform authority can upgrade merchants to Pro/Enterprise tiers via update_merchant_tier
-    let default_tier = crate::state::MerchantTier::Free;
-    let platform_fee_bps = default_tier.fee_bps();
+    // New merchants start at Standard tier (0.25% platform fee)
+    // Tier automatically upgrades based on 30-day rolling payment volume
+    let default_tier = crate::state::VolumeTier::Standard;
 
-    // Validate that the default Free tier fee is within config bounds
-    require!(
-        platform_fee_bps >= ctx.accounts.config.min_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidConfiguration
-    );
-    require!(
-        platform_fee_bps <= ctx.accounts.config.max_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidConfiguration
-    );
+    // Validate that the default tier fee is within config bounds
+    default_tier.validate_fee()?;
 
     // Validate that the provided USDC mint matches the allowed mint in config
     // This prevents merchants from using fake or arbitrary tokens
@@ -124,15 +116,17 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
     );
 
     let merchant = &mut ctx.accounts.merchant;
+
+    // Get current timestamp for initialization and event
+    let clock = Clock::get()?;
+
     merchant.authority = ctx.accounts.authority.key();
     merchant.usdc_mint = args.usdc_mint;
     merchant.treasury_ata = args.treasury_ata;
-    merchant.platform_fee_bps = platform_fee_bps;
-    merchant.tier = default_tier;
+    merchant.volume_tier = default_tier;
+    merchant.monthly_volume_usdc = 0;
+    merchant.last_volume_update_ts = clock.unix_timestamp;
     merchant.bump = ctx.bumps.merchant;
-
-    // Get current timestamp for event
-    let clock = Clock::get()?;
 
     // Emit MerchantInitialized event
     emit!(crate::events::MerchantInitialized {
@@ -140,7 +134,8 @@ pub fn handler(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()>
         authority: ctx.accounts.authority.key(),
         usdc_mint: args.usdc_mint,
         treasury_ata: args.treasury_ata,
-        platform_fee_bps,
+        volume_tier: default_tier,
+        platform_fee_bps: default_tier.platform_fee_bps(),
         timestamp: clock.unix_timestamp,
     });
 

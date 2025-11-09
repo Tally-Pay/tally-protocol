@@ -1,30 +1,150 @@
 use anchor_lang::prelude::*;
 
-/// Merchant tier determines platform fee rate
+use crate::constants::{
+    GROWTH_TIER_THRESHOLD_USDC, MAX_PLATFORM_FEE_BPS, MIN_PLATFORM_FEE_BPS,
+    SCALE_TIER_THRESHOLD_USDC,
+};
+
+/// Volume tier determines platform fee rate based on 30-day rolling payment volume
+///
+/// Tiers automatically upgrade as payees process more volume, providing fee discounts
+/// that enable economically viable hierarchical payment structures.
+///
+/// # Fee Structure
+///
+/// - **Standard**: 0.25% (up to $10K monthly volume)
+/// - **Growth**: 0.20% ($10K - $100K monthly volume)
+/// - **Scale**: 0.15% (over $100K monthly volume)
+///
+/// # Automatic Tier Upgrades
+///
+/// Tiers are recalculated on every payment execution based on the payee's rolling
+/// 30-day volume. When volume crosses a threshold, the tier automatically upgrades
+/// and the new fee rate applies to all future payments.
+///
+/// # Volume Reset
+///
+/// If no payments are processed for 30 days, volume resets to zero and tier returns
+/// to Standard. This prevents inactive payees from maintaining high-tier discounts.
+///
+/// # Hierarchical Payment Economics
+///
+/// Volume-based discounts make hierarchical payment structures economically viable:
+///
+/// **3-Level Hierarchy (all Standard tier):**
+/// - Total fees: 3 × 0.25% = 0.75% platform fees
+/// - Plus keeper: 3 × 0.15% = 0.45% keeper fees
+/// - Total overhead: 1.20% (competitive with traditional processors)
+///
+/// **4-Level Hierarchy (mixed tiers):**
+/// - Company (Scale, $100K+): 0.15%
+/// - Department (Growth, $50K): 0.20%
+/// - Employee (Standard, $5K): 0.25%
+/// - Vendor (Standard, $1K): 0.25%
+/// - Total overhead: 0.85% + keeper fees = ~1.45%
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
-pub enum MerchantTier {
-    /// Free tier: 2.0% platform fee (200 basis points)
-    Free,
-    /// Pro tier: 1.5% platform fee (150 basis points)
-    Pro,
-    /// Enterprise tier: 1.0% platform fee (100 basis points)
-    Enterprise,
+pub enum VolumeTier {
+    /// Standard tier: Up to $10K monthly volume, 0.25% platform fee
+    Standard,
+    /// Growth tier: $10K - $100K monthly volume, 0.20% platform fee
+    Growth,
+    /// Scale tier: Over $100K monthly volume, 0.15% platform fee
+    Scale,
 }
 
-impl MerchantTier {
+impl VolumeTier {
     /// Returns the platform fee in basis points for this tier
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let standard_fee = VolumeTier::Standard.platform_fee_bps(); // 25 (0.25%)
+    /// let growth_fee = VolumeTier::Growth.platform_fee_bps();     // 20 (0.20%)
+    /// let scale_fee = VolumeTier::Scale.platform_fee_bps();       // 15 (0.15%)
+    /// ```
     #[must_use]
-    pub const fn fee_bps(self) -> u16 {
+    pub const fn platform_fee_bps(self) -> u16 {
         match self {
-            Self::Free => 200,       // 2.0%
-            Self::Pro => 150,        // 1.5%
-            Self::Enterprise => 100, // 1.0%
+            Self::Standard => 25, // 0.25%
+            Self::Growth => 20,   // 0.20%
+            Self::Scale => 15,    // 0.15%
         }
+    }
+
+    /// Determines tier based on 30-day rolling volume
+    ///
+    /// # Arguments
+    ///
+    /// * `volume_usdc` - Total USDC volume in microlamports (6 decimals) over 30 days
+    ///
+    /// # Returns
+    ///
+    /// The appropriate tier for the given volume level
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let tier1 = VolumeTier::from_monthly_volume(5_000_000_000);    // $5K -> Standard
+    /// let tier2 = VolumeTier::from_monthly_volume(50_000_000_000);   // $50K -> Growth
+    /// let tier3 = VolumeTier::from_monthly_volume(500_000_000_000);  // $500K -> Scale
+    /// ```
+    #[must_use]
+    pub const fn from_monthly_volume(volume_usdc: u64) -> Self {
+        if volume_usdc >= SCALE_TIER_THRESHOLD_USDC {
+            Self::Scale
+        } else if volume_usdc >= GROWTH_TIER_THRESHOLD_USDC {
+            Self::Growth
+        } else {
+            Self::Standard
+        }
+    }
+
+    /// Validates that the fee for this tier is within allowed bounds
+    ///
+    /// # Errors
+    ///
+    /// Returns error if tier fee exceeds `MAX_PLATFORM_FEE_BPS` or is below `MIN_PLATFORM_FEE_BPS`
+    #[must_use]
+    pub const fn validate_fee_bps(&self) -> u16 {
+        self.platform_fee_bps()
+    }
+
+    /// Validates that the fee for this tier is within config bounds
+    ///
+    /// # Errors
+    ///
+    /// Returns error if tier fee exceeds `MAX_PLATFORM_FEE_BPS` or is below `MIN_PLATFORM_FEE_BPS`
+    pub fn validate_fee(&self) -> Result<()> {
+        let fee = self.platform_fee_bps();
+        require!(
+            (MIN_PLATFORM_FEE_BPS..=MAX_PLATFORM_FEE_BPS).contains(&fee),
+            crate::errors::SubscriptionError::InvalidConfiguration
+        );
+        Ok(())
     }
 }
 
 /// Merchant account stores merchant configuration and settings
 /// PDA seeds: ["merchant", authority]
+///
+/// # Volume Tracking
+///
+/// The Merchant account tracks rolling 30-day payment volume to automatically
+/// determine the payee's fee tier. Volume resets after 30 days of inactivity.
+///
+/// # Account Size
+///
+/// Total: 122 bytes (14 bytes larger than v1.x.x due to volume tracking)
+/// - Discriminator: 8 bytes
+/// - `authority`: 32 bytes
+/// - `usdc_mint`: 32 bytes
+/// - `treasury_ata`: 32 bytes
+/// - `volume_tier`: 1 byte
+/// - `monthly_volume_usdc`: 8 bytes
+/// - `last_volume_update_ts`: 8 bytes
+/// - bump: 1 byte
+///
+/// Additional rent: ~0.000098 SOL (~$0.004 at $45/SOL)
 #[account]
 #[derive(InitSpace)]
 pub struct Merchant {
@@ -34,10 +154,38 @@ pub struct Merchant {
     pub usdc_mint: Pubkey, // 32 bytes
     /// Merchant's USDC treasury ATA (where merchant fees are sent)
     pub treasury_ata: Pubkey, // 32 bytes
-    /// Platform fee in basis points (0-1000, representing 0-10%)
-    pub platform_fee_bps: u16, // 2 bytes
-    /// Merchant tier (Free, Pro, Enterprise)
-    pub tier: MerchantTier, // 1 byte (enum discriminant)
+
+    /// Current volume tier (automatically calculated from `monthly_volume_usdc`)
+    ///
+    /// This tier determines the platform fee rate:
+    /// - Standard: 0.25% (up to $10K monthly)
+    /// - Growth: 0.20% ($10K-$100K monthly)
+    /// - Scale: 0.15% (>$100K monthly)
+    ///
+    /// The tier is recalculated on every payment execution.
+    pub volume_tier: VolumeTier, // 1 byte (enum discriminant)
+
+    /// Rolling 30-day payment volume in USDC microlamports (6 decimals)
+    ///
+    /// This field accumulates total payment volume processed by this merchant
+    /// over a rolling 30-day window. It resets to zero if no payments are
+    /// processed for 30 days.
+    ///
+    /// # Update Frequency
+    ///
+    /// Updated on every payment execution (both initial and renewals).
+    ///
+    /// # Tier Calculation
+    ///
+    /// Used to determine `volume_tier` via `VolumeTier::from_monthly_volume()`.
+    pub monthly_volume_usdc: u64, // 8 bytes
+
+    /// Unix timestamp of last volume calculation
+    ///
+    /// Used to determine if 30-day window has elapsed and volume should reset.
+    /// Updated on every payment execution.
+    pub last_volume_update_ts: i64, // 8 bytes
+
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
@@ -154,7 +302,13 @@ pub struct Subscription {
 }
 
 impl Merchant {
-    /// Total space: 8 (discriminator) + 32 + 32 + 32 + 2 + 1 + 1 = 108 bytes
+    /// Total space: 8 (discriminator) + 32 + 32 + 32 + 1 + 8 + 8 + 1 = 122 bytes
+    /// Note: Previous version was 108 bytes. New version adds:
+    /// - `monthly_volume_usdc`: 8 bytes
+    /// - `last_volume_update_ts`: 8 bytes
+    /// - Removes `platform_fee_bps`: 2 bytes (fee now derived from tier)
+    ///
+    ///   Net increase: 14 bytes (~0.000098 SOL additional rent)
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 

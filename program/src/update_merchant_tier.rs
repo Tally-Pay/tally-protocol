@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 
-use crate::state::MerchantTier;
+use crate::state::VolumeTier;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct UpdateMerchantTierArgs {
-    pub new_tier: MerchantTier,
+    pub new_tier: VolumeTier,
 }
 
 #[derive(Accounts)]
@@ -40,31 +40,21 @@ pub fn handler(ctx: Context<UpdateMerchantTier>, args: UpdateMerchantTierArgs) -
     );
 
     // Store old tier for event
-    let old_tier = merchant.tier;
+    let old_tier = merchant.volume_tier;
 
-    // Calculate new fee based on tier
-    let new_fee_bps = args.new_tier.fee_bps();
+    // Validate new tier fee is within config bounds
+    args.new_tier.validate_fee()?;
 
-    // Validate fee is within config bounds
-    require!(
-        new_fee_bps >= config.min_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidConfiguration
-    );
-    require!(
-        new_fee_bps <= config.max_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidConfiguration
-    );
-
-    // Update merchant tier and fee
-    merchant.tier = args.new_tier;
-    merchant.platform_fee_bps = new_fee_bps;
+    // Update merchant tier (fee is derived from tier)
+    merchant.volume_tier = args.new_tier;
 
     // Emit event for audit trail
-    emit!(crate::events::MerchantTierChanged {
+    emit!(crate::events::VolumeTierUpgraded {
         merchant: merchant.key(),
         old_tier,
         new_tier: args.new_tier,
-        new_fee_bps,
+        monthly_volume_usdc: merchant.monthly_volume_usdc,
+        new_platform_fee_bps: args.new_tier.platform_fee_bps(),
     });
 
     Ok(())

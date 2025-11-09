@@ -127,7 +127,9 @@ pub struct MerchantInitialized {
     pub usdc_mint: Pubkey,
     /// Merchant's USDC treasury ATA
     pub treasury_ata: Pubkey,
-    /// Platform fee in basis points
+    /// Initial volume tier (always Standard for new merchants)
+    pub volume_tier: crate::state::VolumeTier,
+    /// Platform fee in basis points (derived from volume tier)
     pub platform_fee_bps: u16,
     /// Unix timestamp when merchant was initialized
     pub timestamp: i64,
@@ -285,25 +287,32 @@ pub struct ConfigUpdated {
     pub updated_by: Pubkey,
 }
 
-/// Event emitted when a merchant's tier is changed
+/// Event emitted when a merchant's volume tier is upgraded
 ///
-/// This event provides transparency and auditability for merchant tier changes.
-/// Tier changes immediately affect the platform fee rate applied to new renewals.
+/// Volume tiers upgrade automatically based on 30-day rolling payment volume.
+/// This event provides transparency and auditability for tier changes.
+///
+/// Tier upgrades immediately affect the platform fee rate applied to future payments:
+/// - Standard → Growth: $10K monthly volume reached (2.5% → 2.0% fee)
+/// - Growth → Scale: $100K monthly volume reached (2.0% → 1.5% fee)
+///
 /// Off-chain systems can monitor this event to:
-/// - Track merchant tier progression and revenue impact
-/// - Generate analytics on tier adoption patterns
-/// - Alert merchants of tier changes initiated by platform authority
-/// - Maintain audit trails for billing and compliance
+/// - Track merchant growth and volume progression
+/// - Generate analytics on tier adoption and revenue impact
+/// - Alert merchants of automatic tier upgrades
+/// - Maintain audit trails for fee calculations and billing
 #[event]
-pub struct MerchantTierChanged {
-    /// The merchant account whose tier changed
+pub struct VolumeTierUpgraded {
+    /// The merchant account whose tier upgraded
     pub merchant: Pubkey,
-    /// The previous tier before the change
-    pub old_tier: crate::state::MerchantTier,
-    /// The new tier after the change
-    pub new_tier: crate::state::MerchantTier,
+    /// The previous tier before the upgrade
+    pub old_tier: crate::state::VolumeTier,
+    /// The new tier after the upgrade
+    pub new_tier: crate::state::VolumeTier,
+    /// Current 30-day rolling volume that triggered the upgrade
+    pub monthly_volume_usdc: u64,
     /// The new platform fee in basis points corresponding to the new tier
-    pub new_fee_bps: u16,
+    pub new_platform_fee_bps: u16,
 }
 
 /// Event emitted when a plan's pricing or terms are updated

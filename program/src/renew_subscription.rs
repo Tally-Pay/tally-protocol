@@ -281,10 +281,10 @@ pub fn handler(ctx: Context<RenewSubscription>, _args: RenewSubscriptionArgs) ->
         .checked_sub(keeper_fee)
         .ok_or(SubscriptionError::ArithmeticError)?;
 
-    // Calculate platform fee from remaining amount
+    // Calculate platform fee from remaining amount (fee rate determined by merchant's volume tier)
     let platform_fee = u64::try_from(
         u128::from(remaining_after_keeper)
-            .checked_mul(u128::from(merchant.platform_fee_bps))
+            .checked_mul(u128::from(merchant.volume_tier.platform_fee_bps()))
             .ok_or(SubscriptionError::ArithmeticError)?
             .checked_div(FEE_BASIS_POINTS_DIVISOR)
             .ok_or(SubscriptionError::ArithmeticError)?,

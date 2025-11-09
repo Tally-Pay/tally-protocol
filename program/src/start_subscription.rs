@@ -304,10 +304,10 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     // Core protocol always processes initial payment on subscription start.
     // (Trial support is handled by subscription extension layer)
     {
-        // Calculate platform fee using checked arithmetic
+        // Calculate platform fee using checked arithmetic (fee rate determined by merchant's volume tier)
         let platform_fee = u64::try_from(
             u128::from(plan.price_usdc)
-                .checked_mul(u128::from(merchant.platform_fee_bps))
+                .checked_mul(u128::from(merchant.volume_tier.platform_fee_bps()))
                 .ok_or(SubscriptionError::ArithmeticError)?
                 .checked_div(FEE_BASIS_POINTS_DIVISOR)
                 .ok_or(SubscriptionError::ArithmeticError)?,
