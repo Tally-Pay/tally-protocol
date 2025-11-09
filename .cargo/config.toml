@@ -1,0 +1,21 @@
+# Project-specific Cargo configuration for tally-protocol
+# Prevents global config from interfering with workspace release optimizations
+
+[profile.release]
+# Don't override workspace release profile - let Cargo.toml handle it
+# The workspace config has specific BPF-optimized settings (opt-level="z", lto="fat")
+# that are critical for Solana program binary size
+
+[profile.dev]
+# Fast dev builds with some optimization
+opt-level = 1
+split-debuginfo = "unpacked"
+
+[env]
+# Force usage of system OpenSSL instead of compiling from source
+# This dramatically speeds up builds by avoiding vendored OpenSSL compilation
+OPENSSL_NO_VENDOR = "1"
+
+[target.x86_64-unknown-linux-gnu]
+# Inherit mold linker from global config for fast linking
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
