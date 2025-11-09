@@ -2,7 +2,7 @@ use crate::{errors::RecurringPaymentError, events::*, state::*};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Revoke, Token, TokenAccount};
 
-/// Arguments for canceling an active payment_agreement.
+/// Arguments for canceling an active `payment_agreement`.
 ///
 /// # Rate Limiting Considerations
 ///
@@ -12,7 +12,7 @@ use anchor_spl::token::{self, Revoke, Token, TokenAccount};
 ///
 /// ## Economic Deterrence
 /// - **Transaction Fee**: 0.000005 SOL (~$0.0007) per cancellation
-/// - **No Rent Refund**: PaymentAgreement account remains (can be reactivated)
+/// - **No Rent Refund**: `PaymentAgreement` account remains (can be reactivated)
 /// - **Total Cost**: ~$0.0007 per cancellation (cheapest operation)
 ///
 /// **Cancellation Spam Cost**: Repeatedly canceling subscriptions:
@@ -33,7 +33,7 @@ use anchor_spl::token::{self, Revoke, Token, TokenAccount};
 ///
 /// Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):
 /// - **Info Alert**: >10 cancellations per account per hour
-/// - **Pattern Alert**: Repeated cancel-reactivate cycles on same payment_agreement
+/// - **Pattern Alert**: Repeated cancel-reactivate cycles on same `payment_agreement`
 /// - **Volume Alert**: Unusual spike in system-wide cancellation rate
 ///
 /// Detection is primarily for **observability and abuse prevention**, not critical
@@ -52,7 +52,7 @@ use anchor_spl::token::{self, Revoke, Token, TokenAccount};
 /// **Attack**: User alternates between canceling and reactivating subscriptions.
 /// **Cost**: ~$0.002 per cycle (cancel + reactivate).
 /// **Impact**: Low - generates event noise but doesn't affect other users.
-/// **Detection**: Track payment_agreement state flip frequency.
+/// **Detection**: Track `payment_agreement` state flip frequency.
 /// **Mitigation**: Application-layer cooldown between state changes.
 ///
 /// ## Why No On-Chain Rate Limiting?

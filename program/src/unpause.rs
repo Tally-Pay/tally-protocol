@@ -26,7 +26,7 @@ pub struct Unpause<'info> {
 /// Handler for unpausing the program
 ///
 /// This disables the emergency pause mechanism, re-enabling all user-facing operations
-/// (`start_subscription`, `renew_subscription`, `create_plan`).
+/// (`start_agreement`, `execute_payment`, `create_payment_terms`).
 ///
 /// # Security
 /// - Only `platform_authority` can unpause the program

@@ -26,7 +26,7 @@ pub struct Pause<'info> {
 /// Handler for pausing the program
 ///
 /// This enables the emergency pause mechanism, disabling all user-facing operations
-/// (`start_subscription`, `renew_subscription`, `create_plan`) while allowing admin
+/// (`start_agreement`, `execute_payment`, `create_payment_terms`) while allowing admin
 /// operations to continue for emergency fund recovery.
 ///
 /// # Security

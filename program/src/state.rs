@@ -190,18 +190,18 @@ pub struct Payee {
     pub bump: u8, // 1 byte
 }
 
-/// PaymentTerms account defines payment schedule and amount for recurring payments
-/// PDA seeds: ["payment_terms", payee, `terms_id`]
+/// `PaymentTerms` account defines payment schedule and amount for recurring payments
+/// PDA seeds: ["`payment_terms`", payee, `terms_id`]
 ///
 /// # Account Size: 80 bytes
 /// - Discriminator: 8 bytes
 /// - payee: 32 bytes
-/// - terms_id: 32 bytes
-/// - amount_usdc: 8 bytes
-/// - period_secs: 8 bytes
+/// - `terms_id`: 32 bytes
+/// - `amount_usdc`: 8 bytes
+/// - `period_secs`: 8 bytes
 ///
 /// Reduced from 129 bytes in v1.x.x by removing subscription-specific fields:
-/// - grace_secs: 8 bytes (moved to subscription extension)
+/// - `grace_secs`: 8 bytes (moved to subscription extension)
 /// - name: 32 bytes (moved to off-chain indexer)
 /// - active: 1 byte (moved to subscription extension)
 #[account]
@@ -217,8 +217,8 @@ pub struct PaymentTerms {
     pub period_secs: u64, // 8 bytes
 }
 
-/// PaymentAgreement account tracks recurring payment relationship between payer and payee
-/// PDA seeds: ["payment_agreement", payment_terms, payer]
+/// `PaymentAgreement` account tracks recurring payment relationship between payer and payee
+/// PDA seeds: ["`payment_agreement`", `payment_terms`, payer]
 #[account]
 #[derive(InitSpace)]
 pub struct PaymentAgreement {
