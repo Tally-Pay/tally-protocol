@@ -35,7 +35,7 @@
 //! );
 //! require!(
 //!     ctx.accounts.program_delegate.key() == expected_delegate_pda,
-//!     SubscriptionError::BadSeeds
+//!     RecurringPaymentError::BadSeeds
 //! );
 //! ```
 //!

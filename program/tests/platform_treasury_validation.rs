@@ -26,7 +26,7 @@
 //! ```rust
 //! // Validate platform treasury is owned by platform authority
 //! if platform_treasury_data.owner != ctx.accounts.config.platform_authority {
-//!     return Err(SubscriptionError::Unauthorized.into());
+//!     return Err(RecurringPaymentError::Unauthorized.into());
 //! }
 //! ```
 //!
@@ -209,7 +209,7 @@ fn test_comprehensive_h2_attack_prevention() {
     let attacker = Pubkey::new_unique();
     let random_pubkey = Pubkey::new_unique();
 
-    // Attack vector 1: Merchant tries to redirect fees to own treasury
+    // Attack vector 1: Payee tries to redirect fees to own treasury
     let attack_merchant_owner = merchant_authority;
     assert_ne!(
         attack_merchant_owner, platform_authority,

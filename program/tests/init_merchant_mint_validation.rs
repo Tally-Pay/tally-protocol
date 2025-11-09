@@ -29,7 +29,7 @@
 //! // This prevents merchants from using fake or arbitrary tokens
 //! require!(
 //!     args.usdc_mint == ctx.accounts.config.allowed_mint,
-//!     crate::errors::SubscriptionError::WrongMint
+//!     crate::errors::RecurringPaymentError::WrongMint
 //! );
 //! ```
 //!
@@ -198,7 +198,7 @@ fn test_init_merchant_accepts_devnet_usdc() {
 /// merchants cannot bypass mint validation by providing invalid inputs
 /// that would trigger different errors.
 ///
-/// Edge case: Merchant provides wrong mint but otherwise valid inputs.
+/// Edge case: Payee provides wrong mint but otherwise valid inputs.
 /// The validation should return `WrongMint` error, not a different error.
 #[test]
 fn test_init_merchant_mint_validation_before_other_checks() {
@@ -413,7 +413,7 @@ fn test_error_code_is_wrong_mint() {
     // ```rust
     // require!(
     //     args.usdc_mint == ctx.accounts.config.allowed_mint,
-    //     crate::errors::SubscriptionError::WrongMint
+    //     crate::errors::RecurringPaymentError::WrongMint
     // );
     // ```
     //
@@ -425,8 +425,8 @@ fn test_error_code_is_wrong_mint() {
 
     // Verify the error constant exists by attempting to compile
     const _ERROR_CHECK: () = {
-        use tally_protocol::errors::SubscriptionError;
-        let _ = SubscriptionError::WrongMint;
+        use tally_protocol::errors::RecurringPaymentError;
+        let _ = RecurringPaymentError::WrongMint;
     };
 }
 

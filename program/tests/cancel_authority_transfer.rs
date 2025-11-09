@@ -28,7 +28,7 @@
 //!         mut,
 //!         seeds = [b"config"],
 //!         bump = config.bump,
-//!         has_one = platform_authority @ SubscriptionError::Unauthorized
+//!         has_one = platform_authority @ RecurringPaymentError::Unauthorized
 //!     )]
 //!     pub config: Account<'info, Config>,
 //!
@@ -58,7 +58,7 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     transaction::Transaction,
 };
-use subs::errors::SubscriptionError;
+use subs::errors::RecurringPaymentError;
 use subs::state::Config;
 use subs::{
     AcceptAuthorityArgs, CancelAuthorityTransferArgs, InitConfigArgs, TransferAuthorityArgs,
@@ -370,7 +370,7 @@ async fn test_cancel_authority_transfer_fails_no_pending_transfer() {
                 matches!(
                     inner,
                     solana_sdk::instruction::InstructionError::Custom(code)
-                    if code == SubscriptionError::NoPendingTransfer as u32 + anchor_lang::error::ERROR_CODE_OFFSET
+                    if code == RecurringPaymentError::NoPendingTransfer as u32 + anchor_lang::error::ERROR_CODE_OFFSET
                 ),
                 "Expected NoPendingTransfer error, got: {:?}",
                 inner
@@ -496,7 +496,7 @@ async fn test_cancel_authority_transfer_fails_unauthorized() {
                 matches!(
                     inner,
                     solana_sdk::instruction::InstructionError::Custom(code)
-                    if code == SubscriptionError::Unauthorized as u32 + anchor_lang::error::ERROR_CODE_OFFSET
+                    if code == RecurringPaymentError::Unauthorized as u32 + anchor_lang::error::ERROR_CODE_OFFSET
                 ),
                 "Expected Unauthorized error, got: {:?}",
                 inner
@@ -737,7 +737,7 @@ async fn test_pending_authority_cannot_cancel() {
                 matches!(
                     inner,
                     solana_sdk::instruction::InstructionError::Custom(code)
-                    if code == SubscriptionError::Unauthorized as u32 + anchor_lang::error::ERROR_CODE_OFFSET
+                    if code == RecurringPaymentError::Unauthorized as u32 + anchor_lang::error::ERROR_CODE_OFFSET
                 ),
                 "Expected Unauthorized error, got: {:?}",
                 inner

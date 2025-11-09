@@ -32,7 +32,7 @@
 //!     Pubkey::find_program_address(&[b"delegate", merchant.key().as_ref()], ctx.program_id);
 //! require!(
 //!     ctx.accounts.program_delegate.key() == expected_delegate_pda,
-//!     SubscriptionError::BadSeeds
+//!     RecurringPaymentError::BadSeeds
 //! );
 //!
 //! // Revoke delegate approval to prevent further renewals

@@ -24,7 +24,7 @@
 //!
 //! Error Code Details:
 //! - `InvalidConfiguration` (6027): Global configuration parameters are invalid or inconsistent
-//! - `InvalidPlan` (6006): Subscription plan configuration is invalid
+//! - `InvalidPlan` (6006): `PaymentAgreement` plan configuration is invalid
 //!
 //! The validation ensures:
 //! 1. Configuration parameter constraints are semantically distinct from plan constraints

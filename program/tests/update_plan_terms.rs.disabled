@@ -19,8 +19,8 @@
 
 use anchor_lang::prelude::*;
 use tally_protocol::constants::MAX_PLAN_PRICE_USDC;
-use tally_protocol::errors::SubscriptionError;
-use tally_protocol::state::Plan;
+use tally_protocol::errors::RecurringPaymentError;
+use tally_protocol::state::PaymentTerms;
 
 /// Test that merchant authority validation works correctly
 #[test]
@@ -212,10 +212,10 @@ fn test_plan_state_multiple_updates() {
     name[..9].copy_from_slice(b"Test Plan");
 
     // Create initial plan state
-    let mut plan = Plan {
+    let mut plan = PaymentTerms {
         merchant,
         plan_id,
-        price_usdc: 5_000_000,
+        amount_usdc: 5_000_000,
         period_secs: 2_592_000,
         grace_secs: 259_200,
         name,
@@ -223,12 +223,12 @@ fn test_plan_state_multiple_updates() {
     };
 
     // Record old values
-    let old_price = plan.price_usdc;
+    let old_price = plan.amount_usdc;
     let old_period = plan.period_secs;
     let old_grace = plan.grace_secs;
 
     // Simulate multiple field updates
-    plan.price_usdc = 10_000_000; // Update price
+    plan.amount_usdc = 10_000_000; // Update price
     plan.period_secs = 5_184_000; // Update period
     plan.grace_secs = 518_400; // Update grace
 
@@ -237,14 +237,14 @@ fn test_plan_state_multiple_updates() {
     plan.name = new_name; // Update name
 
     // Verify updates
-    assert_ne!(plan.price_usdc, old_price, "Price should change");
+    assert_ne!(plan.amount_usdc, old_price, "Price should change");
     assert_ne!(plan.period_secs, old_period, "Period should change");
     assert_ne!(plan.grace_secs, old_grace, "Grace should change");
     assert_ne!(plan.name, name, "Name should change");
 
     // Verify immutable fields
-    assert_eq!(plan.merchant, merchant, "Merchant should not change");
-    assert_eq!(plan.plan_id, plan_id, "Plan ID should not change");
+    assert_eq!(plan.payee, merchant, "Merchant should not change");
+    assert_eq!(plan.terms_id, plan_id, "Plan ID should not change");
 }
 
 /// Test that at least one field must be updated
@@ -352,7 +352,7 @@ fn test_grace_period_decrease() {
 /// Test unauthorized error code
 #[test]
 fn test_unauthorized_error_code() {
-    let error = SubscriptionError::Unauthorized;
+    let error = RecurringPaymentError::Unauthorized;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -365,7 +365,7 @@ fn test_unauthorized_error_code() {
 /// Test invalid plan error code
 #[test]
 fn test_invalid_plan_error_code() {
-    let error = SubscriptionError::InvalidPlan;
+    let error = RecurringPaymentError::InvalidPaymentTerms;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -378,7 +378,7 @@ fn test_invalid_plan_error_code() {
 /// Test arithmetic error code
 #[test]
 fn test_arithmetic_error_code() {
-    let error = SubscriptionError::ArithmeticError;
+    let error = RecurringPaymentError::ArithmeticError;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -489,10 +489,10 @@ fn test_simultaneous_all_fields_update() {
     let mut old_name = [0u8; 32];
     old_name[..8].copy_from_slice(b"Old Plan");
 
-    let mut plan = Plan {
+    let mut plan = PaymentTerms {
         merchant,
         plan_id,
-        price_usdc: 5_000_000,
+        amount_usdc: 5_000_000,
         period_secs: 2_592_000,
         grace_secs: 259_200,
         name: old_name,
@@ -500,7 +500,7 @@ fn test_simultaneous_all_fields_update() {
     };
 
     // Update all mutable fields
-    plan.price_usdc = 10_000_000;
+    plan.amount_usdc = 10_000_000;
     plan.period_secs = 5_184_000;
     plan.grace_secs = 518_400;
 
@@ -509,7 +509,7 @@ fn test_simultaneous_all_fields_update() {
     plan.name = new_name;
 
     // Verify all updates
-    assert_eq!(plan.price_usdc, 10_000_000, "Price should be updated");
+    assert_eq!(plan.amount_usdc, 10_000_000, "Price should be updated");
     assert_eq!(plan.period_secs, 5_184_000, "Period should be updated");
     assert_eq!(plan.grace_secs, 518_400, "Grace should be updated");
     assert_eq!(plan.name, new_name, "Name should be updated");

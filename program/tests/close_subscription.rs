@@ -27,8 +27,8 @@
 //!         mut,
 //!         seeds = [b"subscription", subscription.plan.as_ref(), subscriber.key().as_ref()],
 //!         bump = subscription.bump,
-//!         has_one = subscriber @ SubscriptionError::Unauthorized,
-//!         constraint = !subscription.active @ SubscriptionError::AlreadyActive,
+//!         has_one = subscriber @ RecurringPaymentError::Unauthorized,
+//!         constraint = !subscription.active @ RecurringPaymentError::AlreadyActive,
 //!         close = subscriber
 //!     )]
 //!     pub subscription: Account<'info, Subscription>,
@@ -508,7 +508,7 @@ fn test_comprehensive_m1_closure_validation() {
     let subscriber = Pubkey::new_unique();
     let attacker = Pubkey::new_unique();
 
-    // Validation 1: Subscription must be inactive
+    // Validation 1: PaymentAgreement must be inactive
     let active_subscription = true;
     let can_close_active = !active_subscription;
     assert!(

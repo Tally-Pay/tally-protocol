@@ -20,7 +20,7 @@
 //! // This prevents accidental or malicious drainage of entire treasury
 //! require!(
 //!     args.amount <= ctx.accounts.config.max_withdrawal_amount,
-//!     SubscriptionError::WithdrawLimitExceeded
+//!     RecurringPaymentError::WithdrawLimitExceeded
 //! );
 //! ```
 //!
@@ -33,7 +33,7 @@
 //! Note: These are unit tests that validate the business logic.
 //! Full end-to-end integration tests should be run with `anchor test`.
 
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 /// Test that withdrawal at maximum limit passes validation
 ///
@@ -262,7 +262,7 @@ fn test_validation_logic_consistency() {
 /// and can be converted to an Anchor error.
 #[test]
 fn test_withdraw_limit_exceeded_error_code() {
-    let error = SubscriptionError::WithdrawLimitExceeded;
+    let error = RecurringPaymentError::WithdrawLimitExceeded;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error

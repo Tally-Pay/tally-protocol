@@ -13,8 +13,8 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_protocol::errors::SubscriptionError;
-use tally_protocol::state::Plan;
+use tally_protocol::errors::RecurringPaymentError;
+use tally_protocol::state::PaymentTerms;
 
 /// Test that merchant authority matches correctly
 #[test]
@@ -69,10 +69,10 @@ fn test_plan_state_immutability() {
     name[..9].copy_from_slice(b"Test Plan");
 
     // Create initial plan state
-    let mut plan = Plan {
+    let mut plan = PaymentTerms {
         merchant,
         plan_id,
-        price_usdc: 5_000_000,
+        amount_usdc: 5_000_000,
         period_secs: 2_592_000,
         grace_secs: 259_200,
         name,
@@ -80,26 +80,26 @@ fn test_plan_state_immutability() {
     };
 
     // Record immutable fields
-    let price_before = plan.price_usdc;
+    let price_before = plan.amount_usdc;
     let period_before = plan.period_secs;
     let grace_before = plan.grace_secs;
     let name_before = plan.name;
-    let plan_id_before = plan.plan_id;
-    let merchant_before = plan.merchant;
+    let plan_id_before = plan.terms_id;
+    let merchant_before = plan.payee;
 
     // Simulate update_plan: only active field changes
     plan.active = false;
 
     // Verify immutable fields unchanged
-    assert_eq!(plan.price_usdc, price_before, "Price should not change");
+    assert_eq!(plan.amount_usdc, price_before, "Price should not change");
     assert_eq!(plan.period_secs, period_before, "Period should not change");
     assert_eq!(
         plan.grace_secs, grace_before,
         "Grace period should not change"
     );
     assert_eq!(plan.name, name_before, "Name should not change");
-    assert_eq!(plan.plan_id, plan_id_before, "Plan ID should not change");
-    assert_eq!(plan.merchant, merchant_before, "Merchant should not change");
+    assert_eq!(plan.terms_id, plan_id_before, "Plan ID should not change");
+    assert_eq!(plan.payee, merchant_before, "Merchant should not change");
 
     // Verify active field changed
     assert!(!plan.active, "Active status should change");
@@ -108,7 +108,7 @@ fn test_plan_state_immutability() {
 /// Test unauthorized error code
 #[test]
 fn test_unauthorized_error_code() {
-    let error = SubscriptionError::Unauthorized;
+    let error = RecurringPaymentError::Unauthorized;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -271,10 +271,10 @@ fn test_plan_status_transitions() {
     let plan_id = [0u8; 32];
     let name = [0u8; 32];
 
-    let mut plan = Plan {
+    let mut plan = PaymentTerms {
         merchant,
         plan_id,
-        price_usdc: 5_000_000,
+        amount_usdc: 5_000_000,
         period_secs: 2_592_000,
         grace_secs: 259_200,
         name,

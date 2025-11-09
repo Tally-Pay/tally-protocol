@@ -20,13 +20,13 @@
 //! - Potential overflow in downstream calculations involving plan prices
 //!
 //! The M-5 fix implements a maximum price limit of 1 million USDC:
-//! `require!(price_usdc <= MAX_PLAN_PRICE_USDC, SubscriptionError::InvalidPlan)`
+//! `require!(price_usdc <= MAX_PLAN_PRICE_USDC, RecurringPaymentError::InvalidPaymentTerms)`
 //!
 //! This provides a reasonable ceiling for legitimate subscription services while
 //! blocking extreme values that enable malicious behavior.
 
 use tally_protocol::constants::MAX_PLAN_PRICE_USDC;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 // ============================================================================
 // Constants for Testing
@@ -42,7 +42,7 @@ const ONE_USDC: u64 = 1_000_000; // 1 USDC with 6 decimals
 ///
 /// Validates the upper boundary where price equals the maximum allowed limit.
 ///
-/// Example: Plan priced at exactly 1 million USDC
+/// Example: `PaymentTerms` priced at exactly 1 million USDC
 #[test]
 fn test_price_at_maximum_limit_passes() {
     let price_usdc = MAX_PLAN_PRICE_USDC; // Exactly 1 million USDC
@@ -60,7 +60,7 @@ fn test_price_at_maximum_limit_passes() {
 ///
 /// Validates that even 1 microlamport over the limit is rejected.
 ///
-/// Example: Plan priced at 1 million USDC + 1 microlamport
+/// Example: `PaymentTerms` priced at 1 million USDC + 1 microlamport
 #[test]
 fn test_price_exceeds_maximum_by_one_fails() {
     let price_usdc = MAX_PLAN_PRICE_USDC + 1; // 1 million USDC + 1 microlamport
@@ -78,7 +78,7 @@ fn test_price_exceeds_maximum_by_one_fails() {
 ///
 /// Validates that prices below the limit are accepted.
 ///
-/// Example: Plan priced at 1 million USDC - 1 microlamport
+/// Example: `PaymentTerms` priced at 1 million USDC - 1 microlamport
 #[test]
 fn test_price_below_maximum_by_one_passes() {
     let price_usdc = MAX_PLAN_PRICE_USDC - 1; // 999,999.999999 USDC
@@ -96,7 +96,7 @@ fn test_price_below_maximum_by_one_passes() {
 ///
 /// Validates a common high-value price point.
 ///
-/// Example: Plan priced at 500,000 USDC
+/// Example: `PaymentTerms` priced at 500,000 USDC
 #[test]
 fn test_price_at_half_maximum_passes() {
     let price_usdc = MAX_PLAN_PRICE_USDC / 2; // 500,000 USDC
@@ -338,13 +338,13 @@ fn test_invalid_plan_error_for_price_limit_violation() {
     let validation_passes = price_usdc > 0 && price_usdc <= MAX_PLAN_PRICE_USDC;
 
     if !validation_passes {
-        let error = SubscriptionError::InvalidPlan;
+        let error = RecurringPaymentError::InvalidPaymentTerms;
         let anchor_error: anchor_lang::error::Error = error.into();
 
         if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
             assert_eq!(
-                anchor_err.error_code_number, 6006,
-                "Should return InvalidPlan (6006) when price exceeds maximum limit"
+                anchor_err.error_code_number, 6005,
+                "Should return InvalidPaymentTerms (6005) when price exceeds maximum limit"
             );
         }
     }
@@ -524,13 +524,13 @@ fn test_m5_fix_completeness() {
 
     // 5. Validate error handling
     if !(over_limit > 0 && over_limit <= MAX_PLAN_PRICE_USDC) {
-        let error = SubscriptionError::InvalidPlan;
+        let error = RecurringPaymentError::InvalidPaymentTerms;
         let anchor_error: anchor_lang::error::Error = error.into();
 
         if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
             assert_eq!(
-                anchor_err.error_code_number, 6006,
-                "M-5: Returns correct error code (InvalidPlan 6006)"
+                anchor_err.error_code_number, 6005,
+                "M-5: Returns correct error code (InvalidPaymentTerms 6005)"
             );
         }
     }

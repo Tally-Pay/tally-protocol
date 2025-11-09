@@ -29,7 +29,7 @@
 //! let plan_account_info = ctx.accounts.plan.to_account_info();
 //! require!(
 //!     plan_account_info.data_is_empty(),
-//!     SubscriptionError::PlanAlreadyExists
+//!     RecurringPaymentError::AlreadyExists
 //! );
 //! ```
 //!
@@ -37,7 +37,7 @@
 //! Full end-to-end integration tests with actual account creation should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 // ============================================================================
 // PlanAlreadyExists Error Tests (Error Code 6026)
@@ -49,7 +49,7 @@ use tally_protocol::errors::SubscriptionError;
 /// which is required for Anchor's error handling system.
 #[test]
 fn test_plan_already_exists_error_conversion() {
-    let error = SubscriptionError::PlanAlreadyExists;
+    let error = RecurringPaymentError::AlreadyExists;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -66,11 +66,11 @@ fn test_plan_already_exists_error_conversion() {
 ///
 /// Error code calculation:
 /// - Base: 6000 (Anchor's custom error start)
-/// - Index: 26 (0-indexed position of `PlanAlreadyExists` in `SubscriptionError` enum)
+/// - Index: 26 (0-indexed position of `PlanAlreadyExists` in `RecurringPaymentError` enum)
 /// - Result: 6000 + 26 = 6026
 #[test]
 fn test_plan_already_exists_error_number() {
-    let error = SubscriptionError::PlanAlreadyExists;
+    let error = RecurringPaymentError::AlreadyExists;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -89,7 +89,7 @@ fn test_plan_already_exists_error_number() {
 /// for developers and users to understand what went wrong.
 #[test]
 fn test_plan_already_exists_error_message() {
-    let error = SubscriptionError::PlanAlreadyExists;
+    let error = RecurringPaymentError::AlreadyExists;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -307,9 +307,9 @@ fn test_plan_uniqueness_per_merchant_scope() {
 /// other errors in the enum, particularly from related errors.
 #[test]
 fn test_error_code_uniqueness() {
-    let plan_already_exists = SubscriptionError::PlanAlreadyExists;
-    let invalid_plan = SubscriptionError::InvalidPlan;
-    let plan_not_found = SubscriptionError::PlanNotFound;
+    let plan_already_exists = RecurringPaymentError::AlreadyExists;
+    let invalid_plan = RecurringPaymentError::InvalidPaymentTerms;
+    let plan_not_found = RecurringPaymentError::PaymentTermsNotFound;
 
     let error_6026: anchor_lang::error::Error = plan_already_exists.into();
     let error_6006: anchor_lang::error::Error = invalid_plan.into();
@@ -349,7 +349,7 @@ fn test_error_code_uniqueness() {
 /// 3. How to fix it (use different plan ID)
 #[test]
 fn test_error_message_provides_clear_guidance() {
-    let error = SubscriptionError::PlanAlreadyExists;
+    let error = RecurringPaymentError::AlreadyExists;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -395,7 +395,7 @@ fn test_security_impact_duplicate_prevention() {
 
     // With I-2 fix: Only one plan per (merchant, plan_id) tuple allowed
 
-    // Scenario: Merchant tries to create conflicting plans
+    // Scenario: Payee tries to create conflicting plans
     let original_plan = (true, "premium-monthly", 1000u64); // (data_empty, plan_id, price)
     let duplicate_plan = (false, "premium-monthly", 2000u64); // Different price, same plan_id
 
@@ -457,7 +457,7 @@ fn test_account_state_transition() {
 /// 5. Security guarantees
 #[test]
 fn test_i2_fix_completeness() {
-    let error = SubscriptionError::PlanAlreadyExists;
+    let error = RecurringPaymentError::AlreadyExists;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // 1. Verify error code definition
@@ -574,7 +574,7 @@ fn test_error_propagation() {
     // Simulate validation function that returns Result with Anchor error
     fn validate_account_data(data_is_empty: bool) -> Result<()> {
         if !data_is_empty {
-            return Err(SubscriptionError::PlanAlreadyExists.into());
+            return Err(RecurringPaymentError::AlreadyExists.into());
         }
         Ok(())
     }

@@ -24,15 +24,15 @@
 //! let allowance_periods_u64 = u64::from(allowance_periods);
 //! require!(
 //!     allowance_periods_u64 > 0
-//!         && plan.price_usdc <= u64::MAX / allowance_periods_u64,
-//!     SubscriptionError::InvalidPlan
+//!         && plan.amount_usdc <= u64::MAX / allowance_periods_u64,
+//!     RecurringPaymentError::InvalidPaymentTerms
 //! );
 //!
 //! // Validate delegate allowance
 //! let required_allowance = plan
-//!     .price_usdc
+//!     .amount_usdc
 //!     .checked_mul(allowance_periods_u64)
-//!     .ok_or(SubscriptionError::ArithmeticError)?;
+//!     .ok_or(RecurringPaymentError::ArithmeticError)?;
 //! ```
 //!
 //! The pre-validation check (`price_usdc` <= `u64::MAX` / `allowance_periods_u64`) ensures

@@ -1,15 +1,15 @@
 //! Unit tests for error code semantics and validation
 //!
-//! This test suite validates error codes 6024 (`InvalidTransferTarget`) and 6025 (`InvalidAmount`)
+//! This test suite validates error codes 6023 (`InvalidTransferTarget`) and 6024 (`InvalidAmount`)
 //! added to fix issue I-1 from the security audit.
 //!
 //! Test coverage:
-//! - `InvalidTransferTarget` (6024):
+//! - `InvalidTransferTarget` (6023):
 //!   - Error conversion to Anchor error
 //!   - Error number validation
 //!   - Error message validation
 //!   - Authority transfer validation logic (same authority check)
-//! - `InvalidAmount` (6025):
+//! - `InvalidAmount` (6024):
 //!   - Error conversion to Anchor error
 //!   - Error number validation
 //!   - Error message validation
@@ -25,10 +25,10 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 // ============================================================================
-// InvalidTransferTarget Error Tests (Error Code 6024)
+// InvalidTransferTarget Error Tests (Error Code 6023)
 // ============================================================================
 
 /// Test that `InvalidTransferTarget` error can be converted to Anchor error
@@ -37,7 +37,7 @@ use tally_protocol::errors::SubscriptionError;
 /// which is required for Anchor's error handling system.
 #[test]
 fn test_invalid_transfer_target_error_conversion() {
-    let error = SubscriptionError::InvalidTransferTarget;
+    let error = RecurringPaymentError::InvalidTransferTarget;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -47,21 +47,21 @@ fn test_invalid_transfer_target_error_conversion() {
     ));
 }
 
-/// Test `InvalidTransferTarget` error number is 6024
+/// Test `InvalidTransferTarget` error number is 6023
 ///
 /// Validates that the error code is assigned the expected value by Anchor.
 /// This is critical for client-side error handling and debugging.
 #[test]
 fn test_invalid_transfer_target_error_number() {
-    let error = SubscriptionError::InvalidTransferTarget;
+    let error = RecurringPaymentError::InvalidTransferTarget;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
-        // Error code 6024 is the 25th error (starting from 6000)
+        // Error code 6023 is the 25th error (starting from 6000)
         // InvalidTransferTarget is at index 24 (0-indexed)
         assert_eq!(
-            anchor_err.error_code_number, 6024,
-            "InvalidTransferTarget should have error code 6024"
+            anchor_err.error_code_number, 6023,
+            "InvalidTransferTarget should have error code 6023"
         );
     } else {
         panic!("Expected AnchorError variant");
@@ -73,7 +73,7 @@ fn test_invalid_transfer_target_error_number() {
 /// Validates that the error message is clear and actionable for users.
 #[test]
 fn test_invalid_transfer_target_error_message() {
-    let error = SubscriptionError::InvalidTransferTarget;
+    let error = RecurringPaymentError::InvalidTransferTarget;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -154,7 +154,7 @@ fn test_authority_transfer_validation_matrix() {
 }
 
 // ============================================================================
-// InvalidAmount Error Tests (Error Code 6025)
+// InvalidAmount Error Tests (Error Code 6024)
 // ============================================================================
 
 /// Test that `InvalidAmount` error can be converted to Anchor error
@@ -163,7 +163,7 @@ fn test_authority_transfer_validation_matrix() {
 /// which is required for Anchor's error handling system.
 #[test]
 fn test_invalid_amount_error_conversion() {
-    let error = SubscriptionError::InvalidAmount;
+    let error = RecurringPaymentError::InvalidAmount;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error
@@ -173,21 +173,21 @@ fn test_invalid_amount_error_conversion() {
     ));
 }
 
-/// Test `InvalidAmount` error number is 6025
+/// Test `InvalidAmount` error number is 6024
 ///
 /// Validates that the error code is assigned the expected value by Anchor.
 /// This is critical for client-side error handling and debugging.
 #[test]
 fn test_invalid_amount_error_number() {
-    let error = SubscriptionError::InvalidAmount;
+    let error = RecurringPaymentError::InvalidAmount;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
-        // Error code 6025 is the 26th error (starting from 6000)
+        // Error code 6024 is the 26th error (starting from 6000)
         // InvalidAmount is at index 25 (0-indexed)
         assert_eq!(
-            anchor_err.error_code_number, 6025,
-            "InvalidAmount should have error code 6025"
+            anchor_err.error_code_number, 6024,
+            "InvalidAmount should have error code 6024"
         );
     } else {
         panic!("Expected AnchorError variant");
@@ -199,7 +199,7 @@ fn test_invalid_amount_error_number() {
 /// Validates that the error message is clear and actionable for users.
 #[test]
 fn test_invalid_amount_error_message() {
-    let error = SubscriptionError::InvalidAmount;
+    let error = RecurringPaymentError::InvalidAmount;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -382,8 +382,8 @@ fn test_amount_validation_prevents_abuse() {
 /// Validates that `InvalidTransferTarget` and `InvalidAmount` have distinct error codes.
 #[test]
 fn test_error_codes_are_unique() {
-    let error_1 = SubscriptionError::InvalidTransferTarget;
-    let error_2 = SubscriptionError::InvalidAmount;
+    let error_1 = RecurringPaymentError::InvalidTransferTarget;
+    let error_2 = RecurringPaymentError::InvalidAmount;
 
     let anchor_error_1: anchor_lang::error::Error = error_1.into();
     let anchor_error_2: anchor_lang::error::Error = error_2.into();
@@ -395,12 +395,12 @@ fn test_error_codes_are_unique() {
     {
         assert_ne!(
             err1.error_code_number, err2.error_code_number,
-            "Error codes should be unique: InvalidTransferTarget (6024) != InvalidAmount (6025)"
+            "Error codes should be unique: InvalidTransferTarget (6023) != InvalidAmount (6024)"
         );
 
         // Explicitly verify the expected codes
-        assert_eq!(err1.error_code_number, 6024);
-        assert_eq!(err2.error_code_number, 6025);
+        assert_eq!(err1.error_code_number, 6023);
+        assert_eq!(err2.error_code_number, 6024);
     } else {
         panic!("Expected AnchorError variants");
     }
@@ -411,8 +411,8 @@ fn test_error_codes_are_unique() {
 /// Validates that error messages are unique and descriptive.
 #[test]
 fn test_error_messages_are_distinct() {
-    let error_1 = SubscriptionError::InvalidTransferTarget;
-    let error_2 = SubscriptionError::InvalidAmount;
+    let error_1 = RecurringPaymentError::InvalidTransferTarget;
+    let error_2 = RecurringPaymentError::InvalidAmount;
 
     let anchor_error_1: anchor_lang::error::Error = error_1.into();
     let anchor_error_2: anchor_lang::error::Error = error_2.into();
@@ -436,22 +436,22 @@ fn test_error_messages_are_distinct() {
 /// Validates that the new error codes follow the expected sequence after 6023.
 #[test]
 fn test_error_code_sequence() {
-    let error_6024 = SubscriptionError::InvalidTransferTarget;
-    let error_6025 = SubscriptionError::InvalidAmount;
+    let error_6023 = RecurringPaymentError::InvalidTransferTarget;
+    let error_6024 = RecurringPaymentError::InvalidAmount;
 
+    let anchor_error_6023: anchor_lang::error::Error = error_6023.into();
     let anchor_error_6024: anchor_lang::error::Error = error_6024.into();
-    let anchor_error_6025: anchor_lang::error::Error = error_6025.into();
 
     if let (
+        anchor_lang::error::Error::AnchorError(err_6023),
         anchor_lang::error::Error::AnchorError(err_6024),
-        anchor_lang::error::Error::AnchorError(err_6025),
-    ) = (anchor_error_6024, anchor_error_6025)
+    ) = (anchor_error_6023, anchor_error_6024)
     {
         // Verify sequential numbering
         assert_eq!(
-            err_6025.error_code_number,
-            err_6024.error_code_number + 1,
-            "Error codes should be sequential: 6025 = 6024 + 1"
+            err_6024.error_code_number,
+            err_6023.error_code_number + 1,
+            "Error codes should be sequential: 6024 = 6023 + 1"
         );
     } else {
         panic!("Expected AnchorError variants");

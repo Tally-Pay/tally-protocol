@@ -26,7 +26,7 @@
 //! );
 //!
 //! if ctx.accounts.platform_treasury_ata.key() != expected_platform_ata {
-//!     return Err(SubscriptionError::Unauthorized.into());
+//!     return Err(RecurringPaymentError::Unauthorized.into());
 //! }
 //! ```
 //!
@@ -36,7 +36,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
 use std::str::FromStr;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 use tally_protocol::state::Config;
 
 /// Test that platform authority matches correctly
@@ -258,7 +258,7 @@ fn test_config_pda_uniqueness() {
 /// to an Anchor error and matches expected error handling.
 #[test]
 fn test_unauthorized_error_code() {
-    let error = SubscriptionError::Unauthorized;
+    let error = RecurringPaymentError::Unauthorized;
     let anchor_error: anchor_lang::error::Error = error.into();
 
     // Verify error can be converted to Anchor error

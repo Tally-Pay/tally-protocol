@@ -27,7 +27,7 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 /// Test that `keeper_fee_bps` can be updated with valid value
 #[test]
@@ -427,19 +427,19 @@ fn test_update_both_fee_bounds_together() {
 /// Test that error code for unauthorized update is correct
 #[test]
 fn test_unauthorized_error_code() {
-    // The handler uses SubscriptionError::Unauthorized for auth checks
-    let error = SubscriptionError::Unauthorized;
+    // The handler uses RecurringPaymentError::Unauthorized for auth checks
+    let error = RecurringPaymentError::Unauthorized;
 
     // Convert to anchor Error first, then to ProgramError
     let anchor_error: anchor_lang::error::Error = error.into();
     let program_error: ProgramError = anchor_error.into();
 
-    // SubscriptionError::Unauthorized is error code 6010
+    // RecurringPaymentError::Unauthorized is error code 6009
     match program_error {
         ProgramError::Custom(code) => {
             assert_eq!(
-                code, 6010,
-                "Unauthorized error should be custom error code 6010"
+                code, 6009,
+                "Unauthorized error should be custom error code 6009"
             );
         }
         _ => panic!("Expected custom error code"),
@@ -449,19 +449,19 @@ fn test_unauthorized_error_code() {
 /// Test that error code for invalid configuration is correct
 #[test]
 fn test_invalid_configuration_error_code() {
-    // The handler uses SubscriptionError::InvalidConfiguration for validation failures
-    let error = SubscriptionError::InvalidConfiguration;
+    // The handler uses RecurringPaymentError::InvalidConfiguration for validation failures
+    let error = RecurringPaymentError::InvalidConfiguration;
 
     // Convert to anchor Error first, then to ProgramError
     let anchor_error: anchor_lang::error::Error = error.into();
     let program_error: ProgramError = anchor_error.into();
 
-    // SubscriptionError::InvalidConfiguration is error code 6027
+    // RecurringPaymentError::InvalidConfiguration is error code 6026
     match program_error {
         ProgramError::Custom(code) => {
             assert_eq!(
-                code, 6027,
-                "InvalidConfiguration error should be custom error code 6027"
+                code, 6026,
+                "InvalidConfiguration error should be custom error code 6026"
             );
         }
         _ => panic!("Expected custom error code"),

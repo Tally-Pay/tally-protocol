@@ -33,14 +33,14 @@
 //! ```rust
 //! // Prevent double-renewal attack: ensure sufficient time has passed since last renewal
 //! let period_i64 = i64::try_from(plan.period_secs)
-//!     .map_err(|_| SubscriptionError::ArithmeticError)?;
+//!     .map_err(|_| RecurringPaymentError::ArithmeticError)?;
 //! let min_next_renewal_time = subscription
 //!     .last_renewed_ts
 //!     .checked_add(period_i64)
-//!     .ok_or(SubscriptionError::ArithmeticError)?;
+//!     .ok_or(RecurringPaymentError::ArithmeticError)?;
 //!
 //! if current_time < min_next_renewal_time {  // Changed from '<=' to '<'
-//!     return Err(SubscriptionError::NotDue.into());
+//!     return Err(RecurringPaymentError::NotDue.into());
 //! }
 //! ```
 //!

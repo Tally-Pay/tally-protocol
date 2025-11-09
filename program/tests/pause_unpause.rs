@@ -23,7 +23,7 @@
 //! #[account(
 //!     seeds = [b"config"],
 //!     bump = config.bump,
-//!     constraint = !config.paused @ SubscriptionError::Inactive
+//!     constraint = !config.paused @ RecurringPaymentError::Inactive
 //! )]
 //! pub config: Account<'info, Config>,
 //! ```
@@ -32,7 +32,7 @@
 //! Full end-to-end integration tests should be run with `anchor test`.
 
 use anchor_lang::prelude::*;
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 /// Test that Config paused field defaults to false on initialization
 #[test]
@@ -164,21 +164,21 @@ fn test_pause_unpause_multiple_cycles() {
 /// Test that the error code for paused operations is Inactive
 #[test]
 fn test_paused_error_code_is_inactive() {
-    // The pause constraint uses SubscriptionError::Inactive
+    // The pause constraint uses RecurringPaymentError::Inactive
     // This test validates that the error code exists and can be referenced
-    let error = SubscriptionError::Inactive;
+    let error = RecurringPaymentError::Inactive;
 
     // Convert to anchor Error first, then to ProgramError
     let anchor_error: anchor_lang::error::Error = error.into();
     let program_error: ProgramError = anchor_error.into();
 
     // Anchor error codes start at 6000, so we expect a custom error
-    // SubscriptionError::Inactive is error code 6003
+    // RecurringPaymentError::Inactive is error code 6002
     match program_error {
         ProgramError::Custom(code) => {
             assert_eq!(
-                code, 6003,
-                "Inactive error should be custom error code 6003"
+                code, 6002,
+                "Inactive error should be custom error code 6002"
             );
         }
         _ => panic!("Expected custom error code"),
@@ -246,7 +246,7 @@ fn test_pause_state_bool_values() {
 /// Test that pause check constraint logic is correct
 #[test]
 fn test_pause_constraint_logic() {
-    // Constraint: !config.paused @ SubscriptionError::Inactive
+    // Constraint: !config.paused @ RecurringPaymentError::Inactive
     // Means: operation allowed when paused is false
 
     // When paused = false, constraint passes

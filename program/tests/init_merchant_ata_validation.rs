@@ -38,7 +38,7 @@
 //! );
 //! require!(
 //!     ctx.accounts.treasury_ata.key() == expected_treasury_ata,
-//!     crate::errors::SubscriptionError::BadSeeds
+//!     crate::errors::RecurringPaymentError::BadSeeds
 //! );
 //! ```
 //!
@@ -215,7 +215,7 @@ fn test_error_code_is_bad_seeds() {
     // ```rust
     // require!(
     //     ctx.accounts.treasury_ata.key() == expected_treasury_ata,
-    //     crate::errors::SubscriptionError::BadSeeds
+    //     crate::errors::RecurringPaymentError::BadSeeds
     // );
     // ```
     //
@@ -227,8 +227,8 @@ fn test_error_code_is_bad_seeds() {
 
     // Verify the error constant exists by attempting to compile
     const _ERROR_CHECK: () = {
-        use tally_protocol::errors::SubscriptionError;
-        let _ = SubscriptionError::BadSeeds;
+        use tally_protocol::errors::RecurringPaymentError;
+        let _ = RecurringPaymentError::BadSeeds;
     };
 }
 

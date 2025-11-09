@@ -26,16 +26,16 @@
 //!
 //! if is_reactivation {
 //!     // Security check: Prevent reactivation if already active
-//!     require!(!subscription.active, SubscriptionError::AlreadyActive);
+//!     require!(!subscription.active, RecurringPaymentError::AlreadyActive);
 //!
 //!     // Security check: Ensure plan and subscriber match (prevent account hijacking)
 //!     require!(
 //!         subscription.plan == plan.key(),
-//!         SubscriptionError::Unauthorized
+//!         RecurringPaymentError::Unauthorized
 //!     );
 //!     require!(
 //!         subscription.subscriber == ctx.accounts.subscriber.key(),
-//!         SubscriptionError::Unauthorized
+//!         RecurringPaymentError::Unauthorized
 //!     );
 //! }
 //! // ... (later in handler)
@@ -43,7 +43,7 @@
 //!     // REACTIVATION: Preserve historical data, reset operational fields
 //!     subscription.active = true;
 //!     subscription.next_renewal_ts = next_renewal_ts;
-//!     subscription.last_amount = plan.price_usdc;
+//!     subscription.last_amount = plan.amount_usdc;
 //!     subscription.last_renewed_ts = current_time;
 //! } else {
 //!     // NEW SUBSCRIPTION: Initialize all fields
@@ -53,7 +53,7 @@
 //!     subscription.active = true;
 //!     subscription.renewals = 0;
 //!     subscription.created_ts = current_time;
-//!     subscription.last_amount = plan.price_usdc;
+//!     subscription.last_amount = plan.amount_usdc;
 //!     subscription.last_renewed_ts = current_time;
 //!     subscription.bump = ctx.bumps.subscription;
 //! }
@@ -426,7 +426,7 @@ fn test_reactivation_updates_last_renewed_ts() {
 #[test]
 fn test_comprehensive_new_subscription_initialization() {
     // Define subscription structure for testing
-    struct Subscription {
+    struct PaymentAgreement {
         plan: Pubkey,
         subscriber: Pubkey,
         next_renewal_ts: i64,
@@ -451,7 +451,7 @@ fn test_comprehensive_new_subscription_initialization() {
     let subscription = if is_reactivation {
         unreachable!("Not testing reactivation path")
     } else {
-        Subscription {
+        PaymentAgreement {
             plan: plan_key,
             subscriber: subscriber_key,
             next_renewal_ts: current_time + i64::try_from(period_secs).unwrap(),
@@ -842,7 +842,7 @@ fn test_subscribed_event_emitted_for_new_subscription() {
 /// indexers with clear distinction from new subscriptions (I-6 security audit fix).
 ///
 /// Event fields (from events.rs lines 16-31 and `start_subscription.rs` lines 300-309):
-/// - merchant: Pubkey
+/// - payee: Pubkey
 /// - plan: Pubkey
 /// - subscriber: Pubkey
 /// - amount: u64 (current plan price)
@@ -873,7 +873,7 @@ fn test_subscription_reactivated_event_emitted_on_reactivation() {
     // Event field values (as emitted in start_subscription.rs lines 302-309)
     // Note: merchant, plan, and subscriber pubkeys are derived from accounts,
     // so we validate the value fields that provide reactivation context
-    let event_amount = current_plan_price; // plan.price_usdc
+    let event_amount = current_plan_price; // plan.amount_usdc
     let event_total_renewals = total_renewals; // subscription.renewals
     let event_original_created_ts = original_created_ts; // subscription.created_ts
 

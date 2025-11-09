@@ -30,17 +30,17 @@
 //! // Validate grace_secs <= 30% of period_secs (L-2 security fix)
 //! require!(
 //!     args.grace_secs <= (args.period_secs * 3 / 10),
-//!     SubscriptionError::InvalidPlan
+//!     RecurringPaymentError::InvalidPaymentTerms
 //! );
 //!
 //! // Validate grace_secs <= max_grace_period_seconds from config
 //! require!(
 //!     args.grace_secs <= ctx.accounts.config.max_grace_period_seconds,
-//!     SubscriptionError::InvalidPlan
+//!     RecurringPaymentError::InvalidPaymentTerms
 //! );
 //! ```
 
-use tally_protocol::errors::SubscriptionError;
+use tally_protocol::errors::RecurringPaymentError;
 
 // ============================================================================
 // Constants for Realistic Testing
@@ -833,7 +833,7 @@ fn test_30_percent_is_new_maximum() {
 /// This test validates the core security improvement of L-2:
 /// Reducing merchant payment risk from 100% delay to 30% delay.
 ///
-/// Scenario: Merchant creates monthly subscription (30 days)
+/// Scenario: Payee creates monthly subscription (30 days)
 /// Old behavior: Could set 30-day grace period (100% delay, 60 days total exposure)
 /// New behavior: Limited to 9-day grace period (30% delay, 39 days total exposure)
 #[test]
@@ -961,7 +961,7 @@ fn test_invalid_plan_error_for_30_percent_violation() {
     let validation_passes = grace_secs <= (period_secs * 3 / 10);
 
     if !validation_passes {
-        let error = SubscriptionError::InvalidPlan;
+        let error = RecurringPaymentError::InvalidPaymentTerms;
         let anchor_error: anchor_lang::error::Error = error.into();
 
         if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -985,7 +985,7 @@ fn test_invalid_plan_error_for_config_max_violation() {
     let validation_passes = grace_secs <= max_grace_period_seconds;
 
     if !validation_passes {
-        let error = SubscriptionError::InvalidPlan;
+        let error = RecurringPaymentError::InvalidPaymentTerms;
         let anchor_error: anchor_lang::error::Error = error.into();
 
         if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
@@ -1174,7 +1174,7 @@ fn test_l2_fix_completeness() {
         !(invalid_grace <= (period_secs * 3 / 10) && invalid_grace <= max_grace_period_seconds);
 
     if validation_fails {
-        let error = SubscriptionError::InvalidPlan;
+        let error = RecurringPaymentError::InvalidPaymentTerms;
         let anchor_error: anchor_lang::error::Error = error.into();
 
         if let anchor_lang::error::Error::AnchorError(anchor_err) = anchor_error {
