@@ -1,6 +1,6 @@
 //! Program constants
 //!
-//! Mathematical and protocol constants used throughout the subscription program.
+//! Mathematical and protocol constants used throughout the recurring payments program.
 //! These values are immutable and represent universal constants or protocol-level
 //! invariants that should never change post-deployment.
 
@@ -109,26 +109,112 @@ pub const ABSOLUTE_MIN_PERIOD_SECONDS: u64 = 86400;
 /// - Protection against extreme price manipulation attacks
 pub const MAX_PLAN_PRICE_USDC: u64 = 1_000_000_000_000; // 1 million USDC
 
-/// Valid trial duration: 7 days in seconds
+/// Platform base fee for recurring payments (in basis points)
 ///
-/// Free trial period of 7 days is a standard short trial period commonly used
-/// for subscription services to provide quick product evaluation.
+/// This fee applies to every payment execution and is designed to be low enough
+/// for hierarchical payment structures (company → dept → employee → vendor)
+/// while generating sustainable protocol revenue through volume.
 ///
-/// # Value: 604800 seconds (7 days)
-pub const TRIAL_DURATION_7_DAYS: u64 = 604_800;
+/// # Fee Economics
+///
+/// - Single payment: 0.25%
+/// - 3-level hierarchy: 0.75% total (3 × 0.25%)
+/// - 4-level hierarchy: 1.00% total (4 × 0.25%)
+///
+/// # Revenue Projections
+///
+/// - $10M monthly volume: $25K protocol revenue
+/// - $100M monthly volume: $250K protocol revenue
+/// - $1B monthly volume: $2.5M protocol revenue
+///
+/// # Immutability Rationale
+///
+/// This base fee is hardcoded to ensure predictable economics:
+/// - Changing it would affect all payees and payers
+/// - Volume-based discounts are handled via `VolumeTier`
+/// - Extensions can add their own fees on top
+/// - Lower than traditional payment processors (2-3%)
+///
+/// # Value: 25 basis points = 0.25%
+pub const PLATFORM_BASE_FEE_BPS: u16 = 25;
 
-/// Valid trial duration: 14 days in seconds
+/// Keeper fee for executing scheduled payments (in basis points)
 ///
-/// Free trial period of 14 days (2 weeks) is a common trial period for subscription
-/// services, providing sufficient time for thorough product evaluation.
+/// Reduced from traditional 0.5% to support hierarchical payment architectures.
+/// Combined with platform fee (0.25%), total per-transaction overhead is 0.40%.
 ///
-/// # Value: 1209600 seconds (14 days)
-pub const TRIAL_DURATION_14_DAYS: u64 = 1_209_600;
+/// # Hierarchical Economics
+///
+/// - Single payment: 0.40% total (0.25% platform + 0.15% keeper)
+/// - 3-level hierarchy: 1.20% total (3 × 0.40%)
+/// - 4-level hierarchy: 1.60% total (4 × 0.40%)
+///
+/// # Immutability Rationale
+///
+/// This fee incentivizes keepers to execute payments while remaining low enough
+/// for multi-level hierarchical structures:
+/// - Keepers receive this fee for every renewal they execute
+/// - Lower than typical subscription platform keeper fees (0.5-1%)
+/// - Enables viable hierarchical payment patterns
+///
+/// # Alternative: Flat Fee
+///
+/// Consider using a flat USDC fee instead of percentage for high-value
+/// payments. See `KEEPER_FEE_FLAT_USDC` alternative (currently commented out).
+///
+/// # Value: 15 basis points = 0.15%
+pub const KEEPER_FEE_BPS: u16 = 15;
 
-/// Valid trial duration: 30 days in seconds
+/// Maximum platform fee across all volume tiers (in basis points)
 ///
-/// Free trial period of 30 days (1 month) is a generous trial period commonly used
-/// for premium or enterprise subscription services requiring extended evaluation.
+/// Even with volume discounts, platform fee cannot exceed this maximum.
+/// Prevents misconfiguration and ensures fee transparency.
 ///
-/// # Value: 2592000 seconds (30 days)
-pub const TRIAL_DURATION_30_DAYS: u64 = 2_592_000;
+/// # Immutability Rationale
+///
+/// This ceiling protects users from excessive fees:
+/// - Prevents accidental or malicious fee increases
+/// - Guarantees users won't pay more than 0.5% platform fee
+/// - Extensions can add fees on top, but core is bounded
+///
+/// # Value: 50 basis points = 0.5%
+pub const MAX_PLATFORM_FEE_BPS: u16 = 50;
+
+/// Minimum platform fee across all volume tiers (in basis points)
+///
+/// Even at highest volume tier, platform fee cannot go below this minimum.
+/// Ensures protocol sustainability at scale.
+///
+/// # Immutability Rationale
+///
+/// This floor ensures protocol viability:
+/// - Prevents race-to-zero fee competition
+/// - Guarantees minimum revenue for protocol maintenance
+/// - High-volume users still get significant discounts (0.1% vs 0.25%)
+///
+/// # Value: 10 basis points = 0.1%
+pub const MIN_PLATFORM_FEE_BPS: u16 = 10;
+
+/// Volume threshold for Growth tier (in USDC microlamports with 6 decimals)
+///
+/// Payees who process at least this much volume in a 30-day rolling window
+/// are automatically upgraded from Standard (0.25%) to Growth (0.20%) tier.
+///
+/// # Value: $10,000 USDC = 10,000,000,000 microlamports
+pub const GROWTH_TIER_THRESHOLD_USDC: u64 = 10_000_000_000;
+
+/// Volume threshold for Scale tier (in USDC microlamports with 6 decimals)
+///
+/// Payees who process at least this much volume in a 30-day rolling window
+/// are automatically upgraded from Growth (0.20%) to Scale (0.15%) tier.
+///
+/// # Value: $100,000 USDC = 100,000,000,000 microlamports
+pub const SCALE_TIER_THRESHOLD_USDC: u64 = 100_000_000_000;
+
+/// Rolling window period for volume calculations (in seconds)
+///
+/// Volume is tracked over a 30-day rolling window. After this period without
+/// payments, volume resets and tier returns to Standard.
+///
+/// # Value: 2,592,000 seconds = 30 days
+pub const VOLUME_WINDOW_SECONDS: i64 = 2_592_000;
