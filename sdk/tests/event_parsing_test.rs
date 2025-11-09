@@ -391,7 +391,7 @@ async fn test_multiple_events_in_logs() {
             TallyEvent::FeesWithdrawn(_) => "FeesWithdrawn",
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning",
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated",
-            TallyEvent::MerchantTierChanged(_) => "MerchantTierChanged",
+            TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded",
             TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated",
             TallyEvent::TrialStarted(_) => "TrialStarted",
             TallyEvent::TrialConverted(_) => "TrialConverted",

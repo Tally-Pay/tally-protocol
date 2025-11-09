@@ -97,10 +97,10 @@ pub use events::{
     create_receipt, create_receipt_legacy, extract_memo_from_logs, parse_events_from_logs,
     parse_events_with_context, Canceled, ConfigInitialized, ConfigUpdated,
     DelegateMismatchWarning, FeesWithdrawn, LowAllowanceWarning, MerchantInitialized,
-    MerchantTier, MerchantTierChanged, ParsedEventWithContext, PaymentFailed, PlanCreated,
-    PlanStatusChanged, PlanTermsUpdated, ProgramPaused, ProgramUnpaused, ReceiptParams, Renewed,
-    StreamableEventData, Subscribed, SubscriptionClosed, SubscriptionReactivated, TallyEvent,
-    TallyReceipt, TrialConverted, TrialStarted,
+    ParsedEventWithContext, PaymentFailed, PlanCreated, PlanStatusChanged, PlanTermsUpdated,
+    ProgramPaused, ProgramUnpaused, ReceiptParams, Renewed, StreamableEventData, Subscribed,
+    SubscriptionClosed, SubscriptionReactivated, TallyEvent, TallyReceipt, TrialConverted,
+    TrialStarted, VolumeTier, VolumeTierUpgraded,
 };
 pub use keypair::load_keypair;
 pub use program_types::*;
@@ -116,9 +116,9 @@ pub use transaction_builder::{
 #[cfg(feature = "platform-admin")]
 pub use transaction_builder::{
     accept_authority, admin_withdraw_fees, cancel_authority_transfer, init_config, pause,
-    transfer_authority, unpause, update_config, update_merchant_tier, AcceptAuthorityBuilder,
-    AdminWithdrawFeesBuilder, CancelAuthorityTransferBuilder, InitConfigBuilder, PauseBuilder,
-    TransferAuthorityBuilder, UnpauseBuilder, UpdateConfigBuilder, UpdateMerchantTierBuilder,
+    transfer_authority, unpause, update_config, AcceptAuthorityBuilder, AdminWithdrawFeesBuilder,
+    CancelAuthorityTransferBuilder, InitConfigBuilder, PauseBuilder, TransferAuthorityBuilder,
+    UnpauseBuilder, UpdateConfigBuilder,
 };
 pub use validation::*;
 

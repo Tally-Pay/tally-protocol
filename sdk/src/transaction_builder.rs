@@ -1980,7 +1980,9 @@ mod tests {
             usdc_mint: Pubkey::from_str("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v").unwrap(),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0, // Free tier
+            volume_tier: 0, // Standard tier
+            monthly_volume_usdc: 0,
+            last_volume_update_ts: 0,
             bump: 255,
         }
     }
@@ -2187,7 +2189,6 @@ mod tests {
             .authority(authority)
             .usdc_mint(usdc_mint)
             .treasury_ata(treasury_ata)
-            .platform_fee_bps(50)
             .build_instruction()
             .unwrap();
 
@@ -2264,7 +2265,9 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a test mint for classic token
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0, // Free tier
+            volume_tier: 0, // Standard tier
+            monthly_volume_usdc: 0,
+            last_volume_update_ts: 0,
             bump: 255,
         };
 
@@ -2273,7 +2276,9 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()), // Use a different test mint for Token-2022
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0, // Free tier
+            volume_tier: 0, // Standard tier
+            monthly_volume_usdc: 0,
+            last_volume_update_ts: 0,
             bump: 255,
         };
 
@@ -2647,7 +2652,9 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0,
+            volume_tier: 0, // Standard tier
+            monthly_volume_usdc: 0,
+            last_volume_update_ts: 0,
             bump: 255,
         };
 
@@ -2656,7 +2663,9 @@ mod tests {
             usdc_mint: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             treasury_ata: Pubkey::from(Keypair::new().pubkey().to_bytes()),
             platform_fee_bps: 50,
-            tier: 0,
+            volume_tier: 0, // Standard tier
+            monthly_volume_usdc: 0,
+            last_volume_update_ts: 0,
             bump: 255,
         };
 

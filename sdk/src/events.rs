@@ -274,29 +274,29 @@ pub struct ConfigUpdated {
     pub updated_by: Pubkey,
 }
 
-/// Merchant tier for platform fee calculation
+/// Volume tier for platform fee calculation based on monthly payment volume
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MerchantTier {
-    /// Free tier (highest platform fees)
-    Free,
-    /// Pro tier (reduced platform fees)
-    Pro,
-    /// Enterprise tier (lowest platform fees)
-    Enterprise,
+pub enum VolumeTier {
+    /// Standard tier: Up to $10K monthly volume (0.25% platform fee)
+    Standard,
+    /// Growth tier: $10K - $100K monthly volume (0.20% platform fee)
+    Growth,
+    /// Scale tier: Over $100K monthly volume (0.15% platform fee)
+    Scale,
 }
 
 // Manual Borsh implementation to avoid ambiguity
-impl anchor_lang::AnchorSerialize for MerchantTier {
+impl anchor_lang::AnchorSerialize for VolumeTier {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
-            Self::Free => writer.write_all(&[0]),
-            Self::Pro => writer.write_all(&[1]),
-            Self::Enterprise => writer.write_all(&[2]),
+            Self::Standard => writer.write_all(&[0]),
+            Self::Growth => writer.write_all(&[1]),
+            Self::Scale => writer.write_all(&[2]),
         }
     }
 }
 
-impl anchor_lang::AnchorDeserialize for MerchantTier {
+impl anchor_lang::AnchorDeserialize for VolumeTier {
     fn deserialize(buf: &mut &[u8]) -> std::io::Result<Self> {
         if buf.is_empty() {
             return Err(std::io::Error::new(
@@ -307,12 +307,12 @@ impl anchor_lang::AnchorDeserialize for MerchantTier {
         let discriminant = buf[0];
         *buf = &buf[1..];
         match discriminant {
-            0 => Ok(Self::Free),
-            1 => Ok(Self::Pro),
-            2 => Ok(Self::Enterprise),
+            0 => Ok(Self::Standard),
+            1 => Ok(Self::Growth),
+            2 => Ok(Self::Scale),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "Invalid MerchantTier discriminant",
+                "Invalid VolumeTier discriminant",
             )),
         }
     }
@@ -321,28 +321,30 @@ impl anchor_lang::AnchorDeserialize for MerchantTier {
         let mut discriminant = [0u8; 1];
         reader.read_exact(&mut discriminant)?;
         match discriminant[0] {
-            0 => Ok(Self::Free),
-            1 => Ok(Self::Pro),
-            2 => Ok(Self::Enterprise),
+            0 => Ok(Self::Standard),
+            1 => Ok(Self::Growth),
+            2 => Ok(Self::Scale),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                "Invalid MerchantTier discriminant",
+                "Invalid VolumeTier discriminant",
             )),
         }
     }
 }
 
-/// Event emitted when a merchant's tier is changed
+/// Event emitted when a payee's volume tier is upgraded based on payment volume
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MerchantTierChanged {
-    /// The merchant account whose tier changed
+pub struct VolumeTierUpgraded {
+    /// The merchant account whose tier was upgraded
     pub merchant: Pubkey,
-    /// The previous tier before the change
-    pub old_tier: MerchantTier,
-    /// The new tier after the change
-    pub new_tier: MerchantTier,
+    /// The previous tier before the upgrade
+    pub old_tier: VolumeTier,
+    /// The new tier after the upgrade
+    pub new_tier: VolumeTier,
+    /// The rolling 30-day volume that triggered the upgrade
+    pub monthly_volume_usdc: u64,
     /// The new platform fee in basis points corresponding to the new tier
-    pub new_fee_bps: u16,
+    pub new_platform_fee_bps: u16,
 }
 
 /// Event emitted when a plan's pricing or terms are updated
@@ -433,8 +435,8 @@ pub enum TallyEvent {
     DelegateMismatchWarning(DelegateMismatchWarning),
     /// Config updated
     ConfigUpdated(ConfigUpdated),
-    /// Merchant tier changed
-    MerchantTierChanged(MerchantTierChanged),
+    /// Volume tier upgraded based on payment volume
+    VolumeTierUpgraded(VolumeTierUpgraded),
     /// Plan terms updated
     PlanTermsUpdated(PlanTermsUpdated),
     /// Trial started
@@ -595,11 +597,12 @@ impl ParsedEventWithContext {
                 metadata.insert("keeper_fee_bps".to_string(), e.keeper_fee_bps.to_string());
                 ("config_updated".to_string(), String::new(), None, None)
             }
-            TallyEvent::MerchantTierChanged(e) => {
+            TallyEvent::VolumeTierUpgraded(e) => {
                 metadata.insert("old_tier".to_string(), format!("{:?}", e.old_tier));
                 metadata.insert("new_tier".to_string(), format!("{:?}", e.new_tier));
-                metadata.insert("new_fee_bps".to_string(), e.new_fee_bps.to_string());
-                ("merchant_tier_changed".to_string(), e.merchant.to_string(), None, None)
+                metadata.insert("monthly_volume_usdc".to_string(), e.monthly_volume_usdc.to_string());
+                metadata.insert("new_platform_fee_bps".to_string(), e.new_platform_fee_bps.to_string());
+                ("volume_tier_upgraded".to_string(), e.merchant.to_string(), None, None)
             }
             TallyEvent::PlanTermsUpdated(e) => {
                 metadata.insert("updated_by".to_string(), e.updated_by.to_string());
@@ -671,7 +674,7 @@ impl ParsedEventWithContext {
             TallyEvent::PlanCreated(e) => Some(e.merchant),
             TallyEvent::LowAllowanceWarning(e) => Some(e.merchant),
             TallyEvent::DelegateMismatchWarning(e) => Some(e.merchant),
-            TallyEvent::MerchantTierChanged(e) => Some(e.merchant),
+            TallyEvent::VolumeTierUpgraded(e) => Some(e.merchant),
             TallyEvent::PlanTermsUpdated(e) => Some(e.merchant),
             _ => None,
         }
@@ -748,7 +751,7 @@ impl ParsedEventWithContext {
             TallyEvent::FeesWithdrawn(_) => "FeesWithdrawn".to_string(),
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning".to_string(),
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated".to_string(),
-            TallyEvent::MerchantTierChanged(_) => "MerchantTierChanged".to_string(),
+            TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded".to_string(),
             TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated".to_string(),
             TallyEvent::TrialStarted(_) => "TrialStarted".to_string(),
             TallyEvent::TrialConverted(_) => "TrialConverted".to_string(),

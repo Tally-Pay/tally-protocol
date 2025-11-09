@@ -3,26 +3,26 @@
 use anchor_lang::prelude::*;
 use serde::{Deserialize, Serialize};
 
-/// Merchant tier determines platform fee rate
+/// Volume tier determines platform fee rate based on monthly payment volume
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub enum MerchantTier {
-    /// Free tier: 2.0% platform fee (200 basis points)
-    Free = 0,
-    /// Pro tier: 1.5% platform fee (150 basis points)
-    Pro = 1,
-    /// Enterprise tier: 1.0% platform fee (100 basis points)
-    Enterprise = 2,
+pub enum VolumeTier {
+    /// Standard tier: Up to $10K monthly volume, 0.25% platform fee (25 basis points)
+    Standard = 0,
+    /// Growth tier: $10K - $100K monthly volume, 0.20% platform fee (20 basis points)
+    Growth = 1,
+    /// Scale tier: Over $100K monthly volume, 0.15% platform fee (15 basis points)
+    Scale = 2,
 }
 
-impl MerchantTier {
+impl VolumeTier {
     /// Returns the platform fee in basis points for this tier
     #[must_use]
-    pub const fn fee_bps(self) -> u16 {
+    pub const fn platform_fee_bps(self) -> u16 {
         match self {
-            Self::Free => 200,       // 2.0%
-            Self::Pro => 150,        // 1.5%
-            Self::Enterprise => 100, // 1.0%
+            Self::Standard => 25, // 0.25%
+            Self::Growth => 20,   // 0.20%
+            Self::Scale => 15,    // 0.15%
         }
     }
 
@@ -30,10 +30,25 @@ impl MerchantTier {
     #[must_use]
     pub const fn from_discriminant(value: u8) -> Option<Self> {
         match value {
-            0 => Some(Self::Free),
-            1 => Some(Self::Pro),
-            2 => Some(Self::Enterprise),
+            0 => Some(Self::Standard),
+            1 => Some(Self::Growth),
+            2 => Some(Self::Scale),
             _ => None,
+        }
+    }
+
+    /// Determines tier based on 30-day rolling volume
+    #[must_use]
+    pub const fn from_monthly_volume(volume_usdc: u64) -> Self {
+        const GROWTH_THRESHOLD: u64 = 10_000_000_000; // $10K
+        const SCALE_THRESHOLD: u64 = 100_000_000_000; // $100K
+
+        if volume_usdc >= SCALE_THRESHOLD {
+            Self::Scale
+        } else if volume_usdc >= GROWTH_THRESHOLD {
+            Self::Growth
+        } else {
+            Self::Standard
         }
     }
 }
@@ -52,8 +67,13 @@ pub struct Merchant {
     pub treasury_ata: Pubkey,
     /// Platform fee in basis points (0-1000, representing 0-10%)
     pub platform_fee_bps: u16,
-    /// Merchant tier (Free, Pro, Enterprise)
-    pub tier: u8,
+    /// Current volume tier (Standard/Growth/Scale)
+    pub volume_tier: u8,
+    /// Rolling 30-day payment volume in USDC microlamports
+    /// Updated on each payment execution
+    pub monthly_volume_usdc: u64,
+    /// Timestamp of last volume calculation (for tier updates)
+    pub last_volume_update_ts: i64,
     /// PDA bump seed
     pub bump: u8,
 }

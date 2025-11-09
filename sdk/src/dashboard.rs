@@ -856,7 +856,7 @@ impl DashboardClient {
             TallyEvent::FeesWithdrawn(_) => "FeesWithdrawn".to_string(),
             TallyEvent::DelegateMismatchWarning(_) => "DelegateMismatchWarning".to_string(),
             TallyEvent::ConfigUpdated(_) => "ConfigUpdated".to_string(),
-            TallyEvent::MerchantTierChanged(_) => "MerchantTierChanged".to_string(),
+            TallyEvent::VolumeTierUpgraded(_) => "VolumeTierUpgraded".to_string(),
             TallyEvent::PlanTermsUpdated(_) => "PlanTermsUpdated".to_string(),
             TallyEvent::TrialStarted(_) => "TrialStarted".to_string(),
             TallyEvent::TrialConverted(_) => "TrialConverted".to_string(),
