@@ -1,6 +1,6 @@
 use crate::{
     constants::FEE_BASIS_POINTS_DIVISOR,
-    errors::SubscriptionError,
+    errors::RecurringPaymentError,
     events::*,
     state::*,
     utils::validate_platform_treasury,
@@ -8,7 +8,7 @@ use crate::{
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 
-/// Arguments for starting a new subscription or reactivating a canceled subscription.
+/// Arguments for starting a new payment agreement or reactivating a paused payment agreement.
 ///
 /// # Rate Limiting Considerations
 ///
@@ -16,13 +16,13 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 /// economic costs and off-chain monitoring:
 ///
 /// ## Economic Deterrence
-/// - **Transaction Fee**: 0.000005 SOL (~$0.0007) per subscription start
-/// - **Rent Deposit**: 0.00078 SOL (~$0.11) per new subscription (110 bytes account size)
+/// - **Transaction Fee**: 0.000005 SOL (~$0.0007) per payment agreement start
+/// - **Rent Deposit**: 0.00078 SOL (~$0.11) per new payment agreement (110 bytes account size)
 /// - **USDC Payment**: Requires actual USDC transfer for initial payment
 /// - **Delegate Approval**: Requires pre-approval of USDC token delegate
 ///
-/// **Subscription Churn Attack Cost**: Repeatedly starting and canceling the same subscription:
-/// - Per cycle: 0.00001 SOL (start + cancel) + USDC for initial payment
+/// **Payment Agreement Churn Attack Cost**: Repeatedly starting and pausing the same payment agreement:
+/// - Per cycle: 0.00001 SOL (start + pause) + USDC for initial payment
 /// - 1,000 cycles: ~$2-5 (depending on USDC amount and gas)
 ///
 /// The USDC payment requirement and delegate setup add friction that makes high-frequency
@@ -31,30 +31,30 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 /// ## Off-Chain Monitoring
 ///
 /// Recommended monitoring thresholds (see `/docs/SPAM_DETECTION.md`):
-/// - **Churn Alert**: >80% of subscriptions canceled within 1 hour of starting
-/// - **Volume Alert**: >20 subscription operations (start/cancel) per account per hour
-/// - **Pattern Alert**: Rapid start-cancel cycles on same plan/subscriber pairs
+/// - **Churn Alert**: >80% of payment agreements paused within 1 hour of starting
+/// - **Volume Alert**: >20 payment agreement operations (start/pause) per account per hour
+/// - **Pattern Alert**: Rapid start-pause cycles on same payment terms/payer pairs
 ///
 /// ## Attack Scenarios
 ///
-/// ### Subscription Churn Attack
-/// **Attack**: User repeatedly starts and cancels same subscription to generate event noise.
+/// ### Payment Agreement Churn Attack
+/// **Attack**: User repeatedly starts and pauses same payment agreement to generate event noise.
 /// **Cost**: Low (~$0.002 per cycle), but requires USDC balance and delegate approval.
-/// **Detection**: Monitor subscription lifetime duration; flag subscriptions lasting <5 minutes.
-/// **Mitigation**: RPC rate limiting to 20 subscription operations per hour per account.
+/// **Detection**: Monitor payment agreement lifetime duration; flag payment agreements lasting <5 minutes.
+/// **Mitigation**: RPC rate limiting to 20 payment agreement operations per hour per account.
 ///
 /// ### Reactivation Spam
-/// **Attack**: User exploits `init_if_needed` to repeatedly reactivate canceled subscriptions.
+/// **Attack**: User exploits `init_if_needed` to repeatedly reactivate paused payment agreements.
 /// **Cost**: 0.000005 SOL per reactivation (no rent deposit after first creation).
 /// **Detection**: Track reactivation frequency; alert on >5 reactivations per hour.
-/// **Mitigation**: Application-layer cooldown period between cancellation and reactivation.
+/// **Mitigation**: Application-layer cooldown period between pause and reactivation.
 ///
 /// ## Why No On-Chain Rate Limiting?
 ///
 /// On-chain rate limiting was deliberately not implemented because:
-/// 1. **Account Complexity**: Adding rate limit fields to `Subscription` accounts increases
+/// 1. **Account Complexity**: Adding rate limit fields to `PaymentAgreement` accounts increases
 ///    complexity and storage costs for all users.
-/// 2. **State Bloat**: Tracking per-subscriber operation timestamps bloats on-chain state.
+/// 2. **State Bloat**: Tracking per-payer operation timestamps bloats on-chain state.
 /// 3. **Flexibility**: Off-chain rate limits can be adjusted dynamically based on observed
 ///    attack patterns without requiring program upgrades.
 /// 4. **Economic Model**: USDC payment requirement provides natural spam deterrence.
@@ -63,61 +63,61 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, TransferChecked};
 ///
 /// ## Mitigation Recommendations
 ///
-/// 1. **RPC Layer**: Limit subscription operations to 20/hour per account
-/// 2. **Indexer**: Monitor subscription lifetime and churn patterns
-/// 3. **Application Layer**: Implement cooldown periods between cancel and reactivation
-/// 4. **Dashboard**: Alert on abnormal subscription churn rates
+/// 1. **RPC Layer**: Limit payment agreement operations to 20/hour per account
+/// 2. **Indexer**: Monitor payment agreement lifetime and churn patterns
+/// 3. **Application Layer**: Implement cooldown periods between pause and reactivation
+/// 4. **Dashboard**: Alert on abnormal payment agreement churn rates
 ///
 /// See `/docs/OPERATIONAL_PROCEDURES.md` for incident response procedures.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
-pub struct StartSubscriptionArgs {
+pub struct StartAgreementArgs {
     /// Multiplier for allowance (default from config if 0)
-    /// Example: If plan price is 10 USDC and `allowance_periods` is 3,
+    /// Example: If payment terms price is 10 USDC and `allowance_periods` is 3,
     /// the user must approve a delegate allowance of 30 USDC
     pub allowance_periods: u8,
 }
 
 #[derive(Accounts)]
-pub struct StartSubscription<'info> {
+pub struct StartAgreement<'info> {
     /// Global configuration account
     #[account(
         seeds = [b"config"],
         bump = config.bump,
-        constraint = !config.paused @ SubscriptionError::Inactive
+        constraint = !config.paused @ RecurringPaymentError::Inactive
     )]
     pub config: Account<'info, Config>,
 
     #[account(
         init_if_needed,
-        payer = subscriber,
-        space = Subscription::SPACE,
-        seeds = [b"subscription", plan.key().as_ref(), subscriber.key().as_ref()],
+        payer = payer,
+        space = PaymentAgreement::SPACE,
+        seeds = [b"payment_agreement", payment_terms.key().as_ref(), payer.key().as_ref()],
         bump
     )]
-    pub subscription: Account<'info, Subscription>,
+    pub payment_agreement: Account<'info, PaymentAgreement>,
 
     #[account(
-        constraint = plan.active @ SubscriptionError::Inactive
+        constraint = payment_terms.active @ RecurringPaymentError::Inactive
     )]
-    pub plan: Account<'info, Plan>,
+    pub payment_terms: Account<'info, PaymentTerms>,
 
     #[account(
-        seeds = [b"merchant", merchant.authority.as_ref()],
-        bump = merchant.bump
+        seeds = [b"payee", payee.authority.as_ref()],
+        bump = payee.bump
     )]
-    pub merchant: Account<'info, Merchant>,
+    pub payee: Account<'info, Payee>,
 
     #[account(mut)]
-    pub subscriber: Signer<'info>,
+    pub payer: Signer<'info>,
 
     // USDC accounts for transfers
     /// CHECK: Validated as USDC token account in handler
     #[account(mut)]
-    pub subscriber_usdc_ata: UncheckedAccount<'info>,
+    pub payer_usdc_ata: UncheckedAccount<'info>,
 
-    /// CHECK: Validated as merchant treasury ATA in handler
+    /// CHECK: Validated as payee treasury ATA in handler
     #[account(mut)]
-    pub merchant_treasury_ata: UncheckedAccount<'info>,
+    pub payee_treasury_ata: UncheckedAccount<'info>,
 
     /// CHECK: Validated as platform treasury ATA in handler
     #[account(mut)]
@@ -139,50 +139,50 @@ pub struct StartSubscription<'info> {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> Result<()> {
-    let subscription = &mut ctx.accounts.subscription;
-    let plan = &ctx.accounts.plan;
-    let merchant = &ctx.accounts.merchant;
+pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result<()> {
+    let payment_agreement = &mut ctx.accounts.payment_agreement;
+    let payment_terms = &ctx.accounts.payment_terms;
+    let payee = &ctx.accounts.payee;
 
-    // Detect if this is reactivation (account already exists) vs new subscription
+    // Detect if this is reactivation (account already exists) vs new payment_agreement
     // created_ts will be non-zero for existing accounts since it's set during initialization
-    let is_reactivation = subscription.created_ts != 0;
+    let is_reactivation = payment_agreement.created_at != 0;
 
     if is_reactivation {
-        // REACTIVATION PATH: Validate and reactivate existing subscription
+        // REACTIVATION PATH: Validate and reactivate existing payment_agreement
 
         // Security check: Prevent reactivation if already active
-        require!(!subscription.active, SubscriptionError::AlreadyActive);
+        require!(!payment_agreement.active, RecurringPaymentError::AlreadyActive);
 
-        // Security check: Ensure plan and subscriber match (prevent account hijacking)
+        // Security check: Ensure payment_terms and payer match (prevent account hijacking)
         require!(
-            subscription.plan == plan.key(),
-            SubscriptionError::Unauthorized
+            payment_agreement.payment_terms == payment_terms.key(),
+            RecurringPaymentError::Unauthorized
         );
         require!(
-            subscription.subscriber == ctx.accounts.subscriber.key(),
-            SubscriptionError::Unauthorized
+            payment_agreement.payer == ctx.accounts.payer.key(),
+            RecurringPaymentError::Unauthorized
         );
     }
 
     // Deserialize and validate token accounts with specific error handling
     let subscriber_ata_data: TokenAccount =
-        TokenAccount::try_deserialize(&mut ctx.accounts.subscriber_usdc_ata.data.borrow().as_ref())
-            .map_err(|_| SubscriptionError::InvalidSubscriberTokenAccount)?;
+        TokenAccount::try_deserialize(&mut ctx.accounts.payer_usdc_ata.data.borrow().as_ref())
+            .map_err(|_| RecurringPaymentError::InvalidSubscriberTokenAccount)?;
 
     let merchant_treasury_data: TokenAccount = TokenAccount::try_deserialize(
-        &mut ctx.accounts.merchant_treasury_ata.data.borrow().as_ref(),
+        &mut ctx.accounts.payee_treasury_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| SubscriptionError::InvalidMerchantTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidMerchantTreasuryAccount)?;
 
     let platform_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.platform_treasury_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| SubscriptionError::InvalidPlatformTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidPlatformTreasuryAccount)?;
 
     let usdc_mint_data: Mint =
         Mint::try_deserialize(&mut ctx.accounts.usdc_mint.data.borrow().as_ref())
-            .map_err(|_| SubscriptionError::InvalidUsdcMint)?;
+            .map_err(|_| RecurringPaymentError::InvalidUsdcMint)?;
 
     // Runtime validation: Ensure platform treasury ATA remains valid
     // This prevents denial-of-service if the platform authority closes or modifies
@@ -195,23 +195,23 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     )?;
 
     // Validate token account ownership and mints
-    if subscriber_ata_data.owner != ctx.accounts.subscriber.key() {
-        return Err(SubscriptionError::Unauthorized.into());
+    if subscriber_ata_data.owner != ctx.accounts.payer.key() {
+        return Err(RecurringPaymentError::Unauthorized.into());
     }
 
-    if subscriber_ata_data.mint != merchant.usdc_mint
-        || merchant_treasury_data.mint != merchant.usdc_mint
-        || platform_treasury_data.mint != merchant.usdc_mint
+    if subscriber_ata_data.mint != payee.usdc_mint
+        || merchant_treasury_data.mint != payee.usdc_mint
+        || platform_treasury_data.mint != payee.usdc_mint
     {
-        return Err(SubscriptionError::WrongMint.into());
+        return Err(RecurringPaymentError::WrongMint.into());
     }
 
-    if ctx.accounts.usdc_mint.key() != merchant.usdc_mint {
-        return Err(SubscriptionError::WrongMint.into());
+    if ctx.accounts.usdc_mint.key() != payee.usdc_mint {
+        return Err(RecurringPaymentError::WrongMint.into());
     }
 
-    if ctx.accounts.merchant_treasury_ata.key() != merchant.treasury_ata {
-        return Err(SubscriptionError::BadSeeds.into());
+    if ctx.accounts.payee_treasury_ata.key() != payee.treasury_ata {
+        return Err(RecurringPaymentError::BadSeeds.into());
     }
 
     // Use default from config if allowance_periods is 0
@@ -230,24 +230,24 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     let allowance_periods_u64 = u64::from(allowance_periods);
     let max_safe_price = u64::MAX
         .checked_div(allowance_periods_u64)
-        .ok_or(SubscriptionError::ArithmeticError)?;
+        .ok_or(RecurringPaymentError::ArithmeticError)?;
 
     require!(
-        plan.price_usdc <= max_safe_price,
-        SubscriptionError::InvalidPlan
+        payment_terms.amount_usdc <= max_safe_price,
+        RecurringPaymentError::InvalidPlan
     );
 
-    // Validate delegate allowance for multi-period subscription start
+    // Validate delegate allowance for multi-period payment_agreement start
     //
     // ALLOWANCE MANAGEMENT EXPECTATIONS (Audit L-3):
     //
-    // For subscription initiation, we require allowance for multiple periods
+    // For payment_agreement initiation, we require allowance for multiple periods
     // (default 3x, configurable via allowance_periods parameter) to ensure
     // seamless renewals without immediate allowance exhaustion.
     //
-    // IMPORTANT: Subsequent renewals check allowance >= plan.price_usdc (single period).
+    // IMPORTANT: Subsequent renewals check allowance >= payment_terms.amount_usdc (single period).
     // This design allows flexibility in allowance management while preventing immediate
-    // renewal failures. Users should maintain sufficient allowance (recommended: 2x plan price)
+    // renewal failures. Users should maintain sufficient allowance (recommended: 2x payment_terms price)
     // to avoid renewal interruptions.
     //
     // The asymmetry is intentional:
@@ -256,13 +256,13 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     //
     // Off-chain systems should monitor LowAllowanceWarning events to prompt users
     // to increase allowance before the next renewal cycle.
-    let required_allowance = plan
-        .price_usdc
+    let required_allowance = payment_terms
+        .amount_usdc
         .checked_mul(allowance_periods_u64)
-        .ok_or(SubscriptionError::ArithmeticError)?;
+        .ok_or(RecurringPaymentError::ArithmeticError)?;
 
     if subscriber_ata_data.delegated_amount < required_allowance {
-        return Err(SubscriptionError::InsufficientAllowance.into());
+        return Err(RecurringPaymentError::InsufficientAllowance.into());
     }
 
     // Explicitly validate PDA derivation to ensure the delegate PDA was derived with expected seeds
@@ -270,7 +270,7 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         Pubkey::find_program_address(&[b"delegate"], ctx.program_id);
     require!(
         ctx.accounts.program_delegate.key() == expected_delegate_pda,
-        SubscriptionError::BadSeeds
+        RecurringPaymentError::BadSeeds
     );
 
     // Validate delegate is our program PDA
@@ -285,39 +285,39 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
     // Security model:
     // - The global delegate PDA has no private key (only the program can sign with it)
     // - Program validation enforces that only valid subscriptions can be renewed
-    // - Each subscription is bound to a specific plan via PDA derivation
-    // - Merchants cannot renew each other's subscriptions (different subscription PDAs)
-    // - Transfer amounts are validated against plan.price_usdc
+    // - Each payment_agreement is bound to a specific payment_terms via PDA derivation
+    // - Merchants cannot renew each other's subscriptions (different payment_agreement PDAs)
+    // - Transfer amounts are validated against payment_terms.amount_usdc
     //
     // Benefits:
     // - Users can subscribe to multiple merchants with one token account
-    // - Enables budget compartmentalization (dedicated subscription wallets)
+    // - Enables budget compartmentalization (dedicated payment_agreement wallets)
     // - Supports hierarchical payment structures (company → departments → employees)
     // - Simplifies allowance management across multiple merchants
     let actual_delegate = Option::<Pubkey>::from(subscriber_ata_data.delegate);
     if actual_delegate != Some(expected_delegate_pda) {
-        return Err(SubscriptionError::Unauthorized.into());
+        return Err(RecurringPaymentError::Unauthorized.into());
     }
 
     // PAYMENT PROCESSING
     //
-    // Core protocol always processes initial payment on subscription start.
-    // (Trial support is handled by subscription extension layer)
+    // Core protocol always processes initial payment on payment_agreement start.
+    // (Trial support is handled by payment_agreement extension layer)
     {
-        // Calculate platform fee using checked arithmetic (fee rate determined by merchant's volume tier)
+        // Calculate platform fee using checked arithmetic (fee rate determined by payee's volume tier)
         let platform_fee = u64::try_from(
-            u128::from(plan.price_usdc)
-                .checked_mul(u128::from(merchant.volume_tier.platform_fee_bps()))
-                .ok_or(SubscriptionError::ArithmeticError)?
+            u128::from(payment_terms.amount_usdc)
+                .checked_mul(u128::from(payee.volume_tier.platform_fee_bps()))
+                .ok_or(RecurringPaymentError::ArithmeticError)?
                 .checked_div(FEE_BASIS_POINTS_DIVISOR)
-                .ok_or(SubscriptionError::ArithmeticError)?,
+                .ok_or(RecurringPaymentError::ArithmeticError)?,
         )
-        .map_err(|_| SubscriptionError::ArithmeticError)?;
+        .map_err(|_| RecurringPaymentError::ArithmeticError)?;
 
-        let merchant_amount = plan
-            .price_usdc
+        let merchant_amount = payment_terms
+            .amount_usdc
             .checked_sub(platform_fee)
-            .ok_or(SubscriptionError::ArithmeticError)?;
+            .ok_or(RecurringPaymentError::ArithmeticError)?;
 
         // Prepare delegate signer seeds
         let delegate_bump = ctx.bumps.program_delegate;
@@ -327,12 +327,12 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         // Get USDC mint decimals from the mint account
         let usdc_decimals = usdc_mint_data.decimals;
 
-        // Transfer merchant amount to merchant treasury (via delegate)
+        // Transfer payee amount to payee treasury (via delegate)
         if merchant_amount > 0 {
             let transfer_to_merchant = TransferChecked {
-                from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+                from: ctx.accounts.payer_usdc_ata.to_account_info(),
                 mint: ctx.accounts.usdc_mint.to_account_info(),
-                to: ctx.accounts.merchant_treasury_ata.to_account_info(),
+                to: ctx.accounts.payee_treasury_ata.to_account_info(),
                 authority: ctx.accounts.program_delegate.to_account_info(),
             };
 
@@ -350,7 +350,7 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         // Transfer platform fee to platform treasury (via delegate)
         if platform_fee > 0 {
             let transfer_to_platform = TransferChecked {
-                from: ctx.accounts.subscriber_usdc_ata.to_account_info(),
+                from: ctx.accounts.payer_usdc_ata.to_account_info(),
                 mint: ctx.accounts.usdc_mint.to_account_info(),
                 to: ctx.accounts.platform_treasury_ata.to_account_info(),
                 authority: ctx.accounts.program_delegate.to_account_info(),
@@ -370,25 +370,25 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
 
     // Calculate next renewal timestamp
     // Core protocol: next_renewal_ts = current_time + period_secs
-    // (Trials are handled by subscription extension layer)
+    // (Trials are handled by payment_agreement extension layer)
     let period_i64 =
-        i64::try_from(plan.period_secs).map_err(|_| SubscriptionError::ArithmeticError)?;
+        i64::try_from(payment_terms.period_secs).map_err(|_| RecurringPaymentError::ArithmeticError)?;
     let next_renewal_ts = current_time
         .checked_add(period_i64)
-        .ok_or(SubscriptionError::ArithmeticError)?;
+        .ok_or(RecurringPaymentError::ArithmeticError)?;
 
-    // Update subscription account based on whether this is new or reactivation
+    // Update payment_agreement account based on whether this is new or reactivation
     if is_reactivation {
         // ============================================================================
         // REACTIVATION PATH: Preserve Historical Fields While Resetting Billing Cycle
         // ============================================================================
         //
-        // When a previously canceled subscription is reactivated, we intentionally preserve
-        // certain historical fields to maintain a complete record of the subscription's
+        // When a previously canceled payment_agreement is reactivated, we intentionally preserve
+        // certain historical fields to maintain a complete record of the payment_agreement's
         // lifetime across all sessions.
         //
         // This design supports:
-        // - Loyalty programs based on lifetime subscription duration
+        // - Loyalty programs based on lifetime payment_agreement duration
         // - Analytics on long-term customer engagement
         // - Business intelligence on churn and reactivation patterns
         // - Tiered benefits based on cumulative renewals
@@ -400,16 +400,16 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         // PRESERVED FIELDS (Historical Record - Intentionally NOT Modified)
         // ------------------------------------------------------------------------
         //
-        // 1. created_ts: Original subscription creation timestamp
-        //    - Purpose: Track the start of the subscriber-merchant relationship
-        //    - Example: A subscription created on 2024-01-01, canceled, and reactivated
+        // 1. created_ts: Original payment_agreement creation timestamp
+        //    - Purpose: Track the start of the payer-payee relationship
+        //    - Example: A payment_agreement created on 2024-01-01, canceled, and reactivated
         //              on 2024-06-01 will still show created_ts = 2024-01-01
         //    - Use Case: Calculate total relationship duration, anniversary rewards
         //
         // 2. renewals: Cumulative renewal count across ALL sessions
-        //    - Purpose: Track total billing cycles across the subscription's lifetime
+        //    - Purpose: Track total billing cycles across the payment_agreement's lifetime
         //    - Behavior: Continues incrementing from previous session's count
-        //    - Example: A subscription with 10 renewals, when reactivated, continues
+        //    - Example: A payment_agreement with 10 renewals, when reactivated, continues
         //              counting from 10 (next renewal will be 11, not 1)
         //    - Use Case: Lifetime value calculations, tier-based loyalty programs
         //    - Off-Chain: Systems tracking "current session renewals" must calculate:
@@ -425,19 +425,19 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         // ------------------------------------------------------------------------
         //
         // 4. active: Set to true
-        //    - Purpose: Re-enable renewal processing for this subscription
+        //    - Purpose: Re-enable renewal processing for this payment_agreement
         //    - Previous State: false (set during cancellation)
         //    - New State: true (enables automated renewals to proceed)
         //
         // 5. next_renewal_ts: Current timestamp + period
         //    - Purpose: Schedule the next billing cycle from reactivation time
-        //    - Calculation: reactivation_time + plan.period_secs
-        //    - Example: Reactivated on 2024-06-01 with monthly plan → next_renewal_ts = 2024-07-01
+        //    - Calculation: reactivation_time + payment_terms.period_secs
+        //    - Example: Reactivated on 2024-06-01 with monthly payment_terms → next_renewal_ts = 2024-07-01
         //
-        // 6. last_amount: Current plan.price_usdc
+        // 6. last_amount: Current payment_terms.amount_usdc
         //    - Purpose: Track billing amount for upcoming renewals
-        //    - Rationale: Plan pricing may have changed since cancellation
-        //    - Example: Plan was $10/month, now $12/month → last_amount = $12
+        //    - Rationale: PaymentTerms pricing may have changed since cancellation
+        //    - Example: PaymentTerms was $10/month, now $12/month → last_amount = $12
         //
         // 7. last_renewed_ts: Current timestamp
         //    - Purpose: Prevent immediate double-billing after reactivation
@@ -448,57 +448,54 @@ pub fn handler(ctx: Context<StartSubscription>, args: StartSubscriptionArgs) -> 
         // Off-Chain Integration Notes
         // ------------------------------------------------------------------------
         //
-        // The SubscriptionReactivated event includes:
+        // The PaymentAgreementReactivated event includes:
         // - total_renewals: Current renewals count (preserved from previous session)
         // - original_created_ts: Original creation timestamp
         //
         // Off-chain indexers should:
-        // 1. Create a new session record when SubscriptionReactivated is emitted
+        // 1. Create a new session record when PaymentAgreementReactivated is emitted
         // 2. Store renewals_at_session_start = event.total_renewals
-        // 3. Calculate current session renewals as: on_chain.renewals - renewals_at_session_start
+        // 3. Calculate current session renewals as: on_chain.payment_count - renewals_at_session_start
         //
         // For detailed integration examples (TypeScript, SQL, GraphQL), see:
         // docs/SUBSCRIPTION_LIFECYCLE.md#off-chain-integration-guide
 
-        subscription.active = true;
-        subscription.next_renewal_ts = next_renewal_ts;
-        subscription.last_amount = plan.price_usdc;
-        subscription.last_renewed_ts = current_time;
+        payment_agreement.active = true;
+        payment_agreement.next_payment_ts = next_renewal_ts;
+        payment_agreement.last_payment_amount = payment_terms.amount_usdc;
+        payment_agreement.last_payment_ts = current_time;
     } else {
         // NEW SUBSCRIPTION: Initialize all fields
-        subscription.plan = plan.key();
-        subscription.subscriber = ctx.accounts.subscriber.key();
-        subscription.next_renewal_ts = next_renewal_ts;
-        subscription.active = true;
-        subscription.renewals = 0;
-        subscription.created_ts = current_time;
-        subscription.last_amount = plan.price_usdc;
-        subscription.last_renewed_ts = current_time;
-        subscription.bump = ctx.bumps.subscription;
+        payment_agreement.payment_terms = payment_terms.key();
+        payment_agreement.payer = ctx.accounts.payer.key();
+        payment_agreement.next_payment_ts = next_renewal_ts;
+        payment_agreement.active = true;
+        payment_agreement.payment_count = 0;
+        payment_agreement.created_at = current_time;
+        payment_agreement.last_payment_amount = payment_terms.amount_usdc;
+        payment_agreement.last_payment_ts = current_time;
+        payment_agreement.bump = ctx.bumps.payment_agreement;
     }
 
     // Initialize trial fields (trials not supported in core protocol)
-    subscription.trial_ends_at = None;
-    subscription.in_trial = false;
-
-    // Emit appropriate event based on whether this is a new subscription or reactivation
+            // Emit appropriate event based on whether this is a new payment_agreement or reactivation
     if is_reactivation {
-        emit!(crate::events::SubscriptionReactivated {
-            merchant: merchant.key(),
-            plan: plan.key(),
-            subscriber: ctx.accounts.subscriber.key(),
-            amount: plan.price_usdc,
-            total_renewals: subscription.renewals,
-            original_created_ts: subscription.created_ts,
+        emit!(crate::events::PaymentAgreementReactivated {
+            payee: payee.key(),
+            payment_terms: payment_terms.key(),
+            payer: ctx.accounts.payer.key(),
+            amount: payment_terms.amount_usdc,
+            total_renewals: payment_agreement.payment_count,
+            original_created_ts: payment_agreement.created_at,
         });
     } else {
-        // Emit Subscribed event for new paid subscriptions
-        // (Trial events are handled by subscription extension layer)
-        emit!(Subscribed {
-            merchant: merchant.key(),
-            plan: plan.key(),
-            subscriber: ctx.accounts.subscriber.key(),
-            amount: plan.price_usdc,
+        // Emit PaymentAgreementStarted event for new paid subscriptions
+        // (Trial events are handled by payment_agreement extension layer)
+        emit!(PaymentAgreementStarted {
+            payee: payee.key(),
+            payment_terms: payment_terms.key(),
+            payer: ctx.accounts.payer.key(),
+            amount: payment_terms.amount_usdc,
         });
     }
 

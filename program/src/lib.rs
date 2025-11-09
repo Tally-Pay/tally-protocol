@@ -1,15 +1,15 @@
-//! Solana Subscriptions Program
+//! Solana Recurring Payments Protocol
 //!
-//! A Solana-native subscription platform implementing delegate-based USDC payments.
-//! This program enables merchants to create subscription plans and collect recurring
+//! A Solana-native recurring payment platform implementing delegate-based USDC payments.
+//! This program enables payees to create payment terms and collect recurring
 //! payments through SPL Token delegate approvals, eliminating the need for user
-//! signatures on each renewal.
+//! signatures on each payment.
 //!
 //! ## Core Features
-//! - Merchant registration with fee configuration
-//! - Subscription plan creation with flexible pricing and periods
+//! - Payee registration with fee configuration
+//! - Payment terms creation with flexible pricing and periods
 //! - Delegate-based recurring payments using USDC
-//! - Automatic subscription renewals via off-chain keeper
+//! - Automatic payment execution via off-chain executor
 //! - Grace period handling for failed payments
 //! - Admin fee collection and withdrawal
 
@@ -28,41 +28,37 @@ use anchor_lang::prelude::*;
 mod accept_authority;
 mod admin_withdraw_fees;
 mod cancel_authority_transfer;
-mod cancel_subscription;
-mod close_subscription;
+mod close_agreement;
 pub mod constants;
-mod create_plan;
+mod create_payment_terms;
 pub mod errors;
 pub mod events;
+mod execute_payment;
 mod init_config;
-mod init_merchant;
+mod init_payee;
 mod pause;
-mod renew_subscription;
-mod start_subscription;
+mod pause_agreement;
+mod start_agreement;
 pub mod state;
 mod transfer_authority;
 mod unpause;
 mod update_config;
-mod update_plan;
-mod update_plan_terms;
 pub mod utils;
 
 use accept_authority::*;
 use admin_withdraw_fees::*;
 use cancel_authority_transfer::*;
-use cancel_subscription::*;
-use close_subscription::*;
-use create_plan::*;
+use close_agreement::*;
+use create_payment_terms::*;
+use execute_payment::*;
 use init_config::*;
-use init_merchant::*;
+use init_payee::*;
 use pause::*;
-use renew_subscription::*;
-use start_subscription::*;
+use pause_agreement::*;
+use start_agreement::*;
 use transfer_authority::*;
 use unpause::*;
 use update_config::*;
-use update_plan::*;
-use update_plan_terms::*;
 
 // Program ID is loaded from TALLY_PROGRAM_ID environment variable at compile time
 // The build script (build.rs) converts the base58 program ID to bytes
@@ -85,97 +81,97 @@ pub mod tally_protocol {
         init_config::handler(ctx, args)
     }
 
-    /// Initialize a new merchant account with USDC treasury and fee configuration
+    /// Initialize a new payee account with USDC treasury and fee configuration
     ///
     /// # Errors
     /// Returns an error if:
-    /// - The merchant account already exists
+    /// - The payee account already exists
     /// - Invalid USDC mint address
     /// - Fee configuration exceeds maximum allowed (10,000 basis points)
     /// - Account creation or initialization fails
-    pub fn init_merchant(ctx: Context<InitMerchant>, args: InitMerchantArgs) -> Result<()> {
-        init_merchant::handler(ctx, args)
+    pub fn init_payee(ctx: Context<InitPayee>, args: InitPayeeArgs) -> Result<()> {
+        init_payee::handler(ctx, args)
     }
 
-    /// Create a new subscription plan for a merchant
+    /// Create new payment terms for a payee
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Plan ID already exists for this merchant
+    /// - Payment terms ID already exists for this payee
     /// - Price is zero or exceeds maximum
     /// - Period is invalid (too short or too long)
     /// - Grace period exceeds the period duration
     /// - Account creation fails
-    pub fn create_plan(ctx: Context<CreatePlan>, args: CreatePlanArgs) -> Result<()> {
-        create_plan::handler(ctx, args)
+    pub fn create_payment_terms(ctx: Context<CreatePaymentTerms>, args: CreatePaymentTermsArgs) -> Result<()> {
+        create_payment_terms::handler(ctx, args)
     }
 
-    /// Start a new subscription for a user with delegate approval
+    /// Start a new payment agreement for a user with delegate approval
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Subscription already exists for this user and plan
+    /// - Payment agreement already exists for this user and payment terms
     /// - Insufficient USDC balance in user's account
     /// - Token transfer operations fail
     /// - Delegate approval amount is insufficient
-    /// - Plan is inactive or expired
+    /// - Payment terms are inactive or expired
     /// - Account creation fails
-    pub fn start_subscription(
-        ctx: Context<StartSubscription>,
-        args: StartSubscriptionArgs,
+    pub fn start_agreement(
+        ctx: Context<StartAgreement>,
+        args: StartAgreementArgs,
     ) -> Result<()> {
-        start_subscription::handler(ctx, args)
+        start_agreement::handler(ctx, args)
     }
 
-    /// Renew an existing subscription by pulling funds via delegate
+    /// Execute a payment for an existing agreement by pulling funds via delegate
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Subscription is not active or has been cancelled
-    /// - Renewal is not yet due (before `next_renewal_ts`)
-    /// - Insufficient USDC balance for renewal
+    /// - Payment agreement is not active or has been paused
+    /// - Payment is not yet due (before `next_renewal_ts`)
+    /// - Insufficient USDC balance for payment
     /// - Token transfer operations fail
-    /// - Subscription has exceeded grace period
+    /// - Payment agreement has exceeded grace period
     /// - Delegate approval is insufficient or revoked
-    pub fn renew_subscription(
-        ctx: Context<RenewSubscription>,
-        args: RenewSubscriptionArgs,
+    pub fn execute_payment(
+        ctx: Context<ExecutePayment>,
+        args: ExecutePaymentArgs,
     ) -> Result<()> {
-        renew_subscription::handler(ctx, args)
+        execute_payment::handler(ctx, args)
     }
 
-    /// Cancel a subscription and revoke delegate approval
+    /// Pause a payment agreement and revoke delegate approval
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Subscription does not exist or is already cancelled
-    /// - Unauthorized cancellation attempt (wrong subscriber)
+    /// - Payment agreement does not exist or is already paused
+    /// - Unauthorized pause attempt (wrong payer)
     /// - Token revoke operation fails
     /// - Account update operations fail
-    pub fn cancel_subscription(
-        ctx: Context<CancelSubscription>,
-        args: CancelSubscriptionArgs,
+    pub fn pause_agreement(
+        ctx: Context<PauseAgreement>,
+        args: PauseAgreementArgs,
     ) -> Result<()> {
-        cancel_subscription::handler(ctx, args)
+        pause_agreement::handler(ctx, args)
     }
 
-    /// Close a canceled subscription account and reclaim rent
+    /// Close a paused payment agreement account and reclaim rent
     ///
-    /// This instruction allows subscribers to close their subscription accounts
-    /// after cancellation to reclaim the rent (~0.00099792 SOL). The subscription
-    /// must be inactive (canceled) before it can be closed.
+    /// This instruction allows payers to close their payment agreement accounts
+    /// after pausing to reclaim the rent (~0.00099792 SOL). The payment agreement
+    /// must be inactive (paused) before it can be closed.
     ///
     /// # Errors
     /// Returns an error if:
-    /// - Subscription is still active (must be canceled first)
-    /// - Unauthorized closure attempt (wrong subscriber)
-    /// - Subscription does not exist or is invalid
+    /// - Payment agreement is still active (must be paused first)
+    /// - Unauthorized closure attempt (wrong payer)
+    /// - Payment agreement does not exist or is invalid
     /// - Account closure operations fail
-    pub fn close_subscription(
-        ctx: Context<CloseSubscription>,
-        args: CloseSubscriptionArgs,
+    pub fn close_agreement(
+        ctx: Context<CloseAgreement>,
+        args: CloseAgreementArgs,
     ) -> Result<()> {
-        close_subscription::handler(ctx, args)
+        close_agreement::handler(ctx, args)
     }
 
     /// Admin function to withdraw accumulated platform fees
@@ -243,24 +239,10 @@ pub mod tally_protocol {
         cancel_authority_transfer::handler(ctx, args)
     }
 
-    /// Update a subscription plan's active status
-    ///
-    /// Allows the merchant authority or platform admin to toggle whether a plan
-    /// accepts new subscriptions. This does NOT affect existing subscriptions,
-    /// which will continue to renew regardless of plan status.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - Caller is not the merchant authority or platform admin
-    /// - Plan does not exist or is invalid
-    pub fn update_plan(ctx: Context<UpdatePlan>, args: UpdatePlanArgs) -> Result<()> {
-        update_plan::handler(ctx, args)
-    }
-
     /// Pause the program
     ///
     /// This enables the emergency pause mechanism, disabling all user-facing operations
-    /// (`start_subscription`, `renew_subscription`, `create_plan`) while allowing admin
+    /// (`start_agreement`, `execute_payment`, `create_payment_terms`) while allowing admin
     /// operations to continue for emergency fund recovery.
     ///
     /// # Errors
@@ -273,7 +255,7 @@ pub mod tally_protocol {
     /// Unpause the program
     ///
     /// This disables the emergency pause mechanism, re-enabling all user-facing operations
-    /// (`start_subscription`, `renew_subscription`, `create_plan`).
+    /// (`start_agreement`, `execute_payment`, `create_payment_terms`).
     ///
     /// # Errors
     /// Returns an error if:
