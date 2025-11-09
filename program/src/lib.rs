@@ -43,7 +43,6 @@ pub mod state;
 mod transfer_authority;
 mod unpause;
 mod update_config;
-mod update_merchant_tier;
 mod update_plan;
 mod update_plan_terms;
 pub mod utils;
@@ -62,7 +61,6 @@ use start_subscription::*;
 use transfer_authority::*;
 use unpause::*;
 use update_config::*;
-use update_merchant_tier::*;
 use update_plan::*;
 use update_plan_terms::*;
 
@@ -301,27 +299,6 @@ pub mod tally_protocol {
         args: UpdateConfigArgs,
     ) -> Result<()> {
         update_config::handler(ctx, args)
-    }
-
-    /// Update merchant tier
-    ///
-    /// This allows the merchant authority or platform admin to change a merchant's tier,
-    /// which automatically adjusts the platform fee rate:
-    /// - Free: 2.0% (200 basis points)
-    /// - Pro: 1.5% (150 basis points)
-    /// - Enterprise: 1.0% (100 basis points)
-    ///
-    /// Tier changes take effect immediately on the next renewal.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - Caller is not the merchant authority or platform admin
-    /// - New tier fee is outside config min/max bounds
-    pub fn update_merchant_tier(
-        ctx: Context<UpdateMerchantTier>,
-        args: UpdateMerchantTierArgs,
-    ) -> Result<()> {
-        update_merchant_tier::handler(ctx, args)
     }
 
     /// Update subscription plan pricing and terms
