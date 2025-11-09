@@ -10467,7 +10467,7 @@ dependencies = [
 
 [[package]]
 name = "tally-protocol"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -10481,7 +10481,7 @@ dependencies = [
 
 [[package]]
 name = "tally-sdk"
-version = "0.2.1"
+version = "1.0.0"
 dependencies = [
  "anchor-client",
  "anchor-lang",
