@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{errors::SubscriptionError, events::ConfigUpdated, state::Config};
+use crate::{errors::RecurringPaymentError, events::ConfigUpdated, state::Config};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct UpdateConfigArgs {
@@ -31,7 +31,7 @@ pub fn handler(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()>
     // Validate caller is platform authority
     require!(
         ctx.accounts.platform_authority.key() == config.platform_authority,
-        SubscriptionError::Unauthorized
+        RecurringPaymentError::Unauthorized
     );
 
     // Track if any changes were made by checking all Option fields
@@ -44,26 +44,26 @@ pub fn handler(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()>
         || args.default_allowance_periods.is_some();
 
     // Require at least one field to be updated
-    require!(has_update, SubscriptionError::InvalidConfiguration);
+    require!(has_update, RecurringPaymentError::InvalidConfiguration);
 
     // Update keeper fee if provided
     if let Some(keeper_fee) = args.keeper_fee_bps {
         require!(
             keeper_fee <= 100,
-            SubscriptionError::InvalidConfiguration
+            RecurringPaymentError::InvalidConfiguration
         );
         config.keeper_fee_bps = keeper_fee;
     }
 
     // Update max withdrawal if provided
     if let Some(max_withdrawal) = args.max_withdrawal_amount {
-        require!(max_withdrawal > 0, SubscriptionError::InvalidConfiguration);
+        require!(max_withdrawal > 0, RecurringPaymentError::InvalidConfiguration);
         config.max_withdrawal_amount = max_withdrawal;
     }
 
     // Update max grace period if provided
     if let Some(max_grace) = args.max_grace_period_seconds {
-        require!(max_grace > 0, SubscriptionError::InvalidConfiguration);
+        require!(max_grace > 0, RecurringPaymentError::InvalidConfiguration);
         config.max_grace_period_seconds = max_grace;
     }
 
@@ -72,28 +72,28 @@ pub fn handler(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()>
         if let Some(max_fee) = args.max_platform_fee_bps {
             require!(
                 min_fee <= max_fee,
-                SubscriptionError::InvalidConfiguration
+                RecurringPaymentError::InvalidConfiguration
             );
             config.min_platform_fee_bps = min_fee;
             config.max_platform_fee_bps = max_fee;
         } else {
             require!(
                 min_fee <= config.max_platform_fee_bps,
-                SubscriptionError::InvalidConfiguration
+                RecurringPaymentError::InvalidConfiguration
             );
             config.min_platform_fee_bps = min_fee;
         }
     } else if let Some(max_fee) = args.max_platform_fee_bps {
         require!(
             config.min_platform_fee_bps <= max_fee,
-            SubscriptionError::InvalidConfiguration
+            RecurringPaymentError::InvalidConfiguration
         );
         config.max_platform_fee_bps = max_fee;
     }
 
     // Update min period if provided
     if let Some(min_period) = args.min_period_seconds {
-        require!(min_period > 0, SubscriptionError::InvalidConfiguration);
+        require!(min_period > 0, RecurringPaymentError::InvalidConfiguration);
         config.min_period_seconds = min_period;
     }
 
@@ -101,7 +101,7 @@ pub fn handler(ctx: Context<UpdateConfig>, args: UpdateConfigArgs) -> Result<()>
     if let Some(allowance_periods) = args.default_allowance_periods {
         require!(
             allowance_periods > 0,
-            SubscriptionError::InvalidConfiguration
+            RecurringPaymentError::InvalidConfiguration
         );
         config.default_allowance_periods = allowance_periods;
     }

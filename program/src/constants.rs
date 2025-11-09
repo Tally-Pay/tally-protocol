@@ -57,7 +57,7 @@ pub const FEE_BASIS_POINTS_DIVISOR: u128 = 10_000;
 /// ```ignore
 /// require!(
 ///     args.min_period_seconds >= ABSOLUTE_MIN_PERIOD_SECONDS,
-///     SubscriptionError::InvalidConfiguration
+///     RecurringPaymentError::InvalidConfiguration
 /// );
 /// ```
 ///

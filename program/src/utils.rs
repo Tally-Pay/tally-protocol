@@ -3,7 +3,7 @@ use anchor_lang::solana_program::program_pack::Pack;
 use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::{spl_token::state::Account as TokenAccount, Token};
 
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 
 /// Validates that the platform treasury ATA is valid and correctly configured.
 ///
@@ -60,29 +60,29 @@ pub fn validate_platform_treasury<'info>(
 
     require!(
         platform_treasury_ata.key() == expected_platform_ata,
-        SubscriptionError::BadSeeds
+        RecurringPaymentError::BadSeeds
     );
 
     // Validate platform treasury ATA is a valid token account
     let platform_ata_data = platform_treasury_ata.try_borrow_data()?;
     require!(
         platform_ata_data.len() == TokenAccount::LEN,
-        SubscriptionError::InvalidPlatformTreasuryAccount
+        RecurringPaymentError::InvalidPlatformTreasuryAccount
     );
     require!(
         platform_treasury_ata.owner == &token_program.key(),
-        SubscriptionError::InvalidPlatformTreasuryAccount
+        RecurringPaymentError::InvalidPlatformTreasuryAccount
     );
 
     // Deserialize and validate platform treasury token account data
     let token_account = TokenAccount::unpack(&platform_ata_data)?;
     require!(
         token_account.mint == *allowed_mint,
-        SubscriptionError::WrongMint
+        RecurringPaymentError::WrongMint
     );
     require!(
         token_account.owner == *platform_authority,
-        SubscriptionError::Unauthorized
+        RecurringPaymentError::Unauthorized
     );
 
     Ok(())

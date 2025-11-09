@@ -1,4 +1,4 @@
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 use crate::state::Config;
 use anchor_lang::prelude::*;
 
@@ -17,7 +17,7 @@ pub struct TransferAuthority<'info> {
         mut,
         seeds = [b"config"],
         bump = config.bump,
-        has_one = platform_authority @ SubscriptionError::Unauthorized
+        has_one = platform_authority @ RecurringPaymentError::Unauthorized
     )]
     pub config: Account<'info, Config>,
 
@@ -46,13 +46,13 @@ pub fn handler(ctx: Context<TransferAuthority>, args: TransferAuthorityArgs) -> 
     // Ensure no pending transfer exists
     require!(
         config.pending_authority.is_none(),
-        SubscriptionError::TransferAlreadyPending
+        RecurringPaymentError::TransferAlreadyPending
     );
 
     // Ensure new authority is different from current
     require!(
         args.new_authority != config.platform_authority,
-        SubscriptionError::InvalidTransferTarget
+        RecurringPaymentError::InvalidTransferTarget
     );
 
     // Set pending authority

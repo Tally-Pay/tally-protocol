@@ -82,32 +82,9 @@ pub fn handler(ctx: Context<ExecutePayment>, _args: ExecutePaymentArgs) -> Resul
     let clock = Clock::get()?;
     let current_time = clock.unix_timestamp;
 
-    // TRIAL TO PAID CONVERSION
-    //
-    // If this payment_agreement is in trial period, this renewal represents the first payment
-    // after trial expiration. We need to:
-    // 1. Clear the trial flags (in_trial = false, trial_ends_at = None)
-    // 2. Process the payment normally
-    // 3. Emit TrialConverted event after successful payment
-    let was_trial = payment_agreement.in_trial;
-
-    // Check timing: now >= next_renewal_ts AND now <= next_renewal_ts + grace_secs
+    // Check timing: payment is due when current time >= next_payment_ts
     if current_time < payment_agreement.next_payment_ts {
         return Err(RecurringPaymentError::NotDue.into());
-    }
-
-    // Convert grace period to i64 with overflow check
-    let grace_period_i64 = i64::try_from(payment_terms.grace_secs)
-        .map_err(|_| RecurringPaymentError::ArithmeticError)?;
-
-    // Calculate grace deadline with overflow check
-    let grace_deadline = payment_agreement
-        .next_payment_ts
-        .checked_add(grace_period_i64)
-        .ok_or(RecurringPaymentError::ArithmeticError)?;
-
-    if current_time > grace_deadline {
-        return Err(RecurringPaymentError::PastGrace.into());
     }
 
     // Prevent double-renewal attack: ensure sufficient time has passed since last renewal
@@ -126,12 +103,12 @@ pub fn handler(ctx: Context<ExecutePayment>, _args: ExecutePaymentArgs) -> Resul
     // Deserialize and validate token accounts with specific error handling
     let subscriber_ata_data: TokenAccount =
         TokenAccount::try_deserialize(&mut ctx.accounts.payer_usdc_ata.data.borrow().as_ref())
-            .map_err(|_| RecurringPaymentError::InvalidSubscriberTokenAccount)?;
+            .map_err(|_| RecurringPaymentError::InvalidPayerTokenAccount)?;
 
     let payee_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.payee_treasury_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| RecurringPaymentError::InvalidMerchantTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidPayeeTreasuryAccount)?;
 
     let platform_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.platform_treasury_ata.data.borrow().as_ref(),
@@ -140,7 +117,7 @@ pub fn handler(ctx: Context<ExecutePayment>, _args: ExecutePaymentArgs) -> Resul
 
     let keeper_ata_data: TokenAccount =
         TokenAccount::try_deserialize(&mut ctx.accounts.keeper_usdc_ata.data.borrow().as_ref())
-            .map_err(|_| RecurringPaymentError::InvalidSubscriberTokenAccount)?;
+            .map_err(|_| RecurringPaymentError::InvalidPayerTokenAccount)?;
 
     let usdc_mint_data: Mint =
         Mint::try_deserialize(&mut ctx.accounts.usdc_mint.data.borrow().as_ref())
@@ -216,7 +193,7 @@ pub fn handler(ctx: Context<ExecutePayment>, _args: ExecutePaymentArgs) -> Resul
             payer: payment_agreement.payer,
             current_allowance: subscriber_ata_data.delegated_amount,
             recommended_allowance,
-            plan_price: payment_terms.amount_usdc,
+            payment_price: payment_terms.amount_usdc,
         });
     }
 
@@ -374,30 +351,16 @@ pub fn handler(ctx: Context<ExecutePayment>, _args: ExecutePaymentArgs) -> Resul
         .checked_add(1)
         .ok_or(RecurringPaymentError::ArithmeticError)?;
 
-    payment_agreement.last_payment_amount = payment_terms.amount_usdc;
+    payment_agreement.last_amount = payment_terms.amount_usdc;
     payment_agreement.last_payment_ts = current_time;
 
-    // Clear trial status if this was a trial conversion
-    if was_trial {
-                    }
-
-    // Emit appropriate event based on whether this was a trial conversion or regular renewal
-    if was_trial {
-        // Emit TrialConverted event for trial to paid conversion
-        emit!(crate::events::TrialConverted {
-            payment_agreement: payment_agreement.key(),
-            payer: payment_agreement.payer,
-            payment_terms: payment_terms.key(),
-        });
-    }
-
-    // Always emit PaymentExecuted event (regardless of trial status)
+    // Emit PaymentExecuted event
     emit!(PaymentExecuted {
         payee: payee.key(),
         payment_terms: payment_terms.key(),
         payer: payment_agreement.payer,
         amount: payment_terms.amount_usdc,
-        executor: ctx.accounts.executor.key(),
+        keeper: ctx.accounts.executor.key(),
         keeper_fee,
     });
 

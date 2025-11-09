@@ -10,7 +10,7 @@ pub struct CloseAgreementArgs {
 pub struct CloseAgreement<'info> {
     #[account(
         mut,
-        seeds = [b"payment_agreement", payment_agreement.plan.as_ref(), payer.key().as_ref()],
+        seeds = [b"payment_agreement", payment_agreement.payment_terms.as_ref(), payer.key().as_ref()],
         bump = payment_agreement.bump,
         has_one = payer @ RecurringPaymentError::Unauthorized,
         constraint = !payment_agreement.active @ RecurringPaymentError::AlreadyActive,
@@ -27,7 +27,7 @@ pub fn handler(ctx: Context<CloseAgreement>, _args: CloseAgreementArgs) -> Resul
 
     // Emit PaymentAgreementClosed event before account is closed
     emit!(PaymentAgreementClosed {
-        plan: payment_agreement.plan,
+        payment_terms: payment_agreement.payment_terms,
         payer: ctx.accounts.payer.key(),
     });
 

@@ -196,7 +196,7 @@ fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
     let expected_program_data = get_program_data_address(ctx.program_id);
     require!(
         ctx.accounts.program_data.key() == expected_program_data,
-        crate::errors::SubscriptionError::InvalidProgramData
+        crate::errors::RecurringPaymentError::InvalidProgramData
     );
 
     // Step 2: Deserialize program data to extract upgrade authority
@@ -204,7 +204,7 @@ fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
     let program_data_bytes = program_data_account.try_borrow_data()?;
 
     let program_data_state: UpgradeableLoaderState = bincode::deserialize(&program_data_bytes)
-        .map_err(|_| crate::errors::SubscriptionError::InvalidProgramData)?;
+        .map_err(|_| crate::errors::RecurringPaymentError::InvalidProgramData)?;
 
     // Step 3: Extract and validate upgrade authority exists
     let UpgradeableLoaderState::ProgramData {
@@ -212,12 +212,12 @@ fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
         slot: deployment_slot,
     } = program_data_state
     else {
-        return Err(crate::errors::SubscriptionError::InvalidProgramData.into());
+        return Err(crate::errors::RecurringPaymentError::InvalidProgramData.into());
     };
 
     // Step 4: Ensure upgrade authority has not been revoked (critical security check)
     let upgrade_authority =
-        upgrade_authority_option.ok_or(crate::errors::SubscriptionError::Unauthorized)?;
+        upgrade_authority_option.ok_or(crate::errors::RecurringPaymentError::Unauthorized)?;
 
     // Step 5: AUDIT TRAIL - Log upgrade authority for security monitoring
     msg!("=== CONFIG INITIALIZATION AUDIT TRAIL ===");
@@ -229,7 +229,7 @@ fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
     // Step 6: Validate signer is the current upgrade authority
     require!(
         ctx.accounts.authority.key() == upgrade_authority,
-        crate::errors::SubscriptionError::Unauthorized
+        crate::errors::RecurringPaymentError::Unauthorized
     );
 
     // Step 7: OPTIONAL - Hardcoded upgrade authority validation (defense-in-depth)
@@ -237,7 +237,7 @@ fn validate_upgrade_authority(ctx: &Context<InitConfig>) -> Result<Pubkey> {
     if let Some(expected_authority) = EXPECTED_UPGRADE_AUTHORITY {
         require!(
             upgrade_authority == expected_authority,
-            crate::errors::SubscriptionError::Unauthorized
+            crate::errors::RecurringPaymentError::Unauthorized
         );
         msg!("✓ Hardcoded upgrade authority validation passed");
     } else {
@@ -266,13 +266,13 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     // Validate that min_platform_fee_bps <= max_platform_fee_bps
     require!(
         args.min_platform_fee_bps <= args.max_platform_fee_bps,
-        crate::errors::SubscriptionError::InvalidConfiguration
+        crate::errors::RecurringPaymentError::InvalidConfiguration
     );
 
     // Validate max_grace_period_seconds is reasonable (not zero)
     require!(
         args.max_grace_period_seconds > 0,
-        crate::errors::SubscriptionError::InvalidConfiguration
+        crate::errors::RecurringPaymentError::InvalidConfiguration
     );
 
     // Validate min_period_seconds meets absolute minimum (M-4 security fix)
@@ -288,14 +288,14 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
     // have reasonable billing cycles aligned with industry standards.
     require!(
         args.min_period_seconds >= crate::constants::ABSOLUTE_MIN_PERIOD_SECONDS,
-        crate::errors::SubscriptionError::InvalidConfiguration
+        crate::errors::RecurringPaymentError::InvalidConfiguration
     );
 
     // Validate keeper_fee_bps is within acceptable range (max 1% = 100 bps)
     // This prevents excessive keeper fees that would reduce merchant revenue
     require!(
         args.keeper_fee_bps <= 100,
-        crate::errors::SubscriptionError::InvalidConfiguration
+        crate::errors::RecurringPaymentError::InvalidConfiguration
     );
 
     // ========================================================================
@@ -362,29 +362,29 @@ pub fn handler(ctx: Context<InitConfig>, args: InitConfigArgs) -> Result<()> {
 
     require!(
         ctx.accounts.platform_treasury_ata.key() == expected_platform_ata,
-        crate::errors::SubscriptionError::BadSeeds
+        crate::errors::RecurringPaymentError::BadSeeds
     );
 
     // Validate platform treasury ATA is a valid token account
     let platform_ata_data = ctx.accounts.platform_treasury_ata.try_borrow_data()?;
     require!(
         platform_ata_data.len() == TokenAccount::LEN,
-        crate::errors::SubscriptionError::InvalidPlatformTreasuryAccount
+        crate::errors::RecurringPaymentError::InvalidPlatformTreasuryAccount
     );
     require!(
         ctx.accounts.platform_treasury_ata.owner == &ctx.accounts.token_program.key(),
-        crate::errors::SubscriptionError::InvalidPlatformTreasuryAccount
+        crate::errors::RecurringPaymentError::InvalidPlatformTreasuryAccount
     );
 
     // Deserialize and validate platform treasury token account data
     let token_account = TokenAccount::unpack(&platform_ata_data)?;
     require!(
         token_account.mint == args.allowed_mint,
-        crate::errors::SubscriptionError::WrongMint
+        crate::errors::RecurringPaymentError::WrongMint
     );
     require!(
         token_account.owner == args.platform_authority,
-        crate::errors::SubscriptionError::Unauthorized
+        crate::errors::RecurringPaymentError::Unauthorized
     );
 
     // Initialize config account

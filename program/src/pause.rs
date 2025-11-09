@@ -1,4 +1,4 @@
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 use crate::events::ProgramPaused;
 use crate::state::Config;
 use anchor_lang::prelude::*;
@@ -15,7 +15,7 @@ pub struct Pause<'info> {
         mut,
         seeds = [b"config"],
         bump = config.bump,
-        has_one = platform_authority @ SubscriptionError::Unauthorized
+        has_one = platform_authority @ RecurringPaymentError::Unauthorized
     )]
     pub config: Account<'info, Config>,
 

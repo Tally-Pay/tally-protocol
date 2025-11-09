@@ -283,25 +283,23 @@ pub mod tally_protocol {
         update_config::handler(ctx, args)
     }
 
-    /// Update subscription plan pricing and terms
-    ///
-    /// Allows the merchant authority to update an existing plan's price, period,
-    /// grace period, and name without creating a new plan. This is useful for
-    /// adjusting pricing, extending or shortening billing cycles, or updating
-    /// plan details based on market conditions.
-    ///
-    /// # Errors
-    /// Returns an error if:
-    /// - Caller is not the merchant authority
-    /// - No fields are provided for update (at least one required)
-    /// - New price is zero or exceeds maximum
-    /// - New period is below minimum period from config
-    /// - New grace period exceeds period or config maximum
-    /// - New name is empty
-    pub fn update_plan_terms(
-        ctx: Context<UpdatePlanTerms>,
-        args: UpdatePlanTermsArgs,
-    ) -> Result<()> {
-        update_plan_terms::handler(ctx, args)
-    }
+    // TODO: Implement update_payment_terms instruction
+    // /// Update payment terms pricing and period
+    // ///
+    // /// Allows the payee authority to update an existing terms' price and period
+    // /// without creating new payment terms. This is useful for adjusting pricing
+    // /// or extending or shortening billing cycles.
+    // ///
+    // /// # Errors
+    // /// Returns an error if:
+    // /// - Caller is not the payee authority
+    // /// - No fields are provided for update (at least one required)
+    // /// - New price is zero or exceeds maximum
+    // /// - New period is below minimum period from config
+    // pub fn update_payment_terms(
+    //     ctx: Context<UpdatePaymentTerms>,
+    //     args: UpdatePaymentTermsArgs,
+    // ) -> Result<()> {
+    //     update_payment_terms::handler(ctx, args)
+    // }
 }

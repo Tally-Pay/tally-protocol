@@ -91,10 +91,10 @@ pub struct PauseAgreement<'info> {
     pub payment_terms: Account<'info, PaymentTerms>,
 
     #[account(
-        seeds = [b"merchant", merchant.authority.as_ref()],
-        bump = merchant.bump
+        seeds = [b"payee", payee.authority.as_ref()],
+        bump = payee.bump
     )]
-    pub merchant: Account<'info, Merchant>,
+    pub payee: Account<'info, Payee>,
 
     pub payer: Signer<'info>,
 
@@ -117,19 +117,19 @@ pub struct PauseAgreement<'info> {
 pub fn handler(ctx: Context<PauseAgreement>, _args: PauseAgreementArgs) -> Result<()> {
     let payment_agreement = &mut ctx.accounts.payment_agreement;
     let payment_terms = &ctx.accounts.payment_terms;
-    let merchant = &ctx.accounts.merchant;
+    let payee = &ctx.accounts.payee;
 
     // Deserialize and validate payer's token account
     let subscriber_ata_data: TokenAccount =
         TokenAccount::try_deserialize(&mut ctx.accounts.payer_usdc_ata.data.borrow().as_ref())
-            .map_err(|_| RecurringPaymentError::InvalidSubscriberTokenAccount)?;
+            .map_err(|_| RecurringPaymentError::InvalidPayerTokenAccount)?;
 
     // Validate token account ownership and mint
     if subscriber_ata_data.owner != ctx.accounts.payer.key() {
         return Err(RecurringPaymentError::Unauthorized.into());
     }
 
-    if subscriber_ata_data.mint != merchant.usdc_mint {
+    if subscriber_ata_data.mint != payee.usdc_mint {
         return Err(RecurringPaymentError::WrongMint.into());
     }
 
@@ -183,7 +183,7 @@ pub fn handler(ctx: Context<PauseAgreement>, _args: PauseAgreementArgs) -> Resul
 
     // Emit PaymentAgreementPaused event
     emit!(PaymentAgreementPaused {
-        merchant: merchant.key(),
+        payee: payee.key(),
         payment_terms: payment_terms.key(),
         payer: ctx.accounts.payer.key(),
     });

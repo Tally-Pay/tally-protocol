@@ -96,9 +96,6 @@ pub struct StartAgreement<'info> {
     )]
     pub payment_agreement: Account<'info, PaymentAgreement>,
 
-    #[account(
-        constraint = payment_terms.active @ RecurringPaymentError::Inactive
-    )]
     pub payment_terms: Account<'info, PaymentTerms>,
 
     #[account(
@@ -146,7 +143,7 @@ pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result
 
     // Detect if this is reactivation (account already exists) vs new payment_agreement
     // created_ts will be non-zero for existing accounts since it's set during initialization
-    let is_reactivation = payment_agreement.created_at != 0;
+    let is_reactivation = payment_agreement.created_ts != 0;
 
     if is_reactivation {
         // REACTIVATION PATH: Validate and reactivate existing payment_agreement
@@ -168,12 +165,12 @@ pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result
     // Deserialize and validate token accounts with specific error handling
     let subscriber_ata_data: TokenAccount =
         TokenAccount::try_deserialize(&mut ctx.accounts.payer_usdc_ata.data.borrow().as_ref())
-            .map_err(|_| RecurringPaymentError::InvalidSubscriberTokenAccount)?;
+            .map_err(|_| RecurringPaymentError::InvalidPayerTokenAccount)?;
 
     let merchant_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.payee_treasury_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| RecurringPaymentError::InvalidMerchantTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidPayeeTreasuryAccount)?;
 
     let platform_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.platform_treasury_ata.data.borrow().as_ref(),
@@ -234,7 +231,7 @@ pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result
 
     require!(
         payment_terms.amount_usdc <= max_safe_price,
-        RecurringPaymentError::InvalidPlan
+        RecurringPaymentError::InvalidPaymentTerms
     );
 
     // Validate delegate allowance for multi-period payment_agreement start
@@ -462,17 +459,17 @@ pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result
 
         payment_agreement.active = true;
         payment_agreement.next_payment_ts = next_renewal_ts;
-        payment_agreement.last_payment_amount = payment_terms.amount_usdc;
+        payment_agreement.last_amount = payment_terms.amount_usdc;
         payment_agreement.last_payment_ts = current_time;
     } else {
-        // NEW SUBSCRIPTION: Initialize all fields
+        // NEW PAYMENT AGREEMENT: Initialize all fields
         payment_agreement.payment_terms = payment_terms.key();
         payment_agreement.payer = ctx.accounts.payer.key();
         payment_agreement.next_payment_ts = next_renewal_ts;
         payment_agreement.active = true;
         payment_agreement.payment_count = 0;
-        payment_agreement.created_at = current_time;
-        payment_agreement.last_payment_amount = payment_terms.amount_usdc;
+        payment_agreement.created_ts = current_time;
+        payment_agreement.last_amount = payment_terms.amount_usdc;
         payment_agreement.last_payment_ts = current_time;
         payment_agreement.bump = ctx.bumps.payment_agreement;
     }
@@ -485,8 +482,8 @@ pub fn handler(ctx: Context<StartAgreement>, args: StartAgreementArgs) -> Result
             payment_terms: payment_terms.key(),
             payer: ctx.accounts.payer.key(),
             amount: payment_terms.amount_usdc,
-            total_renewals: payment_agreement.payment_count,
-            original_created_ts: payment_agreement.created_at,
+            total_payments: payment_agreement.payment_count,
+            original_created_ts: payment_agreement.created_ts,
         });
     } else {
         // Emit PaymentAgreementStarted event for new paid subscriptions

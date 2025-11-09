@@ -1,95 +1,95 @@
 use anchor_lang::prelude::*;
 
-/// Event emitted when a subscription is successfully started
+/// Event emitted when a payment agreement is successfully started
 #[event]
-pub struct Subscribed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being subscribed to
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount paid for the subscription (in USDC micro-units)
+pub struct PaymentAgreementStarted {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being agreed to
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
+    /// The amount paid for the payment agreement (in USDC micro-units)
     pub amount: u64,
 }
 
-/// Event emitted when a previously canceled subscription is reactivated
+/// Event emitted when a previously paused payment agreement is reactivated
 #[event]
-pub struct SubscriptionReactivated {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being reactivated
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
+pub struct PaymentAgreementReactivated {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being reactivated
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
     /// The amount paid for reactivation (in USDC micro-units)
     pub amount: u64,
-    /// Cumulative number of renewals across all subscription sessions
-    pub total_renewals: u32,
-    /// Original subscription creation timestamp (preserved from first session)
+    /// Cumulative number of payments across all agreement sessions
+    pub total_payments: u32,
+    /// Original payment agreement creation timestamp (preserved from first session)
     pub original_created_ts: i64,
 }
 
-/// Event emitted when a subscription is successfully renewed
+/// Event emitted when a recurring payment is successfully executed
 #[event]
-pub struct Renewed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being renewed
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
-    /// The amount paid for the renewal (in USDC micro-units)
+pub struct PaymentExecuted {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being executed
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
+    /// The amount paid for the execution (in USDC micro-units)
     pub amount: u64,
-    /// The keeper (transaction caller) who executed the renewal
+    /// The keeper (transaction caller) who executed the payment
     pub keeper: Pubkey,
     /// The fee paid to the keeper (in USDC micro-units)
     pub keeper_fee: u64,
 }
 
-/// Event emitted when a subscription is canceled
+/// Event emitted when a payment agreement is paused
 #[event]
-pub struct Canceled {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan being canceled
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
+pub struct PaymentAgreementPaused {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms being paused
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
 }
 
-/// Event emitted when a subscription account is closed and rent is reclaimed
+/// Event emitted when a payment agreement account is closed and rent is reclaimed
 #[event]
-pub struct SubscriptionClosed {
-    /// The subscription plan that was closed
-    pub plan: Pubkey,
-    /// The subscriber's public key who closed the subscription and received the rent
-    pub subscriber: Pubkey,
+pub struct PaymentAgreementClosed {
+    /// The payment terms that was closed
+    pub payment_terms: Pubkey,
+    /// The payer's public key who closed the payment agreement and received the rent
+    pub payer: Pubkey,
 }
 
-/// Event emitted when a subscription payment fails
+/// Event emitted when a recurring payment fails
 #[event]
 pub struct PaymentFailed {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan where payment failed
-    pub plan: Pubkey,
-    /// The subscriber's public key
-    pub subscriber: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms where payment failed
+    pub payment_terms: Pubkey,
+    /// The payer's public key
+    pub payer: Pubkey,
     /// The reason for payment failure (encoded as string for off-chain analysis)
     pub reason: String,
 }
 
-/// Event emitted when a plan's active status is changed
+/// Event emitted when payment terms' active status is changed
 #[event]
-pub struct PlanStatusChanged {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan whose status changed
-    pub plan: Pubkey,
+pub struct PaymentTermsStatusChanged {
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms whose status changed
+    pub payment_terms: Pubkey,
     /// The new active status
     pub active: bool,
-    /// Who changed the status: "merchant" or "platform"
+    /// Who changed the status: "payee" or "platform"
     pub changed_by: String,
 }
 
@@ -116,43 +116,39 @@ pub struct ConfigInitialized {
     pub timestamp: i64,
 }
 
-/// Event emitted when a merchant account is initialized
+/// Event emitted when a payee account is initialized
 #[event]
-pub struct MerchantInitialized {
-    /// The merchant PDA account
-    pub merchant: Pubkey,
-    /// Merchant authority (signer for merchant operations)
+pub struct PayeeInitialized {
+    /// The payee PDA account
+    pub payee: Pubkey,
+    /// Payee authority (signer for payee operations)
     pub authority: Pubkey,
     /// Pinned USDC mint address for all transactions
     pub usdc_mint: Pubkey,
-    /// Merchant's USDC treasury ATA
+    /// Payee's USDC treasury ATA
     pub treasury_ata: Pubkey,
-    /// Initial volume tier (always Standard for new merchants)
+    /// Initial volume tier (always Standard for new payees)
     pub volume_tier: crate::state::VolumeTier,
     /// Platform fee in basis points (derived from volume tier)
     pub platform_fee_bps: u16,
-    /// Unix timestamp when merchant was initialized
+    /// Unix timestamp when payee was initialized
     pub timestamp: i64,
 }
 
-/// Event emitted when a subscription plan is created
+/// Event emitted when payment terms are created
 #[event]
-pub struct PlanCreated {
-    /// The plan PDA account
-    pub plan: Pubkey,
-    /// Reference to the merchant PDA
-    pub merchant: Pubkey,
-    /// Deterministic plan identifier
-    pub plan_id: String,
-    /// Price in USDC microlamports (6 decimals)
-    pub price_usdc: u64,
-    /// Subscription period in seconds
+pub struct PaymentTermsCreated {
+    /// The payment terms PDA account
+    pub payment_terms: Pubkey,
+    /// Reference to the payee PDA
+    pub payee: Pubkey,
+    /// Deterministic payment terms identifier
+    pub terms_id: String,
+    /// Amount in USDC microlamports (6 decimals)
+    pub amount_usdc: u64,
+    /// Payment period in seconds
     pub period_secs: u64,
-    /// Grace period for renewals in seconds
-    pub grace_secs: u64,
-    /// Plan display name
-    pub name: String,
-    /// Unix timestamp when plan was created
+    /// Unix timestamp when payment terms were created
     pub timestamp: i64,
 }
 
@@ -174,35 +170,35 @@ pub struct ProgramUnpaused {
     pub timestamp: i64,
 }
 
-/// Event emitted when a subscription renewal succeeds but remaining allowance is low
+/// Event emitted when a payment execution succeeds but remaining allowance is low
 ///
 /// This warning event alerts off-chain systems and users when the delegate allowance
-/// drops below a recommended threshold (2x the plan price). While the current renewal
-/// succeeded, the low allowance may cause the next renewal to fail if not topped up.
+/// drops below a recommended threshold (2x the payment price). While the current payment
+/// succeeded, the low allowance may cause the next payment to fail if not topped up.
 ///
 /// This addresses the allowance management UX concern from audit finding L-3, where
-/// users may successfully start a subscription with multi-period allowance but find
-/// renewals failing if allowance drops below the single-period price.
+/// users may successfully start a payment agreement with multi-period allowance but find
+/// payments failing if allowance drops below the single-period price.
 ///
 /// Off-chain systems should monitor this event to:
 /// - Send notifications to users to increase their allowance
-/// - Display warnings in UI before the next renewal date
+/// - Display warnings in UI before the next payment date
 /// - Trigger automated allowance top-up workflows
 /// - Generate analytics on allowance management patterns
 #[event]
 pub struct LowAllowanceWarning {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan with low allowance
-    pub plan: Pubkey,
-    /// The subscriber who needs to increase allowance
-    pub subscriber: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms with low allowance
+    pub payment_terms: Pubkey,
+    /// The payer who needs to increase allowance
+    pub payer: Pubkey,
     /// Current remaining allowance (in USDC micro-units)
     pub current_allowance: u64,
-    /// Recommended minimum allowance (2x plan price)
+    /// Recommended minimum allowance (2x payment price)
     pub recommended_allowance: u64,
-    /// Plan price for reference (in USDC micro-units)
-    pub plan_price: u64,
+    /// Payment price for reference (in USDC micro-units)
+    pub payment_price: u64,
 }
 
 /// Event emitted when platform fees are withdrawn
@@ -225,42 +221,42 @@ pub struct FeesWithdrawn {
     pub timestamp: i64,
 }
 
-/// Event emitted when a delegate mismatch is detected during subscription renewal
+/// Event emitted when a delegate mismatch is detected during payment execution
 ///
 /// This warning event alerts off-chain systems and users when the token account's
 /// current delegate does not match the expected global protocol delegate PDA.
 ///
 /// **Global Delegate Architecture**: This protocol uses a single global delegate PDA
-/// shared by all merchants and subscriptions. The global delegate enables users to
-/// subscribe to multiple merchants using the same token account without delegate conflicts.
+/// shared by all payees and payment agreements. The global delegate enables users to
+/// have payment agreements with multiple payees using the same token account without delegate conflicts.
 ///
 /// **Scenarios that trigger this event:**
-/// 1. User manually revoked the global delegate → All subscriptions on this account stop renewing
+/// 1. User manually revoked the global delegate → All payment agreements on this account stop executing
 /// 2. User approved a different program's delegate → Token account now delegated elsewhere
-/// 3. Delegate was never approved → Subscription was created without proper delegate setup
+/// 3. Delegate was never approved → Payment agreement was created without proper delegate setup
 /// 4. User is using the token account for other programs → Delegate overwritten by another protocol
 ///
 /// Off-chain systems should monitor this event to:
-/// - Alert users that their subscription is non-functional due to delegate mismatch
-/// - Recommend re-approving the global delegate to restore all subscriptions
-/// - Guide users to reactivate affected subscriptions
+/// - Alert users that their payment agreement is non-functional due to delegate mismatch
+/// - Recommend re-approving the global delegate to restore all payment agreements
+/// - Guide users to reactivate affected payment agreements
 /// - Display clear information about the global delegate requirement
 /// - Track delegate revocation patterns for user support
 ///
 /// **Recovery**: The user needs to re-approve the global protocol delegate on their token
-/// account, then reactivate any affected subscriptions. Once the global delegate is approved,
-/// ALL merchant subscriptions will be able to renew again.
+/// account, then reactivate any affected payment agreements. Once the global delegate is approved,
+/// ALL payee payment agreements will be able to execute again.
 ///
-/// **Important**: This subscription will NOT renew until the delegate is corrected and the
-/// subscription is reactivated.
+/// **Important**: This payment agreement will NOT execute until the delegate is corrected and the
+/// payment agreement is reactivated.
 #[event]
 pub struct DelegateMismatchWarning {
-    /// The merchant who owns the subscription plan
-    pub merchant: Pubkey,
-    /// The subscription plan with delegate mismatch
-    pub plan: Pubkey,
-    /// The subscriber whose token account has incorrect delegate
-    pub subscriber: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The payment terms with delegate mismatch
+    pub payment_terms: Pubkey,
+    /// The payer whose token account has incorrect delegate
+    pub payer: Pubkey,
     /// The expected global protocol delegate PDA
     pub expected_delegate: Pubkey,
     /// The actual delegate currently set on the token account (may be None or from another program)
@@ -287,7 +283,7 @@ pub struct ConfigUpdated {
     pub updated_by: Pubkey,
 }
 
-/// Event emitted when a merchant's volume tier is upgraded
+/// Event emitted when a payee's volume tier is upgraded
 ///
 /// Volume tiers upgrade automatically based on 30-day rolling payment volume.
 /// This event provides transparency and auditability for tier changes.
@@ -297,14 +293,14 @@ pub struct ConfigUpdated {
 /// - Growth → Scale: $100K monthly volume reached (2.0% → 1.5% fee)
 ///
 /// Off-chain systems can monitor this event to:
-/// - Track merchant growth and volume progression
+/// - Track payee growth and volume progression
 /// - Generate analytics on tier adoption and revenue impact
-/// - Alert merchants of automatic tier upgrades
+/// - Alert payees of automatic tier upgrades
 /// - Maintain audit trails for fee calculations and billing
 #[event]
 pub struct VolumeTierUpgraded {
-    /// The merchant account whose tier upgraded
-    pub merchant: Pubkey,
+    /// The payee account whose tier upgraded
+    pub payee: Pubkey,
     /// The previous tier before the upgrade
     pub old_tier: crate::state::VolumeTier,
     /// The new tier after the upgrade
@@ -315,77 +311,30 @@ pub struct VolumeTierUpgraded {
     pub new_platform_fee_bps: u16,
 }
 
-/// Event emitted when a plan's pricing or terms are updated
+/// Event emitted when payment terms' pricing or period are updated
 ///
-/// This event provides transparency for all plan term modifications made by merchant authority.
-/// Term updates affect existing subscriptions starting from their next renewal.
+/// This event provides transparency for all payment term modifications made by payee authority.
+/// Term updates affect existing payment agreements starting from their next payment.
 /// Off-chain systems can monitor this event to:
 /// - Track pricing changes and revenue impacts
-/// - Alert subscribers of upcoming term changes
-/// - Generate analytics on plan evolution patterns
-/// - Maintain audit trails for subscription management
+/// - Alert payers of upcoming term changes
+/// - Generate analytics on payment terms evolution patterns
+/// - Maintain audit trails for payment agreement management
 #[event]
-pub struct PlanTermsUpdated {
-    /// The plan account whose terms were updated
-    pub plan: Pubkey,
-    /// The merchant who owns the plan
-    pub merchant: Pubkey,
-    /// The old price before update (if price was updated)
-    pub old_price: Option<u64>,
-    /// The new price after update (if price was updated)
-    pub new_price: Option<u64>,
+pub struct PaymentTermsUpdated {
+    /// The payment terms account whose terms were updated
+    pub payment_terms: Pubkey,
+    /// The payee who owns the payment terms
+    pub payee: Pubkey,
+    /// The old amount before update (if amount was updated)
+    pub old_amount: Option<u64>,
+    /// The new amount after update (if amount was updated)
+    pub new_amount: Option<u64>,
     /// The old period before update (if period was updated)
     pub old_period: Option<u64>,
     /// The new period after update (if period was updated)
     pub new_period: Option<u64>,
-    /// The old grace period before update (if grace was updated)
-    pub old_grace: Option<u64>,
-    /// The new grace period after update (if grace was updated)
-    pub new_grace: Option<u64>,
-    /// Merchant authority who performed the update
+    /// Payee authority who performed the update
     pub updated_by: Pubkey,
 }
 
-/// Event emitted when a subscription starts with a free trial period
-///
-/// This event indicates a new subscription was created with a trial period,
-/// during which no payment is required. The first payment will occur when
-/// the trial ends.
-///
-/// Off-chain systems can monitor this event to:
-/// - Track trial usage and conversion rates
-/// - Send trial expiration reminders to subscribers
-/// - Generate analytics on trial effectiveness
-/// - Identify potential trial abuse patterns
-#[event]
-pub struct TrialStarted {
-    /// The subscription account that entered trial period
-    pub subscription: Pubkey,
-    /// The subscriber who started the trial
-    pub subscriber: Pubkey,
-    /// The subscription plan for this trial
-    pub plan: Pubkey,
-    /// Unix timestamp when the trial period ends
-    pub trial_ends_at: i64,
-}
-
-/// Event emitted when a trial subscription converts to paid
-///
-/// This event marks the successful conversion of a free trial subscription
-/// to a paid subscription after the trial period ends. This occurs during
-/// the first renewal after trial expiration.
-///
-/// Off-chain systems can monitor this event to:
-/// - Track trial-to-paid conversion rates
-/// - Measure subscription revenue attribution
-/// - Generate trial effectiveness metrics
-/// - Trigger post-conversion workflows (welcome emails, etc.)
-#[event]
-pub struct TrialConverted {
-    /// The subscription account that converted from trial to paid
-    pub subscription: Pubkey,
-    /// The subscriber who converted to paid
-    pub subscriber: Pubkey,
-    /// The subscription plan that was converted
-    pub plan: Pubkey,
-}

@@ -1,4 +1,4 @@
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 use crate::state::Config;
 use anchor_lang::prelude::*;
 
@@ -16,7 +16,7 @@ pub struct CancelAuthorityTransfer<'info> {
         mut,
         seeds = [b"config"],
         bump = config.bump,
-        has_one = platform_authority @ SubscriptionError::Unauthorized
+        has_one = platform_authority @ RecurringPaymentError::Unauthorized
     )]
     pub config: Account<'info, Config>,
 
@@ -45,7 +45,7 @@ pub fn handler(ctx: Context<CancelAuthorityTransfer>, _args: CancelAuthorityTran
     // Ensure a pending transfer exists to cancel
     let pending_authority = config
         .pending_authority
-        .ok_or(SubscriptionError::NoPendingTransfer)?;
+        .ok_or(RecurringPaymentError::NoPendingTransfer)?;
 
     // Clear the pending authority
     config.pending_authority = None;

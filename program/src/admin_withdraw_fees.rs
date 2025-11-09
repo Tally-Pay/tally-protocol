@@ -1,4 +1,4 @@
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 use crate::events::FeesWithdrawn;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
@@ -41,7 +41,7 @@ pub struct AdminWithdrawFees<'info> {
 pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> Result<()> {
     // Validate platform authority
     if ctx.accounts.platform_authority.key() != ctx.accounts.config.platform_authority {
-        return Err(SubscriptionError::Unauthorized.into());
+        return Err(RecurringPaymentError::Unauthorized.into());
     }
 
     // Validate that platform_treasury_ata is the correct ATA derived from platform authority and USDC mint
@@ -52,51 +52,51 @@ pub fn handler(ctx: Context<AdminWithdrawFees>, args: AdminWithdrawFeesArgs) -> 
     );
 
     if ctx.accounts.platform_treasury_ata.key() != expected_platform_ata {
-        return Err(SubscriptionError::Unauthorized.into());
+        return Err(RecurringPaymentError::Unauthorized.into());
     }
 
     // Deserialize and validate token accounts with specific error handling
     let platform_treasury_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.platform_treasury_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| SubscriptionError::InvalidPlatformTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidPlatformTreasuryAccount)?;
 
     let platform_destination_data: TokenAccount = TokenAccount::try_deserialize(
         &mut ctx.accounts.platform_destination_ata.data.borrow().as_ref(),
     )
-    .map_err(|_| SubscriptionError::InvalidPlatformTreasuryAccount)?;
+    .map_err(|_| RecurringPaymentError::InvalidPlatformTreasuryAccount)?;
 
     let usdc_mint_data: Mint =
         Mint::try_deserialize(&mut ctx.accounts.usdc_mint.data.borrow().as_ref())
-            .map_err(|_| SubscriptionError::InvalidUsdcMint)?;
+            .map_err(|_| RecurringPaymentError::InvalidUsdcMint)?;
 
     // Validate platform_treasury_ata is owned by platform_authority
     if platform_treasury_data.owner != ctx.accounts.platform_authority.key() {
-        return Err(SubscriptionError::Unauthorized.into());
+        return Err(RecurringPaymentError::Unauthorized.into());
     }
 
     // Validate both ATAs use the correct USDC mint
     if platform_treasury_data.mint != ctx.accounts.usdc_mint.key()
         || platform_destination_data.mint != ctx.accounts.usdc_mint.key()
     {
-        return Err(SubscriptionError::WrongMint.into());
+        return Err(RecurringPaymentError::WrongMint.into());
     }
 
     // Validate sufficient balance
     if platform_treasury_data.amount < args.amount {
-        return Err(SubscriptionError::InsufficientFunds.into());
+        return Err(RecurringPaymentError::InsufficientFunds.into());
     }
 
     // Validate amount is greater than 0
     if args.amount == 0 {
-        return Err(SubscriptionError::InvalidAmount.into());
+        return Err(RecurringPaymentError::InvalidAmount.into());
     }
 
     // Validate amount does not exceed configured maximum withdrawal limit
     // This prevents accidental or malicious drainage of entire treasury
     require!(
         args.amount <= ctx.accounts.config.max_withdrawal_amount,
-        SubscriptionError::WithdrawLimitExceeded
+        RecurringPaymentError::WithdrawLimitExceeded
     );
 
     // Transfer funds from platform treasury to destination

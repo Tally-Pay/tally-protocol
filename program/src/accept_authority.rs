@@ -1,4 +1,4 @@
-use crate::errors::SubscriptionError;
+use crate::errors::RecurringPaymentError;
 use crate::state::Config;
 use anchor_lang::prelude::*;
 
@@ -43,12 +43,12 @@ pub fn handler(ctx: Context<AcceptAuthority>, _args: AcceptAuthorityArgs) -> Res
     // Ensure a pending transfer exists
     let pending_authority = config
         .pending_authority
-        .ok_or(SubscriptionError::NoPendingTransfer)?;
+        .ok_or(RecurringPaymentError::NoPendingTransfer)?;
 
     // Ensure signer is the pending authority
     require!(
         ctx.accounts.new_authority.key() == pending_authority,
-        SubscriptionError::Unauthorized
+        RecurringPaymentError::Unauthorized
     );
 
     let old_authority = config.platform_authority;
