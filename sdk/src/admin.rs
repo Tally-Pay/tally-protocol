@@ -12,7 +12,6 @@
 //! - **Fee Management**: Withdraw accumulated platform fees
 //! - **Authority Transfer**: Securely transfer platform authority
 //! - **Emergency Controls**: Pause/unpause protocol operations
-//! - **Payee Management**: Update payee tier levels
 //!
 //! # Security
 //!
@@ -46,7 +45,7 @@ pub use crate::program_types::{
 // Re-export admin-related builders from transaction_builder
 pub use crate::transaction_builder::{
     accept_authority, admin_withdraw_fees, cancel_authority_transfer, init_config, pause,
-    transfer_authority, unpause, update_config, update_payee_tier, AcceptAuthorityBuilder,
+    transfer_authority, unpause, update_config, AcceptAuthorityBuilder,
     AdminWithdrawFeesBuilder, CancelAuthorityTransferBuilder, InitConfigBuilder, PauseBuilder,
-    TransferAuthorityBuilder, UnpauseBuilder, UpdateConfigBuilder, UpdatePayeeTierBuilder,
+    TransferAuthorityBuilder, UnpauseBuilder, UpdateConfigBuilder,
 };
