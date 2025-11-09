@@ -1,168 +1,148 @@
 use anchor_lang::prelude::*;
 
-/// Custom error codes for the subscription program
+/// Custom error codes for the recurring payments protocol
 ///
 /// Note: Anchor automatically assigns error codes starting from 6000.
-/// The error codes in comments (1001-1007) represent the logical PRD mapping,
-/// but Anchor will assign them as 6000-6006 respectively.
 #[error_code]
-pub enum SubscriptionError {
-    /// Error Code: 6000 (maps to PRD 1001)
-    /// When delegate allowance is insufficient for subscription payments
-    ///
-    /// For subscription start: Requires multi-period allowance (default 3x plan price)
-    /// For renewals: Requires single-period allowance (1x plan price), warns when low (< 2x)
+pub enum RecurringPaymentError {
+    /// Error Code: 6000
+    /// When delegate allowance is insufficient for recurring payments
     #[msg(
-        "Insufficient USDC allowance. For new subscriptions, approve multi-period allowance (recommended: 3x plan price). For renewals, maintain at least 2x plan price to avoid interruptions."
+        "Insufficient USDC allowance. Approve delegate allowance (recommended: 3x payment amount) to enable recurring payments."
     )]
     InsufficientAllowance,
 
-    /// Error Code: 6001 (maps to PRD 1002)
-    /// When user has insufficient USDC balance for subscription
-    #[msg("Insufficient USDC funds in your account to complete the subscription payment.")]
+    /// Error Code: 6001
+    /// When user has insufficient USDC balance for payment
+    #[msg("Insufficient USDC funds in your account to complete the payment.")]
     InsufficientFunds,
 
-    /// Error Code: 6002 (maps to PRD 1003)
-    /// When renewal attempt is made after grace period has expired
-    #[msg("Subscription renewal window has expired. Grace period has passed.")]
-    PastGrace,
-
-    /// Error Code: 6003 (maps to PRD 1004)
-    /// When subscription or plan is marked as inactive
-    #[msg("Subscription or plan is inactive and cannot be used for operations.")]
+    /// Error Code: 6002
+    /// When payment agreement is marked as inactive
+    #[msg("Payment agreement is inactive and cannot be used for operations.")]
     Inactive,
 
-    /// Error Code: 6004 (maps to PRD 1005)
+    /// Error Code: 6003
     /// When incorrect token mint is provided (expecting USDC)
-    #[msg("Invalid token mint provided. Only USDC is supported for subscriptions.")]
+    #[msg("Invalid token mint provided. Only USDC is supported for payments.")]
     WrongMint,
 
-    /// Error Code: 6005 (maps to PRD 1006)
+    /// Error Code: 6004
     /// When PDA seeds don't match expected values
     #[msg("Invalid PDA seeds provided. Account derivation failed.")]
     BadSeeds,
 
-    /// Error Code: 6006 (maps to PRD 1007)
-    /// When plan configuration is invalid (price, period, etc.)
-    #[msg("Invalid plan configuration. Check price, period, or other plan parameters.")]
-    InvalidPlan,
+    /// Error Code: 6005
+    /// When payment terms configuration is invalid (amount, period, etc.)
+    #[msg("Invalid payment terms configuration. Check amount, period, or other parameters.")]
+    InvalidPaymentTerms,
 
-    /// Error Code: 6007
+    /// Error Code: 6006
     /// When arithmetic operations would overflow/underflow
     #[msg("Arithmetic operation would result in overflow or underflow.")]
     ArithmeticError,
 
-    /// Error Code: 6008
-    /// When subscription is already active and cannot be started again
-    #[msg("Subscription is already active and cannot be started again.")]
+    /// Error Code: 6007
+    /// When payment agreement is already active and cannot be started again
+    #[msg("Payment agreement is already active and cannot be started again.")]
     AlreadyActive,
 
-    /// Error Code: 6009
-    /// When trying to renew a subscription that's not due yet
-    #[msg("Subscription is not due for renewal yet.")]
+    /// Error Code: 6008
+    /// When trying to execute a payment that's not due yet
+    #[msg("Payment is not due yet. Next payment scheduled for later.")]
     NotDue,
 
-    /// Error Code: 6010
+    /// Error Code: 6009
     /// When unauthorized access is attempted
-    #[msg("Unauthorized access. Only the merchant or platform admin can perform this action.")]
+    #[msg("Unauthorized access. Only the payee or platform admin can perform this action.")]
     Unauthorized,
 
+    /// Error Code: 6010
+    /// When payment agreement has already been paused
+    #[msg("Payment agreement has already been paused and cannot be operated on.")]
+    AlreadyPaused,
+
     /// Error Code: 6011
-    /// When subscription has already been canceled
-    #[msg("Subscription has already been canceled and cannot be operated on.")]
-    AlreadyCanceled,
+    /// When provided payer token account is invalid or cannot be deserialized
+    #[msg("Invalid payer token account. Ensure the account is a valid USDC token account owned by the payer.")]
+    InvalidPayerTokenAccount,
 
     /// Error Code: 6012
-    /// When provided subscriber token account is invalid or cannot be deserialized
-    #[msg("Invalid subscriber token account. Ensure the account is a valid USDC token account owned by the subscriber.")]
-    InvalidSubscriberTokenAccount,
+    /// When provided payee treasury token account is invalid or cannot be deserialized
+    #[msg("Invalid payee treasury token account. Ensure the account is a valid USDC token account.")]
+    InvalidPayeeTreasuryAccount,
 
     /// Error Code: 6013
-    /// When provided merchant treasury token account is invalid or cannot be deserialized
-    #[msg("Invalid merchant treasury token account. Ensure the account is a valid USDC token account.")]
-    InvalidMerchantTreasuryAccount,
-
-    /// Error Code: 6014
     /// When provided platform treasury token account is invalid or cannot be deserialized
     #[msg("Invalid platform treasury token account. Ensure the account is a valid USDC token account.")]
     InvalidPlatformTreasuryAccount,
 
-    /// Error Code: 6015
+    /// Error Code: 6014
     /// When provided USDC mint account is invalid or cannot be deserialized
     #[msg("Invalid USDC mint account. Ensure the account is a valid token mint account.")]
     InvalidUsdcMint,
 
-    /// Error Code: 6016
-    /// When a required merchant account is missing or invalid
+    /// Error Code: 6015
+    /// When a required payee account is missing or invalid
     #[msg(
-        "Merchant account not found or invalid. Ensure the merchant has been properly initialized."
+        "Payee account not found or invalid. Ensure the payee has been properly initialized."
     )]
-    MerchantNotFound,
+    PayeeNotFound,
+
+    /// Error Code: 6016
+    /// When a required payment terms account is missing or invalid
+    #[msg("Payment terms not found or invalid. Ensure the terms exist and belong to the specified payee.")]
+    PaymentTermsNotFound,
 
     /// Error Code: 6017
-    /// When a required plan account is missing or invalid
-    #[msg("Subscription plan not found or invalid. Ensure the plan exists and belongs to the specified merchant.")]
-    PlanNotFound,
+    /// When a required payment agreement account is missing or invalid
+    #[msg("Payment agreement not found or invalid. Ensure the agreement exists for these terms and payer.")]
+    PaymentAgreementNotFound,
 
     /// Error Code: 6018
-    /// When a required subscription account is missing or invalid
-    #[msg("Subscription not found or invalid. Ensure the subscription exists for this plan and subscriber.")]
-    SubscriptionNotFound,
-
-    /// Error Code: 6019
     /// When the global configuration account is missing or invalid
     #[msg("Global configuration account not found or invalid. Ensure the program has been properly initialized.")]
     ConfigNotFound,
 
-    /// Error Code: 6020
+    /// Error Code: 6019
     /// When the program data account is invalid or cannot be deserialized
     #[msg("Invalid program data account. Ensure the account is the correct program data account for this program.")]
     InvalidProgramData,
 
-    /// Error Code: 6021
+    /// Error Code: 6020
     /// When attempting to accept authority transfer but no transfer is pending
     #[msg(
         "No pending authority transfer. A transfer must be initiated before it can be accepted."
     )]
     NoPendingTransfer,
 
-    /// Error Code: 6022
+    /// Error Code: 6021
     /// When attempting to initiate authority transfer but one is already pending
     #[msg("Authority transfer already pending. Complete or cancel the current transfer before initiating a new one.")]
     TransferAlreadyPending,
 
-    /// Error Code: 6023
+    /// Error Code: 6022
     /// When withdrawal amount exceeds configured maximum
     #[msg("Withdrawal amount exceeds maximum allowed per transaction. Please reduce the amount or contact platform admin to adjust limits.")]
     WithdrawLimitExceeded,
 
-    /// Error Code: 6024
+    /// Error Code: 6023
     /// When authority transfer target is invalid (same as current authority)
     #[msg("Invalid authority transfer target. The new authority must be different from the current authority.")]
     InvalidTransferTarget,
 
-    /// Error Code: 6025
+    /// Error Code: 6024
     /// When a monetary amount is invalid (zero, negative, or exceeds limits)
     #[msg("Invalid amount provided. Amount must be greater than zero and within acceptable limits.")]
     InvalidAmount,
 
-    /// Error Code: 6026
-    /// When attempting to create a plan that already exists for this merchant
-    #[msg("A plan with this ID already exists for this merchant. Each plan ID must be unique per merchant.")]
-    PlanAlreadyExists,
+    /// Error Code: 6025
+    /// When attempting to create payment terms that already exist for this payee
+    #[msg("Payment terms with this ID already exist for this payee. Each terms ID must be unique per payee.")]
+    PaymentTermsAlreadyExist,
 
-    /// Error Code: 6027
+    /// Error Code: 6026
     /// When global configuration parameters are invalid or inconsistent
     #[msg("Invalid configuration parameters. Ensure min/max fee bounds are consistent and all values are within acceptable ranges.")]
     InvalidConfiguration,
-
-    /// Error Code: 6028
-    /// When an invalid trial duration is provided (must be 7, 14, or 30 days)
-    #[msg("Invalid trial duration. Trial period must be exactly 7 days (604800 seconds), 14 days (1209600 seconds), or 30 days (2592000 seconds).")]
-    InvalidTrialDuration,
-
-    /// Error Code: 6029
-    /// When attempting to start a trial but subscriber has already used their trial for this plan
-    #[msg("Trial already used. Each subscriber can only use one free trial per plan.")]
-    TrialAlreadyUsed,
 }

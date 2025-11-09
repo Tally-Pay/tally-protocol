@@ -118,18 +118,18 @@ impl VolumeTier {
         let fee = self.platform_fee_bps();
         require!(
             (MIN_PLATFORM_FEE_BPS..=MAX_PLATFORM_FEE_BPS).contains(&fee),
-            crate::errors::SubscriptionError::InvalidConfiguration
+            crate::errors::RecurringPaymentError::InvalidConfiguration
         );
         Ok(())
     }
 }
 
-/// Merchant account stores merchant configuration and settings
-/// PDA seeds: ["merchant", authority]
+/// Payee account stores payment recipient configuration and settings
+/// PDA seeds: ["payee", authority]
 ///
 /// # Volume Tracking
 ///
-/// The Merchant account tracks rolling 30-day payment volume to automatically
+/// The Payee account tracks rolling 30-day payment volume to automatically
 /// determine the payee's fee tier. Volume resets after 30 days of inactivity.
 ///
 /// # Account Size
@@ -147,12 +147,12 @@ impl VolumeTier {
 /// Additional rent: ~0.000098 SOL (~$0.004 at $45/SOL)
 #[account]
 #[derive(InitSpace)]
-pub struct Merchant {
-    /// Merchant authority (signer for merchant operations)
+pub struct Payee {
+    /// Payee authority (signer for payee operations)
     pub authority: Pubkey, // 32 bytes
     /// Pinned USDC mint address for all transactions
     pub usdc_mint: Pubkey, // 32 bytes
-    /// Merchant's USDC treasury ATA (where merchant fees are sent)
+    /// Payee's USDC treasury ATA (where payment revenues are sent)
     pub treasury_ata: Pubkey, // 32 bytes
 
     /// Current volume tier (automatically calculated from `monthly_volume_usdc`)
@@ -167,13 +167,13 @@ pub struct Merchant {
 
     /// Rolling 30-day payment volume in USDC microlamports (6 decimals)
     ///
-    /// This field accumulates total payment volume processed by this merchant
+    /// This field accumulates total payment volume processed by this payee
     /// over a rolling 30-day window. It resets to zero if no payments are
     /// processed for 30 days.
     ///
     /// # Update Frequency
     ///
-    /// Updated on every payment execution (both initial and renewals).
+    /// Updated on every payment execution.
     ///
     /// # Tier Calculation
     ///
@@ -190,118 +190,99 @@ pub struct Merchant {
     pub bump: u8, // 1 byte
 }
 
-/// Plan account defines subscription plan details
-/// PDA seeds: ["plan", merchant, `plan_id`]
+/// PaymentTerms account defines payment schedule and amount for recurring payments
+/// PDA seeds: ["payment_terms", payee, `terms_id`]
+///
+/// # Account Size: 80 bytes
+/// - Discriminator: 8 bytes
+/// - payee: 32 bytes
+/// - terms_id: 32 bytes
+/// - amount_usdc: 8 bytes
+/// - period_secs: 8 bytes
+///
+/// Reduced from 129 bytes in v1.x.x by removing subscription-specific fields:
+/// - grace_secs: 8 bytes (moved to subscription extension)
+/// - name: 32 bytes (moved to off-chain indexer)
+/// - active: 1 byte (moved to subscription extension)
 #[account]
 #[derive(InitSpace)]
-pub struct Plan {
-    /// Reference to the merchant PDA
-    pub merchant: Pubkey, // 32 bytes
-    /// Deterministic plan identifier (string as bytes, padded to 32)
-    pub plan_id: [u8; 32], // 32 bytes
-    /// Price in USDC microlamports (6 decimals)
-    pub price_usdc: u64, // 8 bytes
-    /// Subscription period in seconds
+pub struct PaymentTerms {
+    /// Reference to the payee PDA
+    pub payee: Pubkey, // 32 bytes
+    /// Deterministic payment terms identifier (string as bytes, padded to 32)
+    pub terms_id: [u8; 32], // 32 bytes
+    /// Payment amount in USDC microlamports (6 decimals)
+    pub amount_usdc: u64, // 8 bytes
+    /// Payment period in seconds (payment frequency)
     pub period_secs: u64, // 8 bytes
-    /// Grace period for renewals in seconds
-    pub grace_secs: u64, // 8 bytes
-    /// Plan display name (string as bytes, padded to 32)
-    pub name: [u8; 32], // 32 bytes
-    /// Whether new subscriptions can be created for this plan
-    pub active: bool, // 1 byte
 }
 
-/// Subscription account tracks individual user subscriptions
-/// PDA seeds: ["subscription", plan, subscriber]
+/// PaymentAgreement account tracks recurring payment relationship between payer and payee
+/// PDA seeds: ["payment_agreement", payment_terms, payer]
 #[account]
 #[derive(InitSpace)]
-pub struct Subscription {
-    /// Reference to the plan PDA
-    pub plan: Pubkey, // 32 bytes
-    /// User's pubkey (the subscriber)
-    pub subscriber: Pubkey, // 32 bytes
-    /// Unix timestamp for next renewal
-    pub next_renewal_ts: i64, // 8 bytes
-    /// Whether subscription is active
+pub struct PaymentAgreement {
+    /// Reference to the payment terms PDA
+    pub payment_terms: Pubkey, // 32 bytes
+    /// Payer's pubkey (the one making payments)
+    pub payer: Pubkey, // 32 bytes
+    /// Unix timestamp for next payment execution
+    pub next_payment_ts: i64, // 8 bytes
+    /// Whether payment agreement is active
     pub active: bool, // 1 byte
-    /// Number of renewals processed for this subscription.
+    /// Number of payments executed under this agreement.
     ///
-    /// This counter increments with each successful renewal payment and is preserved
-    /// across subscription cancellation and reactivation cycles. When a subscription
-    /// is canceled and later reactivated, this field retains its historical value
-    /// rather than resetting to zero.
+    /// This counter increments with each successful payment execution and is preserved
+    /// across pause and resume cycles. When a payment agreement is paused and later
+    /// resumed, this field retains its historical value rather than resetting to zero.
     ///
-    /// # Reactivation Behavior
+    /// # Pause/Resume Behavior
     ///
-    /// - **New Subscription**: Initialized to `0`
-    /// - **Each Renewal**: Incremented by `1`
-    /// - **Cancellation**: Preserved (not reset)
-    /// - **Reactivation**: Preserved (continues from previous value)
+    /// - **New Agreement**: Initialized to `0`
+    /// - **Each Payment**: Incremented by `1`
+    /// - **Pause**: Preserved (not reset)
+    /// - **Resume**: Preserved (continues from previous value)
     ///
     /// # Use Cases
     ///
     /// This preservation behavior is intentional to maintain a complete historical
-    /// record of all renewals across the lifetime of the subscription relationship,
+    /// record of all payments across the lifetime of the payment relationship,
     /// regardless of interruptions. Off-chain systems using this field for analytics,
     /// business logic, or rewards programs must account for the possibility that this
-    /// value may represent renewals from previous subscription sessions.
+    /// value may represent payments from previous active sessions.
     ///
     /// # Example
     ///
     /// ```ignore
-    /// // Initial subscription
-    /// subscription.renewals = 0;
+    /// // Initial agreement
+    /// agreement.payment_count = 0;
     ///
-    /// // After 10 renewals
-    /// subscription.renewals = 10;
+    /// // After 10 payments
+    /// agreement.payment_count = 10;
     ///
-    /// // User cancels subscription
-    /// subscription.active = false;
-    /// subscription.renewals = 10; // Preserved
+    /// // User pauses agreement
+    /// agreement.active = false;
+    /// agreement.payment_count = 10; // Preserved
     ///
-    /// // User reactivates subscription
-    /// subscription.active = true;
-    /// subscription.renewals = 10; // Still preserved, not reset to 0
+    /// // User resumes agreement
+    /// agreement.active = true;
+    /// agreement.payment_count = 10; // Still preserved, not reset to 0
     ///
-    /// // After 5 more renewals in the new session
-    /// subscription.renewals = 15; // Cumulative across all sessions
+    /// // After 5 more payments in the new session
+    /// agreement.payment_count = 15; // Cumulative across all sessions
     /// ```
-    pub renewals: u32, // 4 bytes
-    /// Unix timestamp when subscription was created
+    pub payment_count: u32, // 4 bytes
+    /// Unix timestamp when agreement was created
     pub created_ts: i64, // 8 bytes
-    /// Last charged amount for audit purposes
+    /// Last payment amount for audit purposes
     pub last_amount: u64, // 8 bytes
-    /// Unix timestamp when subscription was last renewed (prevents double-renewal attacks)
-    pub last_renewed_ts: i64, // 8 bytes
-    /// Unix timestamp when free trial period ends (None if no trial)
-    ///
-    /// When present, indicates the subscription is in or was in a free trial period.
-    /// During the trial, no payment is required. After `trial_ends_at`, the first
-    /// renewal will process the initial payment.
-    ///
-    /// # Trial Behavior
-    ///
-    /// - **New Subscription with Trial**: Set to `current_time` + `trial_duration_secs`
-    /// - **During Trial**: No payment required, `in_trial` = true
-    /// - **Trial End**: First renewal processes payment, `in_trial` set to false
-    /// - **Reactivation**: Always None (trials only apply to first subscription)
-    pub trial_ends_at: Option<i64>, // 9 bytes (1 byte discriminator + 8 bytes i64)
-    /// Whether subscription is currently in free trial period
-    ///
-    /// When true, the subscription is active but no payment has been made yet.
-    /// The first payment will occur at `next_renewal_ts` (when trial ends).
-    ///
-    /// # Trial State Transitions
-    ///
-    /// - **New Subscription**: Set to true if `trial_duration_secs` provided
-    /// - **Trial End (First Renewal)**: Set to false after successful payment
-    /// - **Reactivation**: Always false (no trials on reactivation)
-    pub in_trial: bool, // 1 byte
+    /// Unix timestamp when last payment was executed (prevents double-payment attacks)
+    pub last_payment_ts: i64, // 8 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
 }
 
-impl Merchant {
+impl Payee {
     /// Total space: 8 (discriminator) + 32 + 32 + 32 + 1 + 8 + 8 + 1 = 122 bytes
     /// Note: Previous version was 108 bytes. New version adds:
     /// - `monthly_volume_usdc`: 8 bytes
@@ -312,17 +293,17 @@ impl Merchant {
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 
-impl Plan {
-    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 8 + 8 + 32 + 1 = 129 bytes
+impl PaymentTerms {
+    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 8 = 80 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 
-impl Subscription {
-    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 8 + 9 + 1 + 1 = 120 bytes
+impl PaymentAgreement {
+    /// Total space: 8 (discriminator) + 32 + 32 + 8 + 1 + 4 + 8 + 8 + 8 + 1 = 110 bytes
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
 
-/// Global configuration account for program constants and settings
+/// Global configuration account for recurring payments protocol
 /// PDA seeds: `["config"]`
 #[account]
 #[derive(InitSpace)]
@@ -335,25 +316,28 @@ pub struct Config {
     pub max_platform_fee_bps: u16, // 2 bytes
     /// Minimum platform fee in basis points (e.g., 50 = 0.5%)
     pub min_platform_fee_bps: u16, // 2 bytes
-    /// Minimum subscription period in seconds (e.g., 86400 = 24 hours)
+    /// Minimum payment period in seconds (e.g., 86400 = 24 hours)
     pub min_period_seconds: u64, // 8 bytes
     /// Default allowance periods multiplier (e.g., 3)
+    /// Used to calculate recommended delegate allowance amount
     pub default_allowance_periods: u8, // 1 byte
     /// Allowed token mint address (e.g., official USDC mint)
-    /// This prevents merchants from using fake or arbitrary tokens
+    /// This prevents payees from using fake or arbitrary tokens
     pub allowed_mint: Pubkey, // 32 bytes
     /// Maximum withdrawal amount per transaction in USDC microlamports
-    /// Prevents accidental or malicious drainage of entire treasury
+    /// Prevents accidental or malicious drainage of platform treasury
     pub max_withdrawal_amount: u64, // 8 bytes
-    /// Maximum grace period in seconds (e.g., 604800 = 7 days)
-    /// Prevents excessively long grace periods that increase merchant payment risk
+    /// DEPRECATED: Maximum grace period in seconds
+    /// This field is deprecated and should not be used. Grace periods are
+    /// subscription-specific and belong in the subscription extension layer.
+    /// Kept for backward compatibility. Will be removed in v3.0.0.
     pub max_grace_period_seconds: u64, // 8 bytes
     /// Emergency pause state - when true, all user-facing operations are disabled
     /// This allows the platform authority to halt operations in case of security incidents
     pub paused: bool, // 1 byte
-    /// Keeper fee in basis points (e.g., 25 = 0.25%)
-    /// This fee is paid to the transaction caller (keeper) to incentivize decentralized renewal network
-    /// Capped at 100 basis points (1%) to prevent excessive keeper fees
+    /// Keeper fee in basis points (e.g., 15 = 0.15%)
+    /// This fee is paid to the transaction caller (keeper) to incentivize
+    /// decentralized payment execution network
     pub keeper_fee_bps: u16, // 2 bytes
     /// PDA bump seed
     pub bump: u8, // 1 byte
