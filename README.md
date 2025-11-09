@@ -1,43 +1,53 @@
 # Tally Protocol
 
-A Solana-native subscription platform enabling merchants to collect recurring USDC payments through SPL Token delegate approvals. Tally implements delegate-based recurring payments, eliminating the need for user signatures on each renewal while maintaining full user control.
+A Solana-native recurring payments platform enabling automated USDC transfers through SPL Token delegate approvals. Tally implements delegate-based recurring payments, eliminating the need for user signatures on each payment while maintaining full user control.
 
 ## Overview
 
-Tally Protocol provides a decentralized subscription management system on Solana where:
+Tally Protocol provides a decentralized recurring payment system on Solana where:
 
-- **Merchants** create subscription plans with flexible pricing and billing periods
-- **Subscribers** approve multi-period USDC allowances through token delegates
-- **Keepers** execute renewals permissionlessly via delegate transfers
-- **Platform** earns fees while providing infrastructure and emergency controls
+- **Payees** create payment terms with flexible amounts and billing periods
+- **Payers** approve multi-period USDC allowances through a global delegate
+- **Keepers** execute payments permissionlessly via delegate transfers
+- **Platform** earns volume-based fees while providing infrastructure and emergency controls
 
-The protocol uses a single-delegate architecture where subscribers approve a merchant-specific delegate PDA for automatic payment collection, enabling seamless recurring billing without repeated user interactions.
+The protocol uses a **global delegate architecture** where all payers approve a single global delegate PDA, enabling multi-payee subscriptions from a single token account without delegate conflicts.
 
 ## Key Features
 
-### Merchant Capabilities
-- Register with USDC treasury and configurable fee rates
-- Create unlimited subscription plans with custom pricing and periods
-- Update plan terms (price, period, grace period, name) without creating new plans
-- Earn tiered revenue based on merchant tier (Free: 98%, Pro: 98.5%, Enterprise: 99%)
-- Control plan availability and subscriber management
+### Universal Recurring Payments
+- Support for subscriptions, payroll, investments, grants, and more
+- Hierarchical payment structures (company → department → employee → vendor)
+- Multi-payee support from single token account (global delegate)
+- Volume-based fee tiers reward growth (0.15-0.25%)
+- Extensions add use-case-specific features
 
-### Subscriber Experience
-- Start subscriptions with single delegate approval
-- Cancel subscriptions anytime and revoke delegate access
-- Close canceled subscriptions to reclaim rent (~0.00099792 SOL)
-- Benefit from grace periods on failed payments
+### Payee Capabilities
+- Register with USDC treasury and automatic volume-based fee tiers
+- Create unlimited payment terms with custom amounts and periods
+- Update plan terms (price, period, grace period, name) without creating new plans
+- Earn revenue with low platform fees (0.15-0.25% depending on volume)
+- Automatic tier upgrades based on 30-day rolling volume
+
+### Payer Experience
+- Single delegate approval for all payments
+- Subscribe to multiple payees without delegate conflicts
+- Cancel payments anytime and revoke delegate access
+- Close canceled agreements to reclaim rent (~0.00099792 SOL)
+- Benefit from grace periods on failed payments (extension-specific)
 - Maintain complete control over token approvals
 
 ### Platform Features
-- Tiered merchant fee structure (2.0% / 1.5% / 1.0%)
-- Configurable keeper incentives (0.5% renewal fee)
+- Volume-based fee tiers (Standard: 0.25%, Growth: 0.20%, Scale: 0.15%)
+- Reduced keeper incentives (0.15% payment fee)
 - Emergency pause mechanism for platform protection
 - Two-step authority transfer for platform governance
 - Fee withdrawal and treasury management
+- Composable extension architecture
 
 ### Technical Architecture
 - Built with Anchor 0.31.1 on Solana 3.0
+- Global delegate PDA enables multi-payee payments
 - Supports both SPL Token and Token-2022 programs
 - Forbids unsafe code with comprehensive clippy lints
 - Implements checked arithmetic and explicit access controls
@@ -50,10 +60,10 @@ tally-protocol/
 ├── program/              # Anchor program (Solana smart contract)
 │   └── src/
 │       ├── lib.rs                    # Program entry point
-│       ├── state.rs                  # Account structures
+│       ├── state.rs                  # Account structures (Merchant, Plan, Subscription)
 │       ├── errors.rs                 # Custom error types
 │       ├── events.rs                 # Event definitions
-│       ├── constants.rs              # Protocol constants
+│       ├── constants.rs              # Protocol constants (volume tiers, fees)
 │       ├── start_subscription.rs     # Start new subscription
 │       ├── renew_subscription.rs     # Renew existing subscription
 │       ├── cancel_subscription.rs    # Cancel subscription
@@ -61,8 +71,7 @@ tally-protocol/
 │       ├── create_plan.rs            # Create subscription plan
 │       ├── update_plan.rs            # Update plan status
 │       ├── update_plan_terms.rs      # Update plan pricing/terms
-│       ├── init_merchant.rs          # Initialize merchant
-│       ├── update_merchant_tier.rs   # Update merchant tier
+│       ├── init_merchant.rs          # Initialize merchant (payee)
 │       ├── init_config.rs            # Initialize global config
 │       ├── update_config.rs          # Update global config
 │       ├── admin_withdraw_fees.rs    # Withdraw platform fees
@@ -78,8 +87,8 @@ tally-protocol/
 │       ├── lib.rs                    # SDK entry point
 │       ├── client.rs                 # Client for program calls
 │       ├── accounts.rs               # Account fetching utilities
-│       ├── transactions.rs           # Transaction builders
-│       ├── events.rs                 # Event parsing
+│       ├── pda.rs                    # PDA derivation (global delegate)
+│       ├── transaction_builder.rs    # Transaction builders
 │       └── utils.rs                  # Helper functions
 │
 ├── packages/             # TypeScript/JavaScript packages
@@ -93,8 +102,8 @@ tally-protocol/
 │   └── list-plans/       # List available plans
 │
 └── docs/                 # Documentation
+    ├── FEE_STRUCTURE.md              # Volume-based fee structure guide
     ├── SUBSCRIPTION_LIFECYCLE.md     # Lifecycle management guide
-    ├── MULTI_MERCHANT_LIMITATION.md  # Single-delegate constraints
     ├── SPAM_DETECTION.md             # Spam prevention strategies
     ├── RATE_LIMITING_STRATEGY.md     # Rate limiting implementation
     └── OPERATIONAL_PROCEDURES.md     # Platform operations guide
@@ -110,40 +119,44 @@ Global program configuration managed by platform authority.
 - `pending_authority` - Two-step authority transfer staging
 - `platform_treasury` - USDC destination for platform fees
 - `usdc_mint` - USDC token mint address
-- `keeper_fee_bps` - Keeper incentive (basis points, max 100)
-- `min_platform_fee_bps` - Minimum merchant tier fee (basis points)
-- `max_platform_fee_bps` - Maximum merchant tier fee (basis points)
-- `max_grace_period_secs` - Maximum subscription grace period
+- `keeper_fee_bps` - Keeper incentive (15 bps = 0.15%)
+- `min_platform_fee_bps` - Minimum platform fee (10 bps = 0.1%)
+- `max_platform_fee_bps` - Maximum platform fee (50 bps = 0.5%)
+- `max_grace_period_secs` - Maximum grace period
 - `min_period_secs` - Minimum billing period length
 - `is_paused` - Emergency pause status
 - `bump` - PDA derivation seed
 
 **PDA Derivation:** `["config", program_id]`
 
-### Merchant (108 bytes)
-Merchant-specific configuration and treasury.
+### Merchant (124 bytes)
+Payee configuration with volume tracking.
 
 **Fields:**
-- `authority` - Merchant admin (manages plans and settings)
-- `treasury` - USDC ATA receiving merchant revenue
-- `platform_fee_bps` - Platform fee rate (tier-based)
+- `authority` - Payee admin (manages plans and settings)
+- `usdc_mint` - Pinned USDC mint address
+- `treasury_ata` - USDC ATA receiving payee revenue
+- `platform_fee_bps` - Current platform fee rate (tier-based)
+- `volume_tier` - Current volume tier (Standard/Growth/Scale)
+- `monthly_volume_usdc` - Rolling 30-day payment volume
+- `last_volume_update_ts` - Last volume calculation timestamp
 - `bump` - PDA derivation seed
 
 **PDA Derivation:** `["merchant", authority.key(), program_id]`
 
-**Merchant Tiers:**
-- Free: 200 bps (2.0% platform fee, 98% merchant revenue)
-- Pro: 150 bps (1.5% platform fee, 98.5% merchant revenue)
-- Enterprise: 100 bps (1.0% platform fee, 99% merchant revenue)
+**Volume Tiers (auto-calculated):**
+- **Standard**: Up to $10K monthly → 0.25% platform fee
+- **Growth**: $10K-$100K monthly → 0.20% platform fee
+- **Scale**: Over $100K monthly → 0.15% platform fee
 
 ### Plan (129 bytes)
-Subscription plan with pricing and billing configuration.
+Payment terms with pricing and billing configuration.
 
 **Fields:**
 - `merchant` - Merchant pubkey (plan owner)
 - `plan_id` - Merchant-defined identifier
 - `name` - Human-readable plan name
-- `price_usdc` - Subscription price (USDC smallest units)
+- `price_usdc` - Payment amount (USDC smallest units)
 - `period_secs` - Billing period length (seconds)
 - `grace_period_secs` - Payment failure grace period
 - `active` - Plan accepts new subscriptions
@@ -153,45 +166,58 @@ Subscription plan with pricing and billing configuration.
 **PDA Derivation:** `["plan", merchant.key(), plan_id.as_bytes(), program_id]`
 
 ### Subscription (120 bytes)
-Individual user subscription state.
+Individual user payment agreement state.
 
 **Fields:**
 - `plan` - Plan pubkey
-- `subscriber` - User pubkey (owns subscription)
+- `subscriber` - User pubkey (payer)
 - `subscriber_usdc_account` - User's USDC token account
 - `active` - Subscription status (active/canceled)
-- `renewals` - Lifetime renewal count (preserved across reactivations)
+- `renewals` - Lifetime payment count (preserved across reactivations)
 - `created_ts` - Original subscription creation timestamp
-- `next_renewal_ts` - Next scheduled renewal
-- `last_renewed_ts` - Last successful renewal timestamp
+- `next_renewal_ts` - Next scheduled payment
+- `last_renewed_ts` - Last successful payment timestamp
 - `last_amount` - Last payment amount
-- `in_trial` - Trial period status
+- `in_trial` - Trial period status (extension-specific)
 - `bump` - PDA derivation seed
 
 **PDA Derivation:** `["subscription", plan.key(), subscriber.key(), program_id]`
 
-**Note:** The `renewals` counter tracks lifetime renewals across all sessions, not just the current active session. This design maintains complete historical records for loyalty programs and analytics. See [Subscription Lifecycle](docs/SUBSCRIPTION_LIFECYCLE.md) for details.
+**Note:** The `renewals` counter tracks lifetime payments across all sessions. See [Subscription Lifecycle](docs/SUBSCRIPTION_LIFECYCLE.md) for details.
+
+### Delegate (Global)
+Single global delegate PDA shared by all payees and payers.
+
+**PDA Derivation:** `["delegate", program_id]`
+
+**Architecture:**
+- All payers approve the **same delegate**
+- Enables multi-payee subscriptions from single token account
+- No delegate conflicts when subscribing to multiple merchants
+- Program validation ensures correct payee receives payment
 
 ## Payment Flow
 
 ### Initial Subscription
 1. User calls `start_subscription` with USDC delegate approval
 2. Program validates plan status and user balance
-3. First payment transfers USDC (deducting keeper fee on renewals only)
-4. Subscription account created with `active = true`
-5. Delegate approval remains for automatic renewals
-6. `Subscribed` or `SubscriptionReactivated` event emitted
+3. First payment transfers USDC to merchant treasury
+4. Platform fee (0.15-0.25%) and keeper fee (0.15%) deducted
+5. Subscription account created with `active = true`
+6. Global delegate approval remains for automatic renewals
+7. `Subscribed` or `SubscriptionReactivated` event emitted
 
 ### Renewals
 1. Keeper calls `renew_subscription` when `current_time >= next_renewal_ts`
-2. Program validates subscription status and delegate approval
-3. Payment transfers via delegate: User USDC → Keeper fee → Platform fee → Merchant treasury
-4. Subscription updated: `renewals++`, `next_renewal_ts += period_secs`
-5. `Renewed` event emitted with payment details
+2. Program validates subscription status and global delegate approval
+3. Payment transfers via delegate: Payer USDC → Keeper fee → Platform fee → Merchant treasury
+4. Payee volume updated, tier potentially upgraded
+5. Subscription updated: `renewals++`, `next_renewal_ts += period_secs`
+6. `Renewed` event emitted with payment details
 
 ### Cancellation
 1. User calls `cancel_subscription` to stop renewals
-2. Delegate approval revoked on USDC account
+2. Global delegate approval optionally revoked on USDC account
 3. Subscription marked `active = false`
 4. `Canceled` event emitted
 
@@ -202,28 +228,46 @@ Individual user subscription state.
 
 ### Fee Distribution
 Each renewal payment is split sequentially:
-1. **Keeper Fee**: 0.5% (configurable, max 1%) to renewal executor
-2. **Platform Fee**: 1-2% (tier-based) to platform treasury
-3. **Merchant Revenue**: Remainder (98-99%) to merchant treasury
+1. **Keeper Fee**: 0.15% to renewal executor
+2. **Platform Fee**: 0.15-0.25% (volume tier-based) to platform treasury
+3. **Payee Revenue**: Remainder (99.60-99.70%) to payee treasury
 
-Example (100 USDC renewal, Pro merchant):
-- Keeper: 0.50 USDC (0.5%)
-- Platform: 1.50 USDC (1.5%)
-- Merchant: 98.00 USDC (98%)
+Example (100 USDC renewal, Growth tier merchant):
+- Keeper: 0.15 USDC (0.15%)
+- Platform: 0.20 USDC (0.20%)
+- Merchant: 99.65 USDC (99.65%)
+
+## Volume Tier Mechanics
+
+### How It Works
+1. **30-Day Rolling Window**: Volume tracked over most recent 30 days
+2. **Automatic Upgrades**: Tier upgrades when volume crosses threshold
+3. **Automatic Downgrades**: Tier downgrades if volume drops below threshold
+4. **Volume Reset**: After 30 days without payments, volume resets to zero
+
+### Tier Thresholds
+- **Standard → Growth**: $10,000 monthly volume
+- **Growth → Scale**: $100,000 monthly volume
+
+### Example Progression
+```
+Day 1-15: Process $5,000 → Standard tier (0.25%)
+Day 16: Process $6,000 → Total $11K → Upgraded to Growth tier (0.20%)
+Day 30: All future payments use 0.20% until volume drops below $10K
+```
 
 ## Program Instructions
 
-### Merchant Operations
-- `init_merchant` - Initialize merchant account with treasury and fee configuration
-- `create_plan` - Create new subscription plan with pricing and billing terms
+### Payee Operations
+- `init_merchant` - Initialize payee account with treasury (auto Standard tier)
+- `create_plan` - Create new payment terms with pricing and billing period
 - `update_plan` - Toggle plan active status (does not affect existing subscriptions)
 - `update_plan_terms` - Update plan price, period, grace period, or name
-- `update_merchant_tier` - Change merchant tier and platform fee rate
 
-### Subscriber Operations
+### Payer Operations
 - `start_subscription` - Start new subscription or reactivate canceled subscription
-- `renew_subscription` - Execute renewal payment via delegate (permissionless)
-- `cancel_subscription` - Cancel subscription and revoke delegate approval
+- `renew_subscription` - Execute payment via delegate (permissionless)
+- `cancel_subscription` - Cancel subscription and optionally revoke delegate
 - `close_subscription` - Close canceled subscription and reclaim rent
 
 ### Platform Operations
@@ -242,9 +286,9 @@ The program emits detailed events for off-chain indexing and analytics:
 
 - `ConfigInitialized` - Global configuration created
 - `ConfigUpdated` - Configuration parameters changed
-- `MerchantInitialized` - New merchant registered
-- `MerchantTierUpdated` - Merchant tier changed
-- `PlanCreated` - New subscription plan created
+- `MerchantInitialized` - New payee registered
+- `VolumeTierUpgraded` - Payee tier upgraded based on volume
+- `PlanCreated` - New payment terms created
 - `PlanUpdated` - Plan status changed
 - `PlanTermsUpdated` - Plan terms modified
 - `Subscribed` - New subscription started
@@ -258,7 +302,7 @@ The program emits detailed events for off-chain indexing and analytics:
 - `AuthorityTransferCanceled` - Authority transfer canceled
 - `Paused` - Emergency pause enabled
 - `Unpaused` - Emergency pause disabled
-- `DelegateMismatchWarning` - Renewal failed due to delegate mismatch
+- `DelegateMismatchWarning` - Payment failed due to delegate mismatch
 
 ## Development
 
@@ -274,7 +318,8 @@ The program emits detailed events for off-chain indexing and analytics:
 # Build the Anchor program
 anchor build
 
-# Run program tests
+# Run program tests (requires TALLY_PROGRAM_ID)
+export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
 anchor test
 
 # Run Rust tests with nextest
@@ -322,6 +367,9 @@ anchor deploy --provider.cluster localnet
 
 ### Testing
 ```bash
+# Set program ID (required for all tests)
+export TALLY_PROGRAM_ID=eUV3U3e6zdQRXmAJFrvEFF9qEdWvjnQMA9BRxJef4d7
+
 # Run all tests
 anchor test
 
@@ -341,7 +389,7 @@ cargo llvm-cov nextest
 The program has undergone a comprehensive security audit. See [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) for complete findings and resolutions.
 
 **Key Findings:**
-- **Medium (1)**: SPL Token single-delegate limitation (architectural constraint, documented)
+- **Medium (1)**: SPL Token single-delegate limitation - RESOLVED via global delegate architecture
 - **Low (3)**: All resolved through code improvements and documentation
 - **Informational (4)**: All addressed with enhanced documentation and operational procedures
 
@@ -353,27 +401,31 @@ The program has undergone a comprehensive security audit. See [SECURITY_AUDIT_RE
 - Two-step authority transfer preventing accidental ownership loss
 - Emergency pause mechanism for platform protection
 - Detailed event logging for transparency and auditability
+- Global delegate architecture eliminates multi-merchant conflicts
 
-### Known Limitations
+### Global Delegate Security
 
-#### Single-Delegate Constraint (M-1)
-SPL Token accounts support only one delegate at a time. Subscribing to multiple merchants using the same USDC account will overwrite previous delegate approvals, breaking existing subscriptions.
+The global delegate PDA is secure because:
+- **Program validation is the security boundary**, not delegate uniqueness
+- Each payment validated against specific subscription PDA
+- Subscription PDAs derived from `[plan, subscriber]` - unforgeable
+- Plan PDAs derived from `[merchant, plan_id]` - merchant-isolated
+- Cannot pay wrong merchant (PDA validation fails)
+- Cannot exceed approved amount (amount validation fails)
+- Cannot pay before due date (timing validation fails)
 
-**Recommended Mitigation:**
-- Use separate USDC token accounts for each merchant subscription
-- Frontend UI should detect and warn about existing delegates
-- Monitor `DelegateMismatchWarning` events for renewal failures
-
-See [MULTI_MERCHANT_LIMITATION.md](docs/MULTI_MERCHANT_LIMITATION.md) for comprehensive details and integration guidance.
+See `.claude/GLOBAL_DELEGATE_REFACTOR.md` for detailed security analysis.
 
 ## Documentation
 
+- [Fee Structure](docs/FEE_STRUCTURE.md) - Volume-based fee tiers and economics
 - [Subscription Lifecycle](docs/SUBSCRIPTION_LIFECYCLE.md) - Complete lifecycle management guide
-- [Multi-Merchant Limitation](docs/MULTI_MERCHANT_LIMITATION.md) - Single-delegate constraint details
 - [Spam Detection](docs/SPAM_DETECTION.md) - Spam prevention strategies
 - [Rate Limiting Strategy](docs/RATE_LIMITING_STRATEGY.md) - Rate limiting implementation
 - [Operational Procedures](docs/OPERATIONAL_PROCEDURES.md) - Platform operations guide
 - [Security Audit Report](SECURITY_AUDIT_REPORT.md) - Comprehensive security audit
+- [Global Delegate Architecture](.claude/GLOBAL_DELEGATE_REFACTOR.md) - Architecture specification
+- [Recurring Payments Architecture](.claude/RECURRING_PAYMENTS_ARCHITECTURE.md) - Platform evolution
 
 ## Examples
 
@@ -387,17 +439,19 @@ Examples demonstrate common usage patterns (implementations coming soon):
 
 ### Rust SDK
 ```rust
-use tally_sdk::{TallyClient, accounts::*, transactions::*};
+use tally_sdk::{TallyClient, accounts::*, pda};
 use solana_sdk::signer::Signer;
 
 // Initialize client
 let client = TallyClient::new(rpc_url, payer)?;
 
+// Get global delegate PDA
+let (delegate_pda, _) = pda::delegate()?;
+
 // Start a subscription
 let subscription_pubkey = client.start_subscription(
     &plan_pubkey,
     &subscriber_usdc_account,
-    &delegate_pubkey,
     approve_amount,
 ).await?;
 
@@ -421,7 +475,6 @@ const client = new TallyClient(connection, wallet);
 const subscriptionPubkey = await client.startSubscription({
   plan: planPubkey,
   subscriberUsdcAccount: usdcAccount,
-  delegate: delegatePubkey,
   approveAmount: amount,
 });
 
